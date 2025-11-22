@@ -90,7 +90,4 @@ app/src/main/java/com/web/webide/
 ---
 
 *这是一个由AI开发的创新项目，体现了人工智能在软件开发领域的新可能性。*
-![[IMG_20251108_171127.jpg]]
-
-#更新日志：
-![[Screenshot_2025-11-09-16-37-39-05_5107d5bb08cdc229243c821312bb3124.jpg]]
+![image](https://github.com/h465855hgg/WebIDE/blob/main/IMG_20251108_171127.jpg)
