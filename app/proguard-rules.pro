@@ -77,3 +77,41 @@
 # Additional miscellaneous keeps you had at the bottom of the original file:
 -keep class * implements org.eclipse.tm4e.core.grammar.IGrammar { *; }
 -keepclassmembers class * implements org.eclipse.tm4e.core.theme.IThemeSource { *; }
+
+
+# =========================================================================
+# WebIDE 核心构建功能混淆白名单 (修复 Release 包签名失败问题)
+# =========================================================================
+
+# 1. 保护 APK 签名库 (核心)
+# 签名库内部大量使用了反射和动态加载，绝对不能混淆
+-keep class com.mcal.apksigner.** { *; }
+-keep class com.android.apksig.** { *; }
+
+# 2. 保护加密库 (Bouncy Castle)
+# 签名必须用到 SHA256withRSA 等算法，混淆会导致找不到 Provider
+-keep class org.bouncycastle.** { *; }
+-keep class org.spongycastle.** { *; }
+-dontwarn org.bouncycastle.**
+-dontwarn org.spongycastle.**
+
+# 3. 保护 AXML 解析与修改库 (用于修改 Manifest)
+# 你的 ApkXmlEditor 依赖这些类
+-keep class com.Day.Studio.** { *; }
+-keep class com.Day.Studio.Function.** { *; }
+-keep class com.Day.Studio.Function.axmleditor.** { *; }
+
+# 4. 保护你自己的构建工具类
+# 防止 ZipAligner 或 ApkBuilder 的方法被误删或改名
+-keep class com.web.webide.build.** { *; }
+
+# 5. 保护 Android 资源压缩逻辑 (防止 assets 里的模板被误删)
+# 如果你在 assets 里放了 webapp_1.0.apk，这行能防止它被 shrinkResources 误删
+-keepclassmembers class ** {
+    *** getAssets(...);
+}
+
+# 6. 忽略签名库可能产生的警告
+# 有些签名库引用了 Android 系统内部类，忽略警告以保证编译通过
+-dontwarn com.android.apksig.**
+-dontwarn java.nio.file.**

@@ -13,8 +13,11 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Redo
+import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,21 +25,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.withTransform
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import androidx.navigation.NavController
-import com.web.webide.build.ApkBuilder // 暂时注释掉，先让编译通过
+import com.web.webide.build.ApkBuilder
 import com.web.webide.core.utils.WorkspaceManager
 import com.web.webide.files.FileTree
 import com.web.webide.ui.editor.components.CodeEditorView
 import com.web.webide.ui.editor.viewmodel.EditorViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.collect
-import androidx.compose.runtime.snapshotFlow // <-- 添加此行
+import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -118,10 +119,10 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                     },
                     actions = {
                         IconButton(onClick = { viewModel.undo() }) {
-                            Icon(Icons.Filled.Undo, "撤销")
+                            Icon(Icons.AutoMirrored.Filled.Undo, "撤销")
                         }
                         IconButton(onClick = { viewModel.redo() }) {
-                            Icon(Icons.Filled.Redo, "重做")
+                            Icon(Icons.AutoMirrored.Filled.Redo, "重做")
                         }
                         IconButton(onClick = {
                             scope.launch {
@@ -149,28 +150,38 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                 DropdownMenuItem(
                                     text = { Text("build") },
                                     onClick = {
-                                        isMoreMenuExpanded = false
-                                        buildState = BuildState.InProgress // 1. 设置状态为“进行中”
-                                        scope.launch(Dispatchers.IO) { // 2. 在后台线程执行构建
-                                            val result = ApkBuilder.bin(
-                                                context,
-                                                workspacePath, // mRootDir
-                                                projectPath, // mDir
-                                                folderName, // aname
-                                                // 创建一个简单的包名
-                                                "com.example.${folderName.replace("[^a-zA-Z0-9]".toRegex(), "").lowercase(Locale.ROOT)}",
-                                                "1.0", // ver
-                                                "1", // code
-                                                "", // amph
-                                                arrayOf() // ps
-                                            )
-                                            // 3. 返回主线程更新UI
-                                            withContext(Dispatchers.Main) {
-                                                buildState = BuildState.Finished(result)
+                                        isMoreMenuExpanded = false // 关闭菜单
+
+                                        // 启动协程
+                                        scope.launch {
+                                            // 1. 【新增】先保存所有已修改的文件到磁盘
+                                            // 这一步是必须的，因为 ApkBuilder 读取的是磁盘文件
+                                            viewModel.saveAllModifiedFiles(context)
+
+                                            // 2. 设置 UI 状态为“构建中”
+                                            buildState = BuildState.InProgress
+
+                                            // 3. 切换到 IO 线程执行耗时的打包操作
+                                            withContext(Dispatchers.IO) {
+                                                val result = ApkBuilder.bin(
+                                                    context,
+                                                    workspacePath, // mRootDir
+                                                    projectPath,   // mDir
+                                                    folderName,    // aname
+                                                    // 包名生成逻辑
+                                                    "com.example.${folderName.replace("[^a-zA-Z0-9]".toRegex(), "").lowercase(Locale.ROOT)}",
+                                                    "1.0", // ver
+                                                    "1",   // code
+                                                    "",    // amph
+                                                    arrayOf() // ps
+                                                )
+
+                                                // 4. 切回主线程更新结果
+                                                withContext(Dispatchers.Main) {
+                                                    buildState = BuildState.Finished(result)
+                                                }
                                             }
                                         }
-                                        
-                                        
                                     }
                                 )
                             }
@@ -180,7 +191,10 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
             },
             bottomBar = {
                 Column {
-                    Divider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
+                    HorizontalDivider(
+                        thickness = 1.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant
+                    )
                     SymbolBar(viewModel = viewModel)
                 }
             },
@@ -383,7 +397,7 @@ fun EditCode(modifier: Modifier = Modifier, viewModel: EditorViewModel) {
                 }
             }
 
-            Divider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
+            HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant)
 
             HorizontalPager(
                 state = pagerState,

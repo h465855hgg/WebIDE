@@ -54,21 +54,14 @@ app/src/main/java/com/web/webide/
 - **Project Management**: Complete project creation and management functions
 - **Settings System**: Customizable development environment configuration
 - **Welcome Interface**: User-friendly onboarding experience
-
-## 🚀 Quick Start
-
-### Environment Requirements
-- None
-
-### **Developer's Development Environment**
-- Android Code Studio 1.0.0+gh.r01(1000)
-
+- 
 ## 🤝 Contribution
+Null
 
 This project is currently open source, but as it's an experimental AI-collaborative development project, the author has stopped maintenance. Developers interested in continuing to improve and extend functionality are welcome.
 
 **Author's Wishlist**
-- Build app
+- Build app [complete]
 - Toolbar
 - Stronger code completion
 - Real-time code error checking

@@ -86,11 +86,11 @@ dependencies {
     implementation("androidx.datastore:datastore-core:1.1.1")
 
     implementation(files("libs/xml.jar"))
+
     // 如果以后还有别的 jar 可以一次性扫进来
     // implementation file:sTree(dir: \"libs\", include: [\"*.jar\"])\n"+
 
     implementation(project(":signer"))
-
 
 
     implementation("com.github.iyxan23:zipalign-java:1.2.2")
