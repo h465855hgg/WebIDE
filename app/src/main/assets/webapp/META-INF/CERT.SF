@@ -1,0 +1,38 @@
+Signature-Version: 1.0
+Created-By: Android Gradle 8.0.2
+SHA-256-Digest-Manifest: fwqkPVe/zMJjTzgPc8xlfOyo7camyi0zixmQ5P4vL2E=
+X-Android-APK-Signed: 2,3
+
+Name: AndroidManifest.xml
+SHA-256-Digest: 00MlVqvwl2UDstEShuVqfjTW3HTRfscg5qSZ1aRgoDs=
+
+Name: META-INF/com/android/build/gradle/app-metadata.properties
+SHA-256-Digest: EcYvg/E9W/f1Kv8O5tzYTs+MK3cgYPsudAETFq2hgog=
+
+Name: META-INF/version-control-info.textproto
+SHA-256-Digest: bGPYrKSsmb5tpmtltqs82gWayRJtXwCM3VXJFk8mnb8=
+
+Name: assets/css/style.css
+SHA-256-Digest: 6cocRSqk+73aYuippTq/CtIBBE+xfxx83a64MIoyONU=
+
+Name: assets/index.html
+SHA-256-Digest: fiyeu5EPQjXw/jQvPxQBBWb6T0S3aiWIfeAKO/t6+wE=
+
+Name: assets/js/index.js
+SHA-256-Digest: yXZ1o89m3ilAtFBKx/JDyCmo1Qf8jxzeob5HqoZCcJ4=
+
+Name: assets/webapp.properties
+SHA-256-Digest: 2DzxeAHwVbvDaYpHdL2rJzqnRHIMka0/+akgD7Ryvzc=
+
+Name: classes.dex
+SHA-256-Digest: v2QwOR2tg8wWXcyr+qIZFsDmdLeNQ0+PZmoXKimeORM=
+
+Name: res/MO.webp
+SHA-256-Digest: aB1I0HSnsiTWsrkfsC8SZ9PT2Fj7hOMwn3pwHijPKNM=
+
+Name: res/fq.webp
+SHA-256-Digest: 8IYzPMkvcpBWk1suEkpnOdE2sab16+fuFVKchm7slVQ=
+
+Name: resources.arsc
+SHA-256-Digest: QweBWuc+2Ai57BvtmH4gk7jEtKh1EAYSNSbB27MWH/U=
+

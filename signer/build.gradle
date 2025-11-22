@@ -1,0 +1,21 @@
+apply plugin: 'java-library'
+apply plugin: 'maven-publish'
+apply plugin: 'kotlin'
+
+dependencies {
+    implementation("com.madgag.spongycastle:core:1.58.0.0")
+    implementation("com.madgag.spongycastle:prov:1.58.0.0")
+}
+
+afterEvaluate {
+    publishing {
+        publications {
+            release(MavenPublication) {
+                from components.java
+                groupId = 'com.mcal'
+                artifactId = 'apksigner'
+                version = "1.2.0"
+            }
+        }
+    }
+}

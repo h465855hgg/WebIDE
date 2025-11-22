@@ -1,0 +1,348 @@
+package com.web.webide.ui.editor.viewmodel
+
+import android.content.Context
+import com.web.webide.core.utils.LogCatcher
+import com.web.webide.core.utils.PermissionManager
+import android.widget.Toast
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.web.webide.ui.editor.components.TextMateInitializer
+import com.web.webide.ui.editor.EditorColorSchemeManager
+import io.github.rosemoe.sora.langs.textmate.TextMateColorScheme
+import com.web.webide.textmate.TextMateLanguage;
+import io.github.rosemoe.sora.langs.textmate.registry.ThemeRegistry
+import io.github.rosemoe.sora.text.Content
+import io.github.rosemoe.sora.text.ContentListener
+import io.github.rosemoe.sora.widget.CodeEditor
+import io.github.rosemoe.sora.widget.schemes.EditorColorScheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+
+data class CodeEditorState(
+    val file: File,
+    val languageScopeName: String,
+) {
+    var content by mutableStateOf("")
+    private var savedContent by mutableStateOf("")
+    val isModified: Boolean get() = content != savedContent
+
+    fun onContentLoaded(loadedContent: String) {
+        content = loadedContent
+        savedContent = loadedContent
+    }
+
+    fun onContentSaved() {
+        savedContent = content
+    }
+}
+
+class EditorViewModel : ViewModel() {
+    var hasShownInitialLoader by mutableStateOf(false)
+        private set
+    var openFiles by mutableStateOf<List<CodeEditorState>>(emptyList())
+        private set
+    var activeFileIndex by mutableStateOf(-1)
+        private set
+var currentProjectPath by mutableStateOf<String?>(null)
+        private set
+    private val editorInstances = mutableMapOf<String, CodeEditor>()
+    private val supportedLanguageScopes = setOf("text.html.basic", "source.css", "source.js")
+    
+    // 权限检查
+    private var hasPermissions = false
+    private lateinit var appContext: Context
+    
+    /**
+     * 初始化权限状态
+     */
+    fun initializePermissions(context: Context) {
+        appContext = context.applicationContext
+        hasPermissions = PermissionManager.hasRequiredPermissions(appContext)
+        LogCatcher.permission("EditorViewModel", "初始化", 
+            if (hasPermissions) "已有权限" else "需要请求权限")
+    }
+    
+    /**
+     * 检查权限，如果没有权限则记录日志
+     */
+    private fun checkPermissions(operation: String): Boolean {
+        if (!hasPermissions) {
+            LogCatcher.w("EditorViewModel", "权限不足 - 操作: $operation")
+            return false
+        }
+        return true
+    }
+
+    fun onInitialLoaderShown() {
+        hasShownInitialLoader = true
+    }
+
+    fun updateEditorTheme(seedColor: Color, isDark: Boolean) {
+        editorInstances.values.forEach { editor ->
+            val currentScheme = editor.colorScheme
+            EditorColorSchemeManager.applyThemeColors(currentScheme, seedColor, isDark)
+        }
+    }
+
+    @Synchronized
+    fun getOrCreateEditor(context: Context, state: CodeEditorState): CodeEditor {
+        val filePath = state.file.absolutePath
+        editorInstances[filePath]?.let { existingEditor ->
+            (existingEditor.parent as? android.view.ViewGroup)?.removeView(existingEditor)
+            return existingEditor
+        }
+        if (!TextMateInitializer.isReady()) {
+            TextMateInitializer.initialize(context)
+        }
+        val editor = CodeEditor(context).apply {
+            setText(state.content)
+            colorScheme = TextMateColorScheme.create(ThemeRegistry.getInstance())
+            if (state.languageScopeName in supportedLanguageScopes) {
+                try {
+                    val language = TextMateLanguage.create(state.languageScopeName, true)
+                    setEditorLanguage(language)
+                } catch (e: Exception) {
+                    LogCatcher.e("EditorViewModel", "设置语言失败: ${state.languageScopeName}", e)
+                }
+            }
+            text.addContentListener(object : ContentListener {
+                override fun beforeReplace(content: Content) {}
+                override fun afterInsert(content: Content, startLine: Int, startColumn: Int, endLine: Int, endColumn: Int, inserted: CharSequence) {
+                    val newText = content.toString()
+                    if (state.content != newText) { state.content = newText }
+                }
+                override fun afterDelete(content: Content, startLine: Int, startColumn: Int, endLine: Int, endColumn: Int, deleted: CharSequence) {
+                    val newText = content.toString()
+                    if (state.content != newText) { state.content = newText }
+                }
+            })
+        }
+        editorInstances[filePath] = editor
+        return editor
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        editorInstances.values.forEach {
+            try {
+                it.release()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        editorInstances.clear()
+    }
+
+    fun loadInitialFile(projectPath: String) {
+        if (projectPath != currentProjectPath) {
+            closeAllFiles()
+            currentProjectPath = projectPath
+            val indexFile = File(projectPath, "index.html")
+            LogCatcher.d("EditorViewModel", "尝试加载初始文件: ${indexFile.absolutePath}")
+            if (indexFile.exists() && indexFile.isFile && indexFile.canRead()) {
+                if (checkPermissions("加载初始文件")) {
+                    LogCatcher.fileOperation("EditorViewModel", "加载初始文件", indexFile.absolutePath, "开始")
+                    openFile(indexFile)
+                } else {
+                    LogCatcher.fileOperation("EditorViewModel", "加载初始文件", indexFile.absolutePath, "权限不足")
+                }
+            }
+        }
+    }
+
+    suspend fun saveAllModifiedFiles(context: Context) {
+        withContext(Dispatchers.IO) {
+            val modifiedFiles = openFiles.filter { it.isModified }
+            if (modifiedFiles.isEmpty()) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "没有需要保存的文件", Toast.LENGTH_SHORT).show()
+                }
+                return@withContext
+            }
+            
+            // 权限检查
+            if (!checkPermissions("保存文件")) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "需要存储权限才能保存文件", Toast.LENGTH_LONG).show()
+                }
+                return@withContext
+            }
+            
+            var successCount = 0
+            modifiedFiles.forEach { state ->
+                try {
+                    if (!state.file.canWrite()) {
+                        LogCatcher.e("EditorViewModel", "文件不可写: ${state.file.absolutePath}")
+                        return@forEach
+                    }
+                    state.file.outputStream().use { output ->
+                        output.bufferedWriter(Charsets.UTF_8).use { writer ->
+                            writer.write(state.content)
+                        }
+                    }
+                    state.onContentSaved()
+                    successCount++
+                    LogCatcher.fileOperation("EditorViewModel", "保存文件", state.file.absolutePath, "成功")
+                } catch (e: Exception) {
+                    LogCatcher.e("EditorViewModel", "保存失败", e)
+                    LogCatcher.fileOperation("EditorViewModel", "保存文件", state.file.absolutePath, "失败: ${e.message}")
+                }
+            }
+            withContext(Dispatchers.Main) {
+                if (successCount > 0) {
+                    Toast.makeText(context, "已保存 $successCount 个文件", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    suspend fun buildHtmlContentFromProject(projectPath: String): String {
+        return withContext(Dispatchers.IO) {
+            val htmlFile = File(projectPath, "index.html")
+            val cssFile = findFileByExtensions(projectPath, listOf("css"))
+            val jsFile = findFileByExtensions(projectPath, listOf("js"))
+            fun safeReadFile(file: File?): String {
+                if (file == null || !file.exists() || !file.canRead()) return ""
+                return try {
+                    file.readText(Charsets.UTF_8)
+                } catch (e: Exception) {
+                    LogCatcher.e("EditorViewModel", "读取文件失败", e)
+                    ""
+                }
+            }
+            val htmlContent = if (htmlFile.exists()) safeReadFile(htmlFile) else "<h1>错误</h1>"
+            val cssContent = safeReadFile(cssFile)
+            val jsContent = safeReadFile(jsFile)
+            """<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>$cssContent</style></head><body>$htmlContent<script>$jsContent</script></body></html>""".trimIndent()
+        }
+    }
+
+    private fun findFileByExtensions(projectPath: String, extensions: List<String>): File? {
+        val projectDir = File(projectPath)
+        for (ext in extensions) {
+            val commonNames = when (ext) {
+                "html", "htm" -> listOf("index.$ext")
+                "css" -> listOf("style.$ext", "styles.$ext")
+                "js" -> listOf("script.$ext", "main.$ext", "index.$ext")
+                else -> emptyList()
+            }
+            for (name in commonNames) {
+                val file = File(projectDir, name)
+                if (file.exists()) return file
+            }
+        }
+        return projectDir.listFiles { _, name -> extensions.any { name.endsWith(".$it") } }?.firstOrNull()
+    }
+
+    fun openFile(file: File) {
+        if (file.isDirectory || !file.exists() || !file.canRead()) return
+        viewModelScope.launch {
+            val existingIndex = openFiles.indexOfFirst { it.file.absolutePath == file.absolutePath }
+            if (existingIndex != -1) {
+                activeFileIndex = existingIndex
+                LogCatcher.fileOperation("EditorViewModel", "切换文件", file.absolutePath, "已存在")
+            } else {
+                val content = withContext(Dispatchers.IO) {
+                    try {
+                        if (file.length() > 1024 * 1024) {
+                            LogCatcher.w("EditorViewModel", "文件过大: ${file.absolutePath}")
+                            "文件过大"
+                        } else {
+                            file.readText(Charsets.UTF_8)
+                        }
+                    } catch (e: Exception) {
+                        LogCatcher.e("EditorViewModel", "读取文件失败", e)
+                        "无法读取文件: ${e.message}"
+                    }
+                }
+                val language = getLanguageScope(file.extension)
+                val newState = CodeEditorState(file = file, languageScopeName = language)
+                newState.onContentLoaded(content)
+                openFiles = openFiles + newState
+                activeFileIndex = openFiles.lastIndex
+                LogCatcher.fileOperation("EditorViewModel", "打开文件", file.absolutePath, "成功")
+            }
+        }
+    }
+    
+    /**
+     * 权限检查版本的打开文件方法
+     */
+    fun openFileWithPermissionCheck(file: File, context: Context) {
+        if (!checkPermissions("打开文件")) {
+            LogCatcher.fileOperation("EditorViewModel", "打开文件", file.absolutePath, "权限不足")
+            return
+        }
+        
+        LogCatcher.fileOperation("EditorViewModel", "打开文件", file.absolutePath, "开始")
+        openFile(file)
+    }
+
+    fun undo() {
+        openFiles.getOrNull(activeFileIndex)?.let { state ->
+            editorInstances[state.file.absolutePath]?.undo()
+        }
+    }
+
+    fun redo() {
+        openFiles.getOrNull(activeFileIndex)?.let { state ->
+            editorInstances[state.file.absolutePath]?.redo()
+        }
+    }
+
+    fun insertSymbol(symbol: String) {
+        openFiles.getOrNull(activeFileIndex)?.let { state ->
+            editorInstances[state.file.absolutePath]?.let { editor ->
+                val cursor = editor.cursor
+                val processedSymbol = if (symbol == "Tab") "\t" else symbol
+                editor.text.insert(cursor.leftLine, cursor.leftColumn, processedSymbol)
+                editor.setSelection(cursor.leftLine, cursor.leftColumn + processedSymbol.length)
+            }
+        }
+    }
+
+    fun changeActiveFileIndex(index: Int) {
+        if (index in openFiles.indices) activeFileIndex = index
+    }
+
+    fun closeAllFiles() {
+        openFiles.forEach { state -> editorInstances.remove(state.file.absolutePath)?.release() }
+        openFiles = emptyList()
+        activeFileIndex = -1
+    }
+
+    fun closeOtherFiles(indexToKeep: Int) {
+        if (indexToKeep !in openFiles.indices) return
+        openFiles.forEachIndexed { index, state ->
+            if (index != indexToKeep) editorInstances.remove(state.file.absolutePath)?.release()
+        }
+        openFiles = listOf(openFiles[indexToKeep])
+        activeFileIndex = 0
+    }
+
+    fun closeFile(indexToClose: Int) {
+        if (indexToClose !in openFiles.indices) return
+        openFiles.getOrNull(indexToClose)?.file?.absolutePath?.let { path ->
+            editorInstances.remove(path)?.release()
+        }
+        openFiles = openFiles.toMutableList().also { it.removeAt(indexToClose) }
+        if (openFiles.isEmpty()) {
+            activeFileIndex = -1
+        } else if (activeFileIndex >= indexToClose) {
+            activeFileIndex = (activeFileIndex - 1).coerceAtLeast(0)
+        }
+    }
+
+    private fun getLanguageScope(extension: String): String = when (extension.lowercase()) {
+        "html", "htm" -> "text.html.basic"
+        "css" -> "source.css"
+        "js" -> "source.js"
+        else -> "text.plain"
+    }
+}
