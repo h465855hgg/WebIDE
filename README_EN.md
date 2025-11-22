@@ -91,6 +91,4 @@ It demonstrates:
 ---
 
 *This is an innovative project developed by AI, showcasing new possibilities for artificial intelligence in the software development field.*
-
-# Changelog:
-*[Images referenced in original document]*
+![image](https://github.com/h465855hgg/WebIDE/blob/main/IMG_20251108_171127.jpg)
