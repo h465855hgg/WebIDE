@@ -8,8 +8,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,7 +23,6 @@ import androidx.navigation.NavController
 import com.web.webide.ui.components.DirectorySelector
 import com.web.webide.core.utils.WorkspaceManager
 import com.web.webide.core.utils.ThemeState
-import com.web.webide.core.utils.LogConfigRepository
 import com.web.webide.core.utils.LogConfigState
 import com.web.webide.ui.welcome.ThemeColor
 import com.web.webide.ui.welcome.themeColors
@@ -58,7 +59,7 @@ fun SettingsScreen(
                 title = { Text("设置") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
                     }
                 }
             )
@@ -157,8 +158,12 @@ fun SettingsScreen(
                         exit = fadeOut() + shrinkVertically()
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                             Divider()
-                             Text("日志文件路径:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                             HorizontalDivider(
+                                 Modifier,
+                                 DividerDefaults.Thickness,
+                                 DividerDefaults.color
+                             )
+                            Text("日志文件路径:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                              Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                                  Column(modifier = Modifier.padding(12.dp)) {
                                      Text(text = logConfigState.logFilePath, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
