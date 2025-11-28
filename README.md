@@ -1,4 +1,4 @@
-# WebIDE - AI协作开发的web预览器
+# WebIDE - AI协作开发的web for AndroIDIDE
 
 ## 📖 项目简介
 
