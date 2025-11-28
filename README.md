@@ -1,4 +1,4 @@
-# WebIDE - AI协作开发的web for AndroIDIDE
+# WebIDE - AI协作开发的web for Android IDE
 
 ## 📖 项目简介
 
