@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.web.webide.core.utils.ThemeDataStoreRepository
 import com.web.webide.core.utils.ThemeState
+import com.web.webide.core.utils.LogCatcher // 导入日志工具
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -18,13 +19,9 @@ class ThemeViewModel(private val repository: ThemeDataStoreRepository) : ViewMod
     val themeState: StateFlow<ThemeState> = repository.themeStateFlow.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
-        // ✅ 初始值包含 isMonetEnabled
         initialValue = ThemeState(0, 0, Build.VERSION.SDK_INT >= Build.VERSION_CODES.S, false, Color(0xFF6750A4), false)
     )
 
-    /**
-     * ✅ 核心修复: 更新函数签名以匹配 Repository
-     */
     fun saveThemeConfig(
         selectedModeIndex: Int,
         selectedThemeIndex: Int,
@@ -32,6 +29,9 @@ class ThemeViewModel(private val repository: ThemeDataStoreRepository) : ViewMod
         isMonetEnabled: Boolean,
         isCustom: Boolean
     ) {
+        // [Debug Log] ViewModel接收层
+        LogCatcher.d("ThemeDebug_VM", "ViewModel准备保存: Monet=$isMonetEnabled, Custom=$isCustom, Color=${customColor.value}")
+
         viewModelScope.launch {
             repository.saveThemeConfig(selectedModeIndex, selectedThemeIndex, customColor, isMonetEnabled, isCustom)
         }

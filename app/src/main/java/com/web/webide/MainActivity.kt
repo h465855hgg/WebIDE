@@ -1,7 +1,6 @@
 package com.web.webide
 
 import android.os.Bundle
-import android.os.Environment
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -26,7 +25,6 @@ import com.web.webide.ui.ThemeViewModelFactory
 import com.web.webide.ui.editor.components.TextMateInitializer
 import com.web.webide.ui.theme.MyComposeApplicationTheme
 import com.web.webide.ui.welcome.WelcomeScreen
-import java.io.File
 
 class MainActivity : ComponentActivity() {
 

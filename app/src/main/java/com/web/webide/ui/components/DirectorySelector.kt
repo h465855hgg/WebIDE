@@ -1,5 +1,6 @@
 package com.web.webide.ui.components
 
+import android.annotation.SuppressLint
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -14,11 +15,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -28,6 +29,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.launch
 import java.io.File
+import androidx.compose.foundation.layout.BoxWithConstraints
+// 或者通配符
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,7 +44,7 @@ fun DirectorySelector(
     var showCreateFolderDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val listState = rememberLazyListState()
-    val coroutineScope = rememberCoroutineScope()
+    rememberCoroutineScope()
 
     val directoryList by remember(currentPath) {
         derivedStateOf {
@@ -129,7 +132,11 @@ fun DirectorySelector(
                     onPathSegmentClicked = { newPath -> currentPath = newPath }
                 )
 
-                Divider(modifier = Modifier.padding(top = 8.dp))
+                HorizontalDivider(
+                    modifier = Modifier.padding(top = 8.dp),
+                    thickness = DividerDefaults.Thickness,
+                    color = DividerDefaults.color
+                )
 
                 // 3. 目录列表 + 快速滑动条
                 Box(modifier = Modifier.weight(1f)) {
@@ -231,7 +238,7 @@ fun DirectorySelector(
                     
                 }
 
-                Divider()
+                HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
 
                 // 4. 底部操作栏
                 Row(
@@ -257,6 +264,7 @@ fun DirectorySelector(
 /**
  * 快速滑动条组件 - Material Design 3 风格
  */
+@SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 private fun FastScrollbar(
     listState: LazyListState,

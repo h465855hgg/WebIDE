@@ -11,12 +11,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -160,72 +160,6 @@ internal fun CustomThemeCard(isSelected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-internal fun ColorPickerDialog(currentColor: Color, onColorSelected: (Color) -> Unit, onDismiss: () -> Unit) {
-    var red by remember { mutableStateOf((currentColor.red * 255).toInt()) }
-    var green by remember { mutableStateOf((currentColor.green * 255).toInt()) }
-    var blue by remember { mutableStateOf((currentColor.blue * 255).toInt()) }
-    val selectedColor = Color(red, green, blue)
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("选择主题颜色") },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(modifier = Modifier.size(120.dp).clip(CircleShape).background(selectedColor).border(3.dp, MaterialTheme.colorScheme.outline, CircleShape))
-                Spacer(Modifier.height(16.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("#${"%02X%02X%02X".format(red, green, blue)}", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    FilledTonalButton(
-                        onClick = { red = (0..255).random(); green = (0..255).random(); blue = (0..255).random() },
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-                    ) {
-                        Icon(Icons.Default.Refresh, "随机", modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("随机", fontSize = 14.sp)
-                    }
-                }
-                Spacer(Modifier.height(24.dp))
-                Text("常用颜色", fontSize = 14.sp, modifier = Modifier.align(Alignment.Start))
-                Spacer(Modifier.height(8.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(Color(0xFFE91E63), Color(0xFF9C27B0), Color(0xFF3F51B5), Color(0xFF2196F3), Color(0xFF009688), Color(0xFF4CAF50), Color(0xFFFFEB3B), Color(0xFFFF9800), Color(0xFFFF5722)).forEach { color ->
-                        Box(modifier = Modifier.size(32.dp).clip(CircleShape).background(color).border(2.dp, if (color == selectedColor) MaterialTheme.colorScheme.primary else Color.Transparent, CircleShape).clickable {
-                            red = (color.red * 255).toInt(); green = (color.green * 255).toInt(); blue = (color.blue * 255).toInt()
-                        })
-                    }
-                }
-                Spacer(Modifier.height(24.dp))
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    ColorSlider("R", Color.Red, red) { red = it }
-                    ColorSlider("G", Color.Green, green) { green = it }
-                    ColorSlider("B", Color.Blue, blue) { blue = it }
-                }
-            }
-        },
-        confirmButton = { Button(onClick = { onColorSelected(selectedColor) }) { Text("确定") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
-    )
-}
-
-@Composable
-private fun ColorSlider(label: String, color: Color, value: Int, onValueChange: (Int) -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(color))
-            Spacer(Modifier.width(8.dp))
-            Text(label, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-        }
-        Text(value.toString(), fontSize = 14.sp, fontWeight = FontWeight.Bold)
-    }
-    Slider(
-        value = value.toFloat(),
-        onValueChange = { onValueChange(it.toInt()) },
-        valueRange = 0f..255f,
-        colors = SliderDefaults.colors(thumbColor = color, activeTrackColor = color)
-    )
-}
-
-@Composable
 internal fun BottomNavigation(currentStep: WelcomeStep, onBack: () -> Unit, onNext: () -> Unit) {
     Column(modifier = Modifier.fillMaxWidth().padding(32.dp)) {
         StepIndicator(currentStep, modifier = Modifier.align(Alignment.CenterHorizontally))
@@ -233,7 +167,7 @@ internal fun BottomNavigation(currentStep: WelcomeStep, onBack: () -> Unit, onNe
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             AnimatedVisibility(currentStep != WelcomeStep.INTRO, enter = fadeIn() + expandHorizontally(), exit = fadeOut() + shrinkHorizontally()) {
                 OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f).height(56.dp), shape = RoundedCornerShape(16.dp)) {
-                    Icon(Icons.Default.ArrowBack, "返回", modifier = Modifier.size(20.dp))
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("返回", fontSize = 16.sp)
                 }
@@ -248,7 +182,7 @@ internal fun BottomNavigation(currentStep: WelcomeStep, onBack: () -> Unit, onNe
                     fontSize = 16.sp
                 )
                 Spacer(Modifier.width(8.dp))
-                Icon(if (currentStep == WelcomeStep.THEME_SETUP) Icons.Default.Check else Icons.Default.ArrowForward, null, modifier = Modifier.size(20.dp))
+                Icon(if (currentStep == WelcomeStep.THEME_SETUP) Icons.Default.Check else Icons.AutoMirrored.Filled.ArrowForward, null, modifier = Modifier.size(20.dp))
             }
         }
     }

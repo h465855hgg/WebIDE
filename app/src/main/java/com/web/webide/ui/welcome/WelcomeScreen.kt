@@ -139,24 +139,20 @@ fun WelcomeScreen(
             )
         }
 
+
         if (showColorPicker) {
             ColorPickerDialog(
-                currentColor = customColor,
+
+                initialColor = customColor,
+
+                onDismiss = { showColorPicker = false },
                 onColorSelected = { color ->
                     customColor = color
-                    selectedThemeIndex = themeColors.size
-                    // ✅ 修复: 调用正确的5参数函数
-                    themeViewModel.saveThemeConfig(selectedModeIndex, themeColors.size, color, isMonetEnabled, true)
                     showColorPicker = false
-                },
-                onDismiss = {
-                    showColorPicker = false
-                    if (selectedThemeIndex == themeColors.size) {
-                        selectedThemeIndex = 0
-                    }
                 }
             )
         }
+
     }
 }
 

@@ -1,7 +1,5 @@
 package com.web.webide.ui.settings
 
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -14,12 +12,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import com.web.webide.ui.welcome.ThemeColor
 import com.web.webide.ui.welcome.themeColors
 import com.web.webide.ui.welcome.ColorPickerDialog
+import com.web.webide.core.utils.LogCatcher // 导入日志工具
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -27,7 +24,7 @@ fun ThemeSelectionDialog(
     onDismiss: () -> Unit,
     onThemeSelected: (Int, Int, Color, Boolean) -> Unit,
     initialModeIndex: Int = 0,
-    initialThemeIndex: Int = 0 // ✅ 改动: 默认索引改为0
+    initialThemeIndex: Int = 0
 ) {
     var selectedModeIndex by remember { mutableStateOf(initialModeIndex) }
     var selectedThemeIndex by remember { mutableStateOf(initialThemeIndex) }
@@ -51,31 +48,17 @@ fun ThemeSelectionDialog(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(
-                        Icons.Default.Palette,
-                        contentDescription = "主题设置",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
+                    Icon(Icons.Default.Palette, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = "选择主题",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text("选择主题", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // 模式选择
-                Text(
-                    text = "模式选择",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
+                // 模式
+                Text("模式", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.height(12.dp))
-                // ✅ 改动: 独立定义 modeOptions
-                val modeOptions = listOf("跟随系统", "浅色模式", "深色模式")
+                val modeOptions = listOf("跟随系统", "浅色", "深色")
                 SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                     modeOptions.forEachIndexed { index, label ->
                         SegmentedButton(
@@ -83,38 +66,26 @@ fun ThemeSelectionDialog(
                             onClick = { selectedModeIndex = index },
                             shape = SegmentedButtonDefaults.itemShape(index = index, count = modeOptions.size),
                             icon = {}
-                        ) {
-                            Text(label)
-                        }
+                        ) { Text(label) }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // 颜色主题选择
-                Text(
-                    text = "颜色主题",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
+                // 颜色列表
+                Text("颜色", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.height(12.dp))
-                // ✅ 改动: colorOptions 直接使用 themeColors
-                val colorOptions = themeColors
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Spacer(modifier = Modifier.width(0.dp))
-                    colorOptions.forEachIndexed { index, theme ->
+
+                Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    // 预设
+                    themeColors.forEachIndexed { index, theme ->
                         com.web.webide.ui.welcome.ThemePreviewCard(
                             theme = theme,
                             isSelected = selectedThemeIndex == index,
                             onClick = { selectedThemeIndex = index }
                         )
                     }
+                    // 自定义 (入口)
                     com.web.webide.ui.welcome.CustomThemeCard(
                         isSelected = selectedThemeIndex == themeColors.size,
                         onClick = {
@@ -122,29 +93,26 @@ fun ThemeSelectionDialog(
                             showColorPicker = true
                         }
                     )
-                    Spacer(modifier = Modifier.width(0.dp))
                 }
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // 按钮区域
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(onClick = onDismiss) {
-                        Text("取消")
-                    }
+                // 底部按钮
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onDismiss) { Text("取消") }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = {
                             val isCustom = selectedThemeIndex == themeColors.size
+
+                            // [Debug Log] UI层点击确认
+                            LogCatcher.i("ThemeDebug_UI", "用户点击应用: 模式=$selectedModeIndex, 主题Index=$selectedThemeIndex, 是否自定义=$isCustom")
+                            LogCatcher.i("ThemeDebug_UI", "自定义颜色Hex: #${Integer.toHexString(customColor.value.toInt())}")
+
                             onThemeSelected(selectedModeIndex, selectedThemeIndex, customColor, isCustom)
                             onDismiss()
                         }
-                    ) {
-                        Text("应用")
-                    }
+                    ) { Text("应用") }
                 }
             }
         }
@@ -152,17 +120,11 @@ fun ThemeSelectionDialog(
 
     if (showColorPicker) {
         ColorPickerDialog(
-            currentColor = customColor,
+            initialColor = customColor,
+            onDismiss = { showColorPicker = false },
             onColorSelected = { color ->
                 customColor = color
                 showColorPicker = false
-            },
-            onDismiss = {
-                showColorPicker = false
-                // 如果用户取消选择自定义颜色，则将主题选择重置为第一个颜色主题
-                if (selectedThemeIndex == themeColors.size) {
-                    selectedThemeIndex = 0
-                }
             }
         )
     }

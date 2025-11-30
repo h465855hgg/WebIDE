@@ -1,5 +1,7 @@
-package com.web.webide.ui.settings
 
+
+
+package com.web.webide.ui.settings
 import android.os.Build
 import android.widget.Toast
 import androidx.compose.animation.*
@@ -11,7 +13,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,7 +25,6 @@ import com.web.webide.ui.components.DirectorySelector
 import com.web.webide.core.utils.WorkspaceManager
 import com.web.webide.core.utils.ThemeState
 import com.web.webide.core.utils.LogConfigState
-import com.web.webide.ui.welcome.ThemeColor
 import com.web.webide.ui.welcome.themeColors
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -37,20 +37,28 @@ fun SettingsScreen(
     onLogConfigChange: (enabled: Boolean, filePath: String) -> Unit
 ) {
     val context = LocalContext.current
-    
+
     var selectedWorkspace by remember { mutableStateOf(WorkspaceManager.getWorkspacePath(context)) }
     var showFileSelector by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
     var showLogPathSelector by remember { mutableStateOf(false) }
-    
+
     val currentModeIndex = currentThemeState.selectedModeIndex
     val currentThemeIndex = currentThemeState.selectedThemeIndex
     val isMonetEnabled = currentThemeState.isMonetEnabled
 
-    val currentTheme = when {
-        isMonetEnabled -> ThemeColor("动态色彩", MaterialTheme.colorScheme.background, MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)
-        currentThemeState.isCustomTheme -> ThemeColor("自定义", Color.White, Color.Gray, currentThemeState.customColor, Color.Gray)
-        else -> themeColors.getOrNull(currentThemeIndex) ?: themeColors.first()
+    // 计算当前显示的主题名称
+    val currentThemeName = when {
+        isMonetEnabled -> "动态色彩 (壁纸取色)"
+        currentThemeState.isCustomTheme -> "自定义颜色"
+        else -> themeColors.getOrNull(currentThemeIndex)?.name ?: "默认主题"
+    }
+
+    // 计算预览色块颜色
+    val previewColor = when {
+        isMonetEnabled -> MaterialTheme.colorScheme.primary
+        currentThemeState.isCustomTheme -> currentThemeState.customColor
+        else -> themeColors.getOrNull(currentThemeIndex)?.primaryColor ?: MaterialTheme.colorScheme.primary
     }
 
     Scaffold(
@@ -73,18 +81,24 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 主题设置卡片 (UI重构)
+            // --- 主题设置卡片 ---
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Text("主题设置", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
 
                     // 当前主题预览
-                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
                         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(40.dp).background(currentTheme.primaryColor, MaterialTheme.shapes.small))
+                            Box(modifier = Modifier
+                                .size(40.dp)
+                                .background(previewColor, MaterialTheme.shapes.small)
+                            )
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
-                                Text(text = currentTheme.name, style = MaterialTheme.typography.bodyMedium)
+                                Text(text = currentThemeName, style = MaterialTheme.typography.bodyMedium)
                                 Text(
                                     text = when (currentModeIndex) { 0 -> "跟随系统"; 1 -> "浅色模式"; 2 -> "深色模式"; else -> "" },
                                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -92,34 +106,44 @@ fun SettingsScreen(
                             }
                         }
                     }
-                    
-                    // 动态色彩开关 (仅在支持的设备上显示)
+
+                    // 动态色彩开关 (仅在 Android 12+ 显示)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            Text("动态色彩", style = MaterialTheme.typography.bodyLarge)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text("动态色彩", style = MaterialTheme.typography.bodyLarge)
+                                Text("使用壁纸颜色", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                             Switch(
                                 checked = isMonetEnabled,
                                 onCheckedChange = { enabled ->
+                                    // 仅切换 Monet 状态，保持其他参数不变
                                     onThemeChange(currentModeIndex, currentThemeIndex, currentThemeState.customColor, enabled, currentThemeState.isCustomTheme)
                                 }
                             )
                         }
                     }
 
-                    // 预设主题和自定义主题（当动态色彩关闭时显示）
-                    AnimatedVisibility(
-                        visible = !isMonetEnabled,
-                        enter = fadeIn() + expandVertically(),
-                        exit = fadeOut() + shrinkVertically()
+                    // 更改主题按钮
+                    // 【关键修复】：始终显示按钮，而不是用 AnimatedVisibility 隐藏。
+                    // 这样用户即使开着动态色彩，也能点进来选主题，选完自动关闭动态色彩。
+                    Button(
+                        onClick = { showThemeDialog = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.medium
                     ) {
-                        Button(onClick = { showThemeDialog = true }, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
-                            Icon(Icons.Default.Palette, "更改主题"); Spacer(modifier = Modifier.width(8.dp)); Text("更改预设主题")
-                        }
+                        Icon(Icons.Default.Palette, "更改主题")
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(if (isMonetEnabled) "切换预设/自定义主题" else "更改预设主题")
                     }
                 }
             }
 
-            // 工作目录设置
+            // --- 工作目录设置 (保持原样) ---
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Text("工作目录设置", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
@@ -135,11 +159,11 @@ fun SettingsScreen(
                 }
             }
 
-            // 日志设置卡片 (UI重构)
+            // --- 日志设置卡片 (保持原样) ---
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Text("日志设置", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                    
+
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Text("启用日志记录", style = MaterialTheme.typography.bodyLarge)
                         Switch(
@@ -150,34 +174,31 @@ fun SettingsScreen(
                             }
                         )
                     }
-                    
-                    // 日志路径设置 (当日志启用时显示)
+
                     AnimatedVisibility(
                         visible = logConfigState.isLogEnabled,
                         enter = fadeIn() + expandVertically(),
                         exit = fadeOut() + shrinkVertically()
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                             HorizontalDivider(
-                                 Modifier,
-                                 DividerDefaults.Thickness,
-                                 DividerDefaults.color
-                             )
+                            HorizontalDivider()
                             Text("日志文件路径:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                             Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                                 Column(modifier = Modifier.padding(12.dp)) {
-                                     Text(text = logConfigState.logFilePath, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                 }
-                             }
-                             Button(onClick = { showLogPathSelector = true }, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
-                                 Icon(Icons.Default.FolderOpen, "更改日志路径"); Spacer(modifier = Modifier.width(8.dp)); Text("更改日志路径")
-                             }
+                            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text(text = logConfigState.logFilePath, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                }
+                            }
+                            Button(onClick = { showLogPathSelector = true }, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
+                                Icon(Icons.Default.FolderOpen, "更改日志路径"); Spacer(modifier = Modifier.width(8.dp)); Text("更改日志路径")
+                            }
                         }
                     }
                 }
             }
         }
     }
+
+    // --- 弹窗处理 ---
 
     if (showFileSelector) {
         DirectorySelector(
@@ -196,13 +217,22 @@ fun SettingsScreen(
         ThemeSelectionDialog(
             onDismiss = { showThemeDialog = false },
             onThemeSelected = { modeIndex, themeIndex, customColor, isCustom ->
-                // ✅ 修复: 保持当前的动态色彩状态，而不是强制关闭
-                onThemeChange(modeIndex, themeIndex, customColor, isMonetEnabled, isCustom)
+                // 【关键修复】：应用参考代码的逻辑。
+                // 如果用户在这里手动选了主题，说明他想覆盖“动态色彩”。
+                // 强制将 isMonetEnabled 设为 false。
+                onThemeChange(
+                    modeIndex,
+                    themeIndex,
+                    customColor,
+                    false, // <--- 强制关闭 Monet
+                    isCustom
+                )
                 Toast.makeText(context, "主题已更新", Toast.LENGTH_SHORT).show()
             },
             initialModeIndex = currentModeIndex,
-            initialThemeIndex = if (currentThemeState.isCustomTheme) themeColors.size else currentThemeIndex, // ✅ 如果是自定义主题，设置为 themeColors.size
-           )
+            // 如果当前是自定义主题，让 UI 选中最后一个位置
+            initialThemeIndex = if (currentThemeState.isCustomTheme) themeColors.size else currentThemeIndex,
+        )
     }
 
     if (showLogPathSelector) {
