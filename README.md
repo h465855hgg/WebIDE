@@ -1,5 +1,8 @@
 # WebIDE - AI协作开发的web for Android IDE
 
+[English 🇺🇸](README_EN.md) | [中文 🇨🇳](README.md)
+
+
 ## 📖 项目简介
 
 采用Jetpack Compose构建。这个项目最大的特色是**完全由AI开发**，展示了AI在软件开发中的强大潜力。
