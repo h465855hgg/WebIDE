@@ -81,7 +81,12 @@ Null
 - 不同AI模型在特定领域的专长
 - 未来AI辅助开发的潜力
 
----
+
+
 
 *这是一个由AI开发的创新项目，体现了人工智能在软件开发领域的新可能性。*
 ![image](https://github.com/h465855hgg/WebIDE/blob/main/IMG_20251108_171127.jpg)
+
+---
+[![Star History Chart](https://api.star-history.com/svg?repos=h465855hgg/WebIDE&type=Date)](https://star-history.com/#h465855hgg/WebIDE&Date)
+

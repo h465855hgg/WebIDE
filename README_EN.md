@@ -85,3 +85,6 @@ It demonstrates:
 
 *This is an innovative project developed by AI, showcasing new possibilities for artificial intelligence in the software development field.*
 ![image](https://github.com/h465855hgg/WebIDE/blob/main/IMG_20251108_171127.jpg)
+
+---
+[![Star History Chart](https://api.star-history.com/svg?repos=h465855hgg/WebIDE&type=Date)](https://star-history.com/#h465855hgg/WebIDE&Date)
