@@ -55,10 +55,19 @@ app/src/main/java/com/web/webide/
 - **设置系统**: 可定制的开发环境配置
 - **欢迎界面**: 友好的用户引导体验
 
-## 🤝 贡献
-Null
+## 👥 贡献者 (Contributors)
 
-这个项目目前处于开源状态，但由于是AI协作开发的实验性项目，作者已停止维护。欢迎有兴趣的开发者继续完善和扩展功能。
+**核心团队 (The Core Team)**
+
+既然这是一个 AI 协作项目，我们的团队结构稍微有点特殊：
+
+| <img src="https://github.com/h465855hgg.png" width="50px;" alt=""/> | <img src="https://github.com/user-attachments/assets/d3afe9ed-460c-4ee7-a041-70bd320da367" width="50px" alt="Claude"/> | <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Google_Gemini_logo.svg/2560px-Google_Gemini_logo.svg.png" width="50px;" alt=""/> | <img src="https://avatars.githubusercontent.com/u/148330874?s=200&v=4" width="50px;" alt=""/> |
+| :---: | :---: | :---: | :---: |
+| **[h465855hgg](https://github.com/h465855hgg)** | **Claude 4.5** | **Gemini 3.0 Pro** | **DeepSeek** |
+| 🧠 架构师 / 提示词工程 | 🎨 UI/UX 设计 | 🏗️ 逻辑与组件 | ⚙️ 核心算法 |
+
+<br/>
+
 
 **作者的美好幻想**
 - build app [complete]
@@ -68,8 +77,8 @@ Null
 - 预览界面加入调试功能
 - 想给预览界面实现DevServer
 - 加入全路径自定义功能
-- 自定义主题色（已实现但未加入）
-- 更好更美观的settings
+- 自定义主题色 [complete]
+- 更好更美观的settings  [complete]
 - 写个关于界面，更新日志之类的
 
 ## 💡 项目意义
@@ -88,5 +97,10 @@ Null
 ![image](https://github.com/h465855hgg/WebIDE/blob/main/IMG_20251108_171127.jpg)
 
 ---
-[![Star History Chart](https://api.star-history.com/svg?repos=h465855hgg/WebIDE&type=Date)](https://star-history.com/#h465855hgg/WebIDE&Date)
+<div align="center">
 
+Star History
+
+![alt text](https://api.star-history.com/svg?repos=h465855hgg/WebIDE&type=Date)
+
+</div>
