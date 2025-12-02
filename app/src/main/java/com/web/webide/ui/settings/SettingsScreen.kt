@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -162,6 +163,10 @@ fun SettingsScreen(
 // 核心组件：ThemeSettingsItem (极速瞬开版)
 // ==========================================
 
+// ==========================================
+// 核心组件：ThemeSettingsItem (极速瞬开 + 右上角弹窗动效版)
+// ==========================================
+
 @Composable
 fun ThemeSettingsItem(
     currentThemeState: ThemeState,
@@ -170,9 +175,9 @@ fun ThemeSettingsItem(
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
 
+    // 全局统一 200ms 极速响应
     val expandDuration = 200
     val textFadeDuration = 200
-
     val snappyEasing = LinearOutSlowInEasing
 
     Card(
@@ -180,7 +185,7 @@ fun ThemeSettingsItem(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
-            // 布局变化动画
+            // 外层容器跟随内容变化，平滑过渡
             modifier = Modifier.animateContentSize(
                 animationSpec = tween(durationMillis = expandDuration, easing = snappyEasing)
             )
@@ -206,7 +211,7 @@ fun ThemeSettingsItem(
                         text = "外观与主题",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                     )
-                    // 副标题切换：极速淡入淡出
+                    // 副标题切换
                     AnimatedVisibility(
                         visible = !expanded,
                         enter = fadeIn(tween(textFadeDuration)) + expandVertically(tween(textFadeDuration), expandFrom = Alignment.Top),
@@ -221,7 +226,7 @@ fun ThemeSettingsItem(
                     }
                 }
 
-                // 箭头旋转：100ms 瞬间转过去
+                // 箭头旋转
                 val rotation by animateFloatAsState(
                     targetValue = if (expanded) 180f else 0f,
                     label = "ArrowRotation",
@@ -234,17 +239,27 @@ fun ThemeSettingsItem(
                 )
             }
 
-            // Expanded Content
+            // Expanded Content (核心修改区域)
             AnimatedVisibility(
                 visible = expanded,
-                enter = fadeIn(tween(expandDuration)) + expandVertically(tween(expandDuration, easing = snappyEasing), expandFrom = Alignment.Top),
-                exit = fadeOut(tween(textFadeDuration)) + shrinkVertically(tween(textFadeDuration), shrinkTowards = Alignment.Top)
+                // 修改为：标准的垂直展开 + 淡入
+                enter = fadeIn(tween(expandDuration)) +
+                        expandVertically(
+                            animationSpec = tween(expandDuration, easing = snappyEasing),
+                            expandFrom = Alignment.Top // 从顶部向下展开
+                        ),
+                // 修改为：标准的垂直收缩 + 淡出
+                exit = fadeOut(tween(textFadeDuration)) +
+                        shrinkVertically(
+                            animationSpec = tween(textFadeDuration, easing = snappyEasing),
+                            shrinkTowards = Alignment.Top // 向上收缩
+                        )
             ) {
                 Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // 1. 动态色彩
+                    // 1. 动态色彩 Switch
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
@@ -264,14 +279,35 @@ fun ThemeSettingsItem(
                         }
                     }
 
-                    // 2. 颜色选择列表
-                    Column(
-                        modifier = Modifier.animateContentSize(
-                            animationSpec = tween(durationMillis = expandDuration, easing = snappyEasing)
-                        )
+
+                    AnimatedVisibility(
+                        visible = !currentThemeState.isMonetEnabled,
+                        enter = fadeIn(tween(expandDuration)) +
+                                expandIn(
+                                    animationSpec = tween(expandDuration, easing = snappyEasing),
+                                    expandFrom = Alignment.TopStart // 核心：从左上角开始撑开
+                                ) +
+                                scaleIn(
+                                    animationSpec = tween(expandDuration, easing = snappyEasing),
+                                    transformOrigin = TransformOrigin(0f, 0f) // 核心：视觉缩放中心设为左上角
+                                ),
+                        exit = fadeOut(tween(expandDuration)) +
+                                shrinkOut(
+                                    animationSpec = tween(expandDuration, easing = snappyEasing),
+                                    shrinkTowards = Alignment.TopStart // 向左上角收缩
+                                ) +
+                                scaleOut(
+                                    animationSpec = tween(expandDuration, easing = snappyEasing),
+                                    transformOrigin = TransformOrigin(0f, 0f)
+                                )
                     ) {
-                        if (!currentThemeState.isMonetEnabled) {
-                            Text("主题色", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                        // 这里的 Column 不需要再加 animateContentSize 了，外层已经处理了动画
+                        Column {
+                            Text(
+                                "主题色",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
                             LazyRow(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp)
@@ -282,7 +318,15 @@ fun ThemeSettingsItem(
                                         color = theme.primaryColor,
                                         name = theme.name,
                                         isSelected = isSelected,
-                                        onClick = { onThemeChange(currentThemeState.selectedModeIndex, index, currentThemeState.customColor, false, false) }
+                                        onClick = {
+                                            onThemeChange(
+                                                currentThemeState.selectedModeIndex,
+                                                index,
+                                                currentThemeState.customColor,
+                                                false,
+                                                false
+                                            )
+                                        }
                                     )
                                 }
                                 item {
@@ -296,6 +340,7 @@ fun ThemeSettingsItem(
                         }
                     }
 
+                    // ... (下方的显示模式 Chip 代码保持不变) ...
                     // 3. 模式选择 (Chip)
                     Text("显示模式", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                     Row(
@@ -317,7 +362,6 @@ fun ThemeSettingsItem(
         }
     }
 }
-
 @Composable
 fun SmoothFilterChip(
     selected: Boolean,

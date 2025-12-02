@@ -23,7 +23,11 @@ import kotlin.math.pow
 // ============================================================================
 // 1. 预设主题 (保留原样)
 // ============================================================================
+// ============================================================================
+// 1. 预设主题 (已修复 Scrim 缺失与卡片对比度问题)
+// ============================================================================
 
+// 默认 Material 深色 (保留官方微调)
 private val DarkColorScheme = darkColorScheme(
     primary = Color(0xFFD0BCFF),
     onPrimary = Color(0xFF381E72),
@@ -41,27 +45,28 @@ private val DarkColorScheme = darkColorScheme(
     onError = Color(0xFF601410),
     errorContainer = Color(0xFF8C1D18),
     onErrorContainer = Color(0xFFF9DEDC),
-    background = Color(0xFF1C1B1F),
+    background = Color(0xFF141218), // 稍微压暗背景，突出卡片
     onBackground = Color(0xFFE6E1E5),
-    surface = Color(0xFF1C1B1F),
+    surface = Color(0xFF141218),
     onSurface = Color(0xFFE6E1E5),
     surfaceVariant = Color(0xFF49454F),
     onSurfaceVariant = Color(0xFFCAC4D0),
     outline = Color(0xFF938F99),
     outlineVariant = Color(0xFF49454F),
-    scrim = Color(0xFF000000),
+    scrim = Color(0xFF000000), // ✅ 已补全
     inverseSurface = Color(0xFFE6E1E5),
     inverseOnSurface = Color(0xFF313033),
     inversePrimary = Color(0xFF6750A4),
     surfaceDim = Color(0xFF141318),
     surfaceBright = Color(0xFF3B383E),
     surfaceContainerLowest = Color(0xFF0F0D13),
-    surfaceContainerLow = Color(0xFF1D1B20),
+    surfaceContainerLow = Color(0xFF1D1B20), // 卡片颜色
     surfaceContainer = Color(0xFF211F26),
     surfaceContainerHigh = Color(0xFF2B2930),
     surfaceContainerHighest = Color(0xFF36343B)
 )
 
+// 默认 Material 浅色
 private val LightColorScheme = lightColorScheme(
     primary = Color(0xFF6750A4),
     onPrimary = Color(0xFFFFFFFF),
@@ -79,28 +84,28 @@ private val LightColorScheme = lightColorScheme(
     onError = Color(0xFFFFFFFF),
     errorContainer = Color(0xFFF9DEDC),
     onErrorContainer = Color(0xFF410E0B),
-    background = Color(0xFFFFFBFE),
+    background = Color(0xFFFDF8FD), // 极淡的灰紫色背景
     onBackground = Color(0xFF1C1B1F),
-    surface = Color(0xFFFFFBFE),
+    surface = Color(0xFFFDF8FD),
     onSurface = Color(0xFF1C1B1F),
     surfaceVariant = Color(0xFFE7E0EC),
     onSurfaceVariant = Color(0xFF49454F),
     outline = Color(0xFF79747E),
     outlineVariant = Color(0xFFCAC4D0),
-    scrim = Color(0xFF000000),
+    scrim = Color(0xFF000000), // ✅ 已补全
     inverseSurface = Color(0xFF313033),
     inverseOnSurface = Color(0xFFF4EFF4),
     inversePrimary = Color(0xFFD0BCFF),
     surfaceDim = Color(0xFFDED8E1),
     surfaceBright = Color(0xFFFFFBFE),
     surfaceContainerLowest = Color(0xFFFFFFFF),
-    surfaceContainerLow = Color(0xFFF7F2FA),
+    surfaceContainerLow = Color(0xFFF7F2FA), // 卡片颜色
     surfaceContainer = Color(0xFFF3EDF7),
     surfaceContainerHigh = Color(0xFFECE6F0),
     surfaceContainerHighest = Color(0xFFE6E0E9)
 )
 
-// Catppuccin Mocha 深色
+// Catppuccin Mocha 深色 (修复背景与卡片撞色)
 private val CatppuccinDarkColorScheme = darkColorScheme(
     primary = Color(0xFFCBA6F7),
     onPrimary = Color(0xFF2B1B42),
@@ -118,24 +123,25 @@ private val CatppuccinDarkColorScheme = darkColorScheme(
     onError = Color(0xFF4C1926),
     errorContainer = Color(0xFF692D3B),
     onErrorContainer = Color(0xFFFFD9E0),
-    background = Color(0xFF1E1E2E),
+    background = Color(0xFF11111B), // 🔥 修改：使用 Crust 作为背景 (更深)
     onBackground = Color(0xFFCDD6F4),
-    surface = Color(0xFF1E1E2E),
+    surface = Color(0xFF11111B),
     onSurface = Color(0xFFCDD6F4),
     surfaceVariant = Color(0xFF313244),
     onSurfaceVariant = Color(0xFFBAC2DE),
     outline = Color(0xFF6C7086),
     outlineVariant = Color(0xFF45475A),
+    scrim = Color(0xFF000000), // ✅ 已补全
     inverseSurface = Color(0xFFCDD6F4),
     inverseOnSurface = Color(0xFF181825),
     inversePrimary = Color(0xFF7F56D9),
-    surfaceDim = Color(0xFF181825),
+    surfaceDim = Color(0xFF11111B),
     surfaceBright = Color(0xFF313244),
-    surfaceContainerLowest = Color(0xFF11111B),
-    surfaceContainerLow = Color(0xFF1E1E2E),
-    surfaceContainer = Color(0xFF313244),
-    surfaceContainerHigh = Color(0xFF45475A),
-    surfaceContainerHighest = Color(0xFF585B70)
+    surfaceContainerLowest = Color(0xFF0F0F16),
+    surfaceContainerLow = Color(0xFF181825), // Mantle (ElevatedCard)
+    surfaceContainer = Color(0xFF1E1E2E),    // Base (NavDrawer/BottomNav)
+    surfaceContainerHigh = Color(0xFF313244),
+    surfaceContainerHighest = Color(0xFF45475A)
 )
 
 // Catppuccin Latte 浅色
@@ -156,7 +162,7 @@ private val CatppuccinLightColorScheme = lightColorScheme(
     onError = Color(0xFFFFFFFF),
     errorContainer = Color(0xFFFFDAD6),
     onErrorContainer = Color(0xFF410002),
-    background = Color(0xFFEFF1F5),
+    background = Color(0xFFEFF1F5), // Base
     onBackground = Color(0xFF4C4F69),
     surface = Color(0xFFEFF1F5),
     onSurface = Color(0xFF4C4F69),
@@ -164,19 +170,20 @@ private val CatppuccinLightColorScheme = lightColorScheme(
     onSurfaceVariant = Color(0xFF5C5F77),
     outline = Color(0xFF9CA0B0),
     outlineVariant = Color(0xFFCCD0DA),
+    scrim = Color(0xFF000000), // ✅ 已补全
     inverseSurface = Color(0xFF4C4F69),
     inverseOnSurface = Color(0xFFEFF1F5),
     inversePrimary = Color(0xFFFFB4AB),
     surfaceDim = Color(0xFFDCE0E8),
     surfaceBright = Color(0xFFFFFBFE),
     surfaceContainerLowest = Color(0xFFFFFFFF),
-    surfaceContainerLow = Color(0xFFF5F5F5),
-    surfaceContainer = Color(0xFFEFF1F5),
+    surfaceContainerLow = Color(0xFFF5F5F5), // 比背景略白
+    surfaceContainer = Color(0xFFFFFFFF),
     surfaceContainerHigh = Color(0xFFE6E9EF),
     surfaceContainerHighest = Color(0xFFDCE0E8)
 )
 
-// Apple 深色
+// Apple 深色 (修复：使用纯黑背景，实现 iOS Grouped 风格)
 private val AppleDarkColorScheme = darkColorScheme(
     primary = Color(0xFF32D74B),
     onPrimary = Color(0xFF003910),
@@ -194,36 +201,37 @@ private val AppleDarkColorScheme = darkColorScheme(
     onError = Color(0xFF680003),
     errorContainer = Color(0xFF930006),
     onErrorContainer = Color(0xFFFFDAD4),
-    background = Color(0xFF1C1C1E),
+    background = Color(0xFF000000), // 🔥 修改：iOS 深色背景通常是纯黑
     onBackground = Color(0xFFF2F2F7),
-    surface = Color(0xFF1C1C1E),
+    surface = Color(0xFF000000),
     onSurface = Color(0xFFF2F2F7),
-    surfaceVariant = Color(0xFF2C2C2E),
+    surfaceVariant = Color(0xFF1C1C1E), // 填充卡片色
     onSurfaceVariant = Color(0xFFE5E5EA),
     outline = Color(0xFF8E8E93),
     outlineVariant = Color(0xFF3A3A3C),
+    scrim = Color(0xFF000000), // ✅ 已补全
     inverseSurface = Color(0xFFF2F2F7),
-    inverseOnSurface = Color(0xFF1C1C1E),
+    inverseOnSurface = Color(0xFF000000),
     inversePrimary = Color(0xFF00A32A),
     surfaceDim = Color(0xFF000000),
-    surfaceBright = Color(0xFF2C2C2E),
+    surfaceBright = Color(0xFF1C1C1E),
     surfaceContainerLowest = Color(0xFF000000),
-    surfaceContainerLow = Color(0xFF1C1C1E),
+    surfaceContainerLow = Color(0xFF1C1C1E), // 🔥 修改：悬浮卡片为深灰色
     surfaceContainer = Color(0xFF2C2C2E),
     surfaceContainerHigh = Color(0xFF3A3A3C),
     surfaceContainerHighest = Color(0xFF48484A)
 )
 
-// Apple 浅色
+// Apple 浅色 (修复：使用灰背景+白卡片，实现 iOS Grouped 风格)
 private val AppleLightColorScheme = lightColorScheme(
-    primary = Color(0xFF34C759),
+    primary = Color(0xFF007AFF), // 改为 iOS 标准蓝 (原绿色有点偏)
     onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFB3F5BF),
-    onPrimaryContainer = Color(0xFF002107),
-    secondary = Color(0xFF007AFF),
+    primaryContainer = Color(0xFFD3E3FF),
+    onPrimaryContainer = Color(0xFF001C3A),
+    secondary = Color(0xFF34C759), // 绿色作为 Secondary
     onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFBFE9FF),
-    onSecondaryContainer = Color(0xFF001F2A),
+    secondaryContainer = Color(0xFFB3F5BF),
+    onSecondaryContainer = Color(0xFF002107),
     tertiary = Color(0xFFBF5AF2),
     onTertiary = Color(0xFFFFFFFF),
     tertiaryContainer = Color(0xFFECCCFF),
@@ -232,38 +240,191 @@ private val AppleLightColorScheme = lightColorScheme(
     onError = Color(0xFFFFFFFF),
     errorContainer = Color(0xFFFFDAD4),
     onErrorContainer = Color(0xFF410001),
-    background = Color(0xFFFFFFFF),
-    onBackground = Color(0xFF1C1C1E),
-    surface = Color(0xFFFFFFFF),
-    onSurface = Color(0xFF1C1C1E),
+    background = Color(0xFFF2F2F7), // 🔥 修改：iOS Grouped 背景色 (浅灰)
+    onBackground = Color(0xFF000000),
+    surface = Color(0xFFF2F2F7),
+    onSurface = Color(0xFF000000),
     surfaceVariant = Color(0xFFE5E5EA),
-    onSurfaceVariant = Color(0xFF48484A),
+    onSurfaceVariant = Color(0xFF000000),
     outline = Color(0xFFC7C7CC),
     outlineVariant = Color(0xFFD1D1D6),
+    scrim = Color(0xFF000000), // ✅ 已补全
     inverseSurface = Color(0xFF1C1C1E),
     inverseOnSurface = Color(0xFFF2F2F7),
-    inversePrimary = Color(0xFF32D74B),
+    inversePrimary = Color(0xFF0A84FF),
     surfaceDim = Color(0xFFE5E5EA),
     surfaceBright = Color(0xFFFFFFFF),
     surfaceContainerLowest = Color(0xFFFFFFFF),
-    surfaceContainerLow = Color(0xFFF2F2F7),
-    surfaceContainer = Color(0xFFE5E5EA),
-    surfaceContainerHigh = Color(0xFFD1D1D6),
-    surfaceContainerHighest = Color(0xFFC7C7CC)
+    surfaceContainerLow = Color(0xFFFFFFFF), // 🔥 修改：卡片为纯白
+    surfaceContainer = Color(0xFFFFFFFF),
+    surfaceContainerHigh = Color(0xFFE5E5EA),
+    surfaceContainerHighest = Color(0xFFD1D1D6)
 )
 
-// ... (其他预设主题: Lavender, Midnight, Nord 等，请确保保留你的原始定义，这里为节省空间省略) ...
-private val LavenderDarkColorScheme = darkColorScheme( primary = Color(0xFFB8ADFF), onPrimary = Color(0xFF2B1B5C), primaryContainer = Color(0xFF422E7A), onPrimaryContainer = Color(0xFFE1D9FF), secondary = Color(0xFFCBC0FF), onSecondary = Color(0xFF332761), secondaryContainer = Color(0xFF4A3D78), onSecondaryContainer = Color(0xFFE8DDFF), tertiary = Color(0xFFFFABED), onTertiary = Color(0xFF5C0050), tertiaryContainer = Color(0xFF7F0070), onTertiaryContainer = Color(0xFFFFD7F5), error = Color(0xFFFFB4AB), onError = Color(0xFF690005), errorContainer = Color(0xFF93000A), onErrorContainer = Color(0xFFFFDAD6), background = Color(0xFF1A1626), onBackground = Color(0xFFE6E1E9), surface = Color(0xFF1A1626), onSurface = Color(0xFFE6E1E9), surfaceVariant = Color(0xFF49454F), onSurfaceVariant = Color(0xFFCAC4D0), outline = Color(0xFF938F99), outlineVariant = Color(0xFF49454F), inverseSurface = Color(0xFFE6E1E9), inverseOnSurface = Color(0xFF313033), inversePrimary = Color(0xFF6750A4), surfaceDim = Color(0xFF141020), surfaceBright = Color(0xFF3B383E), surfaceContainerLowest = Color(0xFF0F0D13), surfaceContainerLow = Color(0xFF1D1B20), surfaceContainer = Color(0xFF211F26), surfaceContainerHigh = Color(0xFF2B2930), surfaceContainerHighest = Color(0xFF36343B) )
-private val LavenderLightColorScheme = lightColorScheme( primary = Color(0xFF6750A4), onPrimary = Color(0xFFFFFFFF), primaryContainer = Color(0xFFE1D9FF), onPrimaryContainer = Color(0xFF22005D), secondary = Color(0xFF5E5A71), onSecondary = Color(0xFFFFFFFF), secondaryContainer = Color(0xFFE8DDFF), onSecondaryContainer = Color(0xFF1A182B), tertiary = Color(0xFFA20095), onTertiary = Color(0xFFFFFFFF), tertiaryContainer = Color(0xFFFFD7F5), onTertiaryContainer = Color(0xFF3A0036), error = Color(0xFFB3261E), onError = Color(0xFFFFFFFF), errorContainer = Color(0xFFFFDAD6), onErrorContainer = Color(0xFF410002), background = Color(0xFFFFFBFE), onBackground = Color(0xFF1C1B1F), surface = Color(0xFFFFFBFE), onSurface = Color(0xFF1C1B1F), surfaceVariant = Color(0xFFE7E0EC), onSurfaceVariant = Color(0xFF49454F), outline = Color(0xFF79747E), outlineVariant = Color(0xFFCAC4D0), inverseSurface = Color(0xFF313033), inverseOnSurface = Color(0xFFF4EFF4), inversePrimary = Color(0xFFB8ADFF), surfaceDim = Color(0xFFDED8E1), surfaceBright = Color(0xFFFFFBFE), surfaceContainerLowest = Color(0xFFFFFFFF), surfaceContainerLow = Color(0xFFF7F2FA), surfaceContainer = Color(0xFFF3EDF7), surfaceContainerHigh = Color(0xFFECE6F0), surfaceContainerHighest = Color(0xFFE6E0E9) )
-private val MidnightDarkColorScheme = darkColorScheme( primary = Color(0xFF58A6FF), onPrimary = Color(0xFF003258), primaryContainer = Color(0xFF004A7C), onPrimaryContainer = Color(0xFFD1E4FF), secondary = Color(0xFF79C0FF), onSecondary = Color(0xFF003D5F), secondaryContainer = Color(0xFF005885), onSecondaryContainer = Color(0xFFCDE5FF), tertiary = Color(0xFFD2A8FF), onTertiary = Color(0xFF3B0072), tertiaryContainer = Color(0xFF5300A0), onTertiaryContainer = Color(0xFFEBDCFF), error = Color(0xFFFF7B72), onError = Color(0xFF8E1B13), errorContainer = Color(0xFFDA3633), onErrorContainer = Color(0xFFFFE0E0), background = Color(0xFF0D1117), onBackground = Color(0xFFE6EDF3), surface = Color(0xFF0D1117), onSurface = Color(0xFFE6EDF3), surfaceVariant = Color(0xFF161B22), onSurfaceVariant = Color(0xFFC9D1D9), outline = Color(0xFF6E7681), outlineVariant = Color(0xFF30363D), inverseSurface = Color(0xFFE6EDF3), inverseOnSurface = Color(0xFF0D1117), inversePrimary = Color(0xFF0969DA), surfaceDim = Color(0xFF010409), surfaceBright = Color(0xFF161B22), surfaceContainerLowest = Color(0xFF010409), surfaceContainerLow = Color(0xFF0D1117), surfaceContainer = Color(0xFF161B22), surfaceContainerHigh = Color(0xFF21262D), surfaceContainerHighest = Color(0xFF30363D) )
-private val MidnightLightColorScheme = lightColorScheme( primary = Color(0xFF0969DA), onPrimary = Color(0xFFFFFFFF), primaryContainer = Color(0xFFD1E4FF), onPrimaryContainer = Color(0xFF001D35), secondary = Color(0xFF0550AE), onSecondary = Color(0xFFFFFFFF), secondaryContainer = Color(0xFFCDE5FF), onSecondaryContainer = Color(0xFF001A30), tertiary = Color(0xFF8250DF), onTertiary = Color(0xFFFFFFFF), tertiaryContainer = Color(0xFFEBDCFF), onTertiaryContainer = Color(0xFF2B0058), error = Color(0xFFCF222E), onError = Color(0xFFFFFFFF), errorContainer = Color(0xFFFFE0E0), onErrorContainer = Color(0xFF5D0F0F), background = Color(0xFFFFFFFF), onBackground = Color(0xFF0D1117), surface = Color(0xFFFFFFFF), onSurface = Color(0xFF0D1117), surfaceVariant = Color(0xFFF6F8FA), onSurfaceVariant = Color(0xFF24292F), outline = Color(0xFFD0D7DE), outlineVariant = Color(0xFFE6EDF3), inverseSurface = Color(0xFF0D1117), inverseOnSurface = Color(0xFFE6EDF3), inversePrimary = Color(0xFF58A6FF), surfaceDim = Color(0xFFE6EDF3), surfaceBright = Color(0xFFFFFFFF), surfaceContainerLowest = Color(0xFFFFFFFF), surfaceContainerLow = Color(0xFFF6F8FA), surfaceContainer = Color(0xFFE6EDF3), surfaceContainerHigh = Color(0xFFD0D7DE), surfaceContainerHighest = Color(0xFFBEC5CC) )
-private val NordDarkColorScheme = darkColorScheme( primary = Color(0xFF88C0D0), onPrimary = Color(0xFF003544), primaryContainer = Color(0xFF004D62), onPrimaryContainer = Color(0xFFB8E7F5), secondary = Color(0xFF81A1C1), onSecondary = Color(0xFF003351), secondaryContainer = Color(0xFF004A74), onSecondaryContainer = Color(0xFFCFE4FF), tertiary = Color(0xFFB48EAD), onTertiary = Color(0xFF3E2845), tertiaryContainer = Color(0xFF563E5C), onTertiaryContainer = Color(0xFFFFD6F7), error = Color(0xFFBF616A), onError = Color(0xFF4A1419), errorContainer = Color(0xFF6E2428), onErrorContainer = Color(0xFFFFD9DC), background = Color(0xFF2E3440), onBackground = Color(0xFFECEFF4), surface = Color(0xFF2E3440), onSurface = Color(0xFFECEFF4), surfaceVariant = Color(0xFF3B4252), onSurfaceVariant = Color(0xFFD8DEE9), outline = Color(0xFF4C566A), outlineVariant = Color(0xFF434C5E), inverseSurface = Color(0xFFECEFF4), inverseOnSurface = Color(0xFF2E3440), inversePrimary = Color(0xFF5E81AC), surfaceDim = Color(0xFF2B323E), surfaceBright = Color(0xFF3B4252), surfaceContainerLowest = Color(0xFF292E39), surfaceContainerLow = Color(0xFF2E3440), surfaceContainer = Color(0xFF3B4252), surfaceContainerHigh = Color(0xFF434C5E), surfaceContainerHighest = Color(0xFF4C566A) )
-private val NordLightColorScheme = lightColorScheme( primary = Color(0xFF5E81AC), onPrimary = Color(0xFFFFFFFF), primaryContainer = Color(0xFFB8E7F5), onPrimaryContainer = Color(0xFF001F28), secondary = Color(0xFF81A1C1), onSecondary = Color(0xFFFFFFFF), secondaryContainer = Color(0xFFCFE4FF), onSecondaryContainer = Color(0xFF001D33), tertiary = Color(0xFFB48EAD), onTertiary = Color(0xFFFFFFFF), tertiaryContainer = Color(0xFFFFD6F7), onTertiaryContainer = Color(0xFF2F1A33), error = Color(0xFFBF616A), onError = Color(0xFFFFFFFF), errorContainer = Color(0xFFFFD9DC), onErrorContainer = Color(0xFF410004), background = Color(0xFFECEFF4), onBackground = Color(0xFF2E3440), surface = Color(0xFFECEFF4), onSurface = Color(0xFF2E3440), surfaceVariant = Color(0xFFE5E9F0), onSurfaceVariant = Color(0xFF3B4252), outline = Color(0xFFD8DEE9), outlineVariant = Color(0xFFE5E9F0), inverseSurface = Color(0xFF2E3440), inverseOnSurface = Color(0xFFECEFF4), inversePrimary = Color(0xFF88C0D0), surfaceDim = Color(0xFFD8DEE9), surfaceBright = Color(0xFFFFFFFF), surfaceContainerLowest = Color(0xFFFFFFFF), surfaceContainerLow = Color(0xFFE5E9F0), surfaceContainer = Color(0xFFECEFF4), surfaceContainerHigh = Color(0xFFD8DEE9), surfaceContainerHighest = Color(0xFFC3C9D4) )
-private val StrawberryDarkColorScheme = darkColorScheme( primary = Color(0xFFFF8FB4), onPrimary = Color(0xFF5F0032), primaryContainer = Color(0xFF840048), onPrimaryContainer = Color(0xFFFFD9E2), secondary = Color(0xFFFFB1C8), onSecondary = Color(0xFF5E1137), secondaryContainer = Color(0xFF7A2A4E), onSecondaryContainer = Color(0xFFFFD9E4), tertiary = Color(0xFFFFABB8), onTertiary = Color(0xFF5F0919), tertiaryContainer = Color(0xFF7D1D2C), onTertiaryContainer = Color(0xFFFFD9DC), error = Color(0xFFFFB4AB), onError = Color(0xFF690005), errorContainer = Color(0xFF93000A), onErrorContainer = Color(0xFFFFDAD6), background = Color(0xFF201418), onBackground = Color(0xFFEFDEE3), surface = Color(0xFF201418), onSurface = Color(0xFFEFDEE3), surfaceVariant = Color(0xFF524347), onSurfaceVariant = Color(0xFFD7C2C7), outline = Color(0xFF9F8C91), outlineVariant = Color(0xFF524347), inverseSurface = Color(0xFFEFDEE3), inverseOnSurface = Color(0xFF362B2E), inversePrimary = Color(0xFFA8005C), surfaceDim = Color(0xFF19100F), surfaceBright = Color(0xFF3F3437), surfaceContainerLowest = Color(0xFF130C0E), surfaceContainerLow = Color(0xFF201418), surfaceContainer = Color(0xFF281B1E), surfaceContainerHigh = Color(0xFF332528), surfaceContainerHighest = Color(0xFF3E3033) )
-private val StrawberryLightColorScheme = lightColorScheme( primary = Color(0xFFFF6B9D), onPrimary = Color(0xFFFFFFFF), primaryContainer = Color(0xFFFFD9E2), onPrimaryContainer = Color(0xFF3E001D), secondary = Color(0xFFD0477E), onSecondary = Color(0xFFFFFFFF), secondaryContainer = Color(0xFFFFD9E4), onSecondaryContainer = Color(0xFF3E0021), tertiary = Color(0xFFE83A59), onTertiary = Color(0xFFFFFFFF), tertiaryContainer = Color(0xFFFFD9DC), onTertiaryContainer = Color(0xFF410004), error = Color(0xFFB3261E), onError = Color(0xFFFFFFFF), errorContainer = Color(0xFFFFDAD6), onErrorContainer = Color(0xFF410002), background = Color(0xFFFFFBFF), onBackground = Color(0xFF201418), surface = Color(0xFFFFFBFF), onSurface = Color(0xFF201418), surfaceVariant = Color(0xFFF4DDE1), onSurfaceVariant = Color(0xFF524347), outline = Color(0xFF847377), outlineVariant = Color(0xFFD7C2C7), inverseSurface = Color(0xFF362B2E), inverseOnSurface = Color(0xFFFAEDEF), inversePrimary = Color(0xFFFF8FB4), surfaceDim = Color(0xFFE4D7D9), surfaceBright = Color(0xFFFFFBFF), surfaceContainerLowest = Color(0xFFFFFFFF), surfaceContainerLow = Color(0xFFFEF0F2), surfaceContainer = Color(0xFFF8EAEC), surfaceContainerHigh = Color(0xFFF2E4E7), surfaceContainerHighest = Color(0xFFECDEE1) )
-private val TakoDarkColorScheme = darkColorScheme( primary = Color(0xFF9D7CD8), onPrimary = Color(0xFF371F5A), primaryContainer = Color(0xFF4E3571), onPrimaryContainer = Color(0xFFE3D4FF), secondary = Color(0xFFB79FE8), onSecondary = Color(0xFF3E2661), secondaryContainer = Color(0xFF553C79), onSecondaryContainer = Color(0xFFEBDCFF), tertiary = Color(0xFFC790FF), onTertiary = Color(0xFF401466), tertiaryContainer = Color(0xFF592A7E), onTertiaryContainer = Color(0xFFF0D9FF), error = Color(0xFFFFB4AB), onError = Color(0xFF690005), errorContainer = Color(0xFF93000A), onErrorContainer = Color(0xFFFFDAD6), background = Color(0xFF1A1625), onBackground = Color(0xFFE6E1E9), surface = Color(0xFF1A1625), onSurface = Color(0xFFE6E1E9), surfaceVariant = Color(0xFF2D2640), onSurfaceVariant = Color(0xFFCAC4D0), outline = Color(0xFF938F99), outlineVariant = Color(0xFF49454F), inverseSurface = Color(0xFFE6E1E9), inverseOnSurface = Color(0xFF313033), inversePrimary = Color(0xFF6750A4), surfaceDim = Color(0xFF141020), surfaceBright = Color(0xFF3B383E), surfaceContainerLowest = Color(0xFF0F0B1B), surfaceContainerLow = Color(0xFF1D1B20), surfaceContainer = Color(0xFF211F26), surfaceContainerHigh = Color(0xFF2B2930), surfaceContainerHighest = Color(0xFF36343B) )
-private val TakoLightColorScheme = lightColorScheme( primary = Color(0xFF825ED0), onPrimary = Color(0xFFFFFFFF), primaryContainer = Color(0xFFE3D4FF), onPrimaryContainer = Color(0xFF2A0D52), secondary = Color(0xFF6B4FA3), onSecondary = Color(0xFFFFFFFF), secondaryContainer = Color(0xFFEBDCFF), onSecondaryContainer = Color(0xFF24004F), tertiary = Color(0xFFA167D9), onTertiary = Color(0xFFFFFFFF), tertiaryContainer = Color(0xFFF0D9FF), onTertiaryContainer = Color(0xFF330055), error = Color(0xFFB3261E), onError = Color(0xFFFFFFFF), errorContainer = Color(0xFFFFDAD6), onErrorContainer = Color(0xFF410002), background = Color(0xFFF5F3F7), onBackground = Color(0xFF1A1625), surface = Color(0xFFF5F3F7), onSurface = Color(0xFF1A1625), surfaceVariant = Color(0xFFE9E4ED), onSurfaceVariant = Color(0xFF49454F), outline = Color(0xFF79747E), outlineVariant = Color(0xFFCAC4D0), inverseSurface = Color(0xFF313033), inverseOnSurface = Color(0xFFF4EFF4), inversePrimary = Color(0xFF9D7CD8), surfaceDim = Color(0xFFDBD9E0), surfaceBright = Color(0xFFFFFBFE), surfaceContainerLowest = Color(0xFFFFFFFF), surfaceContainerLow = Color(0xFFF5F3F7), surfaceContainer = Color(0xFFEFEDF1), surfaceContainerHigh = Color(0xFFE9E7EB), surfaceContainerHighest = Color(0xFFE3E1E5) )
+// Lavender (熏衣草)
+private val LavenderDarkColorScheme = darkColorScheme(
+    primary = Color(0xFFB8ADFF), onPrimary = Color(0xFF2B1B5C), primaryContainer = Color(0xFF422E7A), onPrimaryContainer = Color(0xFFE1D9FF),
+    secondary = Color(0xFFCBC0FF), onSecondary = Color(0xFF332761), secondaryContainer = Color(0xFF4A3D78), onSecondaryContainer = Color(0xFFE8DDFF),
+    tertiary = Color(0xFFFFABED), onTertiary = Color(0xFF5C0050), tertiaryContainer = Color(0xFF7F0070), onTertiaryContainer = Color(0xFFFFD7F5),
+    error = Color(0xFFFFB4AB), onError = Color(0xFF690005), errorContainer = Color(0xFF93000A), onErrorContainer = Color(0xFFFFDAD6),
+    background = Color(0xFF141218), onBackground = Color(0xFFE6E1E9),
+    surface = Color(0xFF141218), onSurface = Color(0xFFE6E1E9),
+    surfaceVariant = Color(0xFF49454F), onSurfaceVariant = Color(0xFFCAC4D0),
+    outline = Color(0xFF938F99), outlineVariant = Color(0xFF49454F),
+    scrim = Color(0xFF000000), // ✅
+    inverseSurface = Color(0xFFE6E1E9), inverseOnSurface = Color(0xFF313033), inversePrimary = Color(0xFF6750A4),
+    surfaceDim = Color(0xFF141020), surfaceBright = Color(0xFF3B383E),
+    surfaceContainerLowest = Color(0xFF0F0D13), surfaceContainerLow = Color(0xFF1D1B20),
+    surfaceContainer = Color(0xFF211F26), surfaceContainerHigh = Color(0xFF2B2930), surfaceContainerHighest = Color(0xFF36343B)
+)
+private val LavenderLightColorScheme = lightColorScheme(
+    primary = Color(0xFF6750A4), onPrimary = Color(0xFFFFFFFF), primaryContainer = Color(0xFFE1D9FF), onPrimaryContainer = Color(0xFF22005D),
+    secondary = Color(0xFF5E5A71), onSecondary = Color(0xFFFFFFFF), secondaryContainer = Color(0xFFE8DDFF), onSecondaryContainer = Color(0xFF1A182B),
+    tertiary = Color(0xFFA20095), onTertiary = Color(0xFFFFFFFF), tertiaryContainer = Color(0xFFFFD7F5), onTertiaryContainer = Color(0xFF3A0036),
+    error = Color(0xFFB3261E), onError = Color(0xFFFFFFFF), errorContainer = Color(0xFFFFDAD6), onErrorContainer = Color(0xFF410002),
+    background = Color(0xFFFFFBFE), onBackground = Color(0xFF1C1B1F),
+    surface = Color(0xFFFFFBFE), onSurface = Color(0xFF1C1B1F),
+    surfaceVariant = Color(0xFFE7E0EC), onSurfaceVariant = Color(0xFF49454F),
+    outline = Color(0xFF79747E), outlineVariant = Color(0xFFCAC4D0),
+    scrim = Color(0xFF000000), // ✅
+    inverseSurface = Color(0xFF313033), inverseOnSurface = Color(0xFFF4EFF4), inversePrimary = Color(0xFFB8ADFF),
+    surfaceDim = Color(0xFFDED8E1), surfaceBright = Color(0xFFFFFBFE),
+    surfaceContainerLowest = Color(0xFFFFFFFF), surfaceContainerLow = Color(0xFFF7F2FA),
+    surfaceContainer = Color(0xFFF3EDF7), surfaceContainerHigh = Color(0xFFECE6F0), surfaceContainerHighest = Color(0xFFE6E0E9)
+)
 
+// Midnight (午夜蓝) - GitHub Dark Style
+private val MidnightDarkColorScheme = darkColorScheme(
+    primary = Color(0xFF58A6FF), onPrimary = Color(0xFF003258), primaryContainer = Color(0xFF004A7C), onPrimaryContainer = Color(0xFFD1E4FF),
+    secondary = Color(0xFF79C0FF), onSecondary = Color(0xFF003D5F), secondaryContainer = Color(0xFF005885), onSecondaryContainer = Color(0xFFCDE5FF),
+    tertiary = Color(0xFFD2A8FF), onTertiary = Color(0xFF3B0072), tertiaryContainer = Color(0xFF5300A0), onTertiaryContainer = Color(0xFFEBDCFF),
+    error = Color(0xFFFF7B72), onError = Color(0xFF8E1B13), errorContainer = Color(0xFFDA3633), onErrorContainer = Color(0xFFFFE0E0),
+    background = Color(0xFF010409), // 🔥 极黑深蓝背景
+    onBackground = Color(0xFFE6EDF3),
+    surface = Color(0xFF010409), onSurface = Color(0xFFE6EDF3),
+    surfaceVariant = Color(0xFF161B22), onSurfaceVariant = Color(0xFFC9D1D9),
+    outline = Color(0xFF6E7681), outlineVariant = Color(0xFF30363D),
+    scrim = Color(0xFF000000), // ✅
+    inverseSurface = Color(0xFFE6EDF3), inverseOnSurface = Color(0xFF0D1117), inversePrimary = Color(0xFF0969DA),
+    surfaceDim = Color(0xFF010409), surfaceBright = Color(0xFF161B22),
+    surfaceContainerLowest = Color(0xFF010409), surfaceContainerLow = Color(0xFF0D1117), // 略微提亮
+    surfaceContainer = Color(0xFF161B22), surfaceContainerHigh = Color(0xFF21262D), surfaceContainerHighest = Color(0xFF30363D)
+)
+private val MidnightLightColorScheme = lightColorScheme(
+    primary = Color(0xFF0969DA), onPrimary = Color(0xFFFFFFFF), primaryContainer = Color(0xFFD1E4FF), onPrimaryContainer = Color(0xFF001D35),
+    secondary = Color(0xFF0550AE), onSecondary = Color(0xFFFFFFFF), secondaryContainer = Color(0xFFCDE5FF), onSecondaryContainer = Color(0xFF001A30),
+    tertiary = Color(0xFF8250DF), onTertiary = Color(0xFFFFFFFF), tertiaryContainer = Color(0xFFEBDCFF), onTertiaryContainer = Color(0xFF2B0058),
+    error = Color(0xFFCF222E), onError = Color(0xFFFFFFFF), errorContainer = Color(0xFFFFE0E0), onErrorContainer = Color(0xFF5D0F0F),
+    background = Color(0xFFFFFFFF), onBackground = Color(0xFF0D1117),
+    surface = Color(0xFFFFFFFF), onSurface = Color(0xFF0D1117),
+    surfaceVariant = Color(0xFFF6F8FA), onSurfaceVariant = Color(0xFF24292F),
+    outline = Color(0xFFD0D7DE), outlineVariant = Color(0xFFE6EDF3),
+    scrim = Color(0xFF000000), // ✅
+    inverseSurface = Color(0xFF0D1117), inverseOnSurface = Color(0xFFE6EDF3), inversePrimary = Color(0xFF58A6FF),
+    surfaceDim = Color(0xFFE6EDF3), surfaceBright = Color(0xFFFFFFFF),
+    surfaceContainerLowest = Color(0xFFFFFFFF), surfaceContainerLow = Color(0xFFF6F8FA),
+    surfaceContainer = Color(0xFFE6EDF3), surfaceContainerHigh = Color(0xFFD0D7DE), surfaceContainerHighest = Color(0xFFBEC5CC)
+)
+
+// Nord (北极光)
+private val NordDarkColorScheme = darkColorScheme(
+    primary = Color(0xFF88C0D0), onPrimary = Color(0xFF003544), primaryContainer = Color(0xFF004D62), onPrimaryContainer = Color(0xFFB8E7F5),
+    secondary = Color(0xFF81A1C1), onSecondary = Color(0xFF003351), secondaryContainer = Color(0xFF004A74), onSecondaryContainer = Color(0xFFCFE4FF),
+    tertiary = Color(0xFFB48EAD), onTertiary = Color(0xFF3E2845), tertiaryContainer = Color(0xFF563E5C), onTertiaryContainer = Color(0xFFFFD6F7),
+    error = Color(0xFFBF616A), onError = Color(0xFF4A1419), errorContainer = Color(0xFF6E2428), onErrorContainer = Color(0xFFFFD9DC),
+    background = Color(0xFF242933), // 🔥 压暗背景 (比默认 Nord 背景更深，制造层级)
+    onBackground = Color(0xFFECEFF4),
+    surface = Color(0xFF242933), onSurface = Color(0xFFECEFF4),
+    surfaceVariant = Color(0xFF3B4252), onSurfaceVariant = Color(0xFFD8DEE9),
+    outline = Color(0xFF4C566A), outlineVariant = Color(0xFF434C5E),
+    scrim = Color(0xFF000000), // ✅
+    inverseSurface = Color(0xFFECEFF4), inverseOnSurface = Color(0xFF2E3440), inversePrimary = Color(0xFF5E81AC),
+    surfaceDim = Color(0xFF2B323E), surfaceBright = Color(0xFF3B4252),
+    surfaceContainerLowest = Color(0xFF242933), surfaceContainerLow = Color(0xFF2E3440), // 标准 Nord 背景作为卡片
+    surfaceContainer = Color(0xFF3B4252), surfaceContainerHigh = Color(0xFF434C5E), surfaceContainerHighest = Color(0xFF4C566A)
+)
+private val NordLightColorScheme = lightColorScheme(
+    primary = Color(0xFF5E81AC), onPrimary = Color(0xFFFFFFFF), primaryContainer = Color(0xFFB8E7F5), onPrimaryContainer = Color(0xFF001F28),
+    secondary = Color(0xFF81A1C1), onSecondary = Color(0xFFFFFFFF), secondaryContainer = Color(0xFFCFE4FF), onSecondaryContainer = Color(0xFF001D33),
+    tertiary = Color(0xFFB48EAD), onTertiary = Color(0xFFFFFFFF), tertiaryContainer = Color(0xFFFFD6F7), onTertiaryContainer = Color(0xFF2F1A33),
+    error = Color(0xFFBF616A), onError = Color(0xFFFFFFFF), errorContainer = Color(0xFFFFD9DC), onErrorContainer = Color(0xFF410004),
+    background = Color(0xFFECEFF4), onBackground = Color(0xFF2E3440),
+    surface = Color(0xFFECEFF4), onSurface = Color(0xFF2E3440),
+    surfaceVariant = Color(0xFFE5E9F0), onSurfaceVariant = Color(0xFF3B4252),
+    outline = Color(0xFFD8DEE9), outlineVariant = Color(0xFFE5E9F0),
+    scrim = Color(0xFF000000), // ✅
+    inverseSurface = Color(0xFF2E3440), inverseOnSurface = Color(0xFFECEFF4), inversePrimary = Color(0xFF88C0D0),
+    surfaceDim = Color(0xFFD8DEE9), surfaceBright = Color(0xFFFFFFFF),
+    surfaceContainerLowest = Color(0xFFFFFFFF), surfaceContainerLow = Color(0xFFE5E9F0),
+    surfaceContainer = Color(0xFFECEFF4), surfaceContainerHigh = Color(0xFFD8DEE9), surfaceContainerHighest = Color(0xFFC3C9D4)
+)
+
+// Strawberry (草莓)
+private val StrawberryDarkColorScheme = darkColorScheme(
+    primary = Color(0xFFFF8FB4), onPrimary = Color(0xFF5F0032), primaryContainer = Color(0xFF840048), onPrimaryContainer = Color(0xFFFFD9E2),
+    secondary = Color(0xFFFFB1C8), onSecondary = Color(0xFF5E1137), secondaryContainer = Color(0xFF7A2A4E), onSecondaryContainer = Color(0xFFFFD9E4),
+    tertiary = Color(0xFFFFABB8), onTertiary = Color(0xFF5F0919), tertiaryContainer = Color(0xFF7D1D2C), onTertiaryContainer = Color(0xFFFFD9DC),
+    error = Color(0xFFFFB4AB), onError = Color(0xFF690005), errorContainer = Color(0xFF93000A), onErrorContainer = Color(0xFFFFDAD6),
+    background = Color(0xFF19100F), // 🔥 略微深红黑
+    onBackground = Color(0xFFEFDEE3),
+    surface = Color(0xFF19100F), onSurface = Color(0xFFEFDEE3),
+    surfaceVariant = Color(0xFF524347), onSurfaceVariant = Color(0xFFD7C2C7),
+    outline = Color(0xFF9F8C91), outlineVariant = Color(0xFF524347),
+    scrim = Color(0xFF000000), // ✅
+    inverseSurface = Color(0xFFEFDEE3), inverseOnSurface = Color(0xFF362B2E), inversePrimary = Color(0xFFA8005C),
+    surfaceDim = Color(0xFF19100F), surfaceBright = Color(0xFF3F3437),
+    surfaceContainerLowest = Color(0xFF130C0E), surfaceContainerLow = Color(0xFF201418),
+    surfaceContainer = Color(0xFF281B1E), surfaceContainerHigh = Color(0xFF332528), surfaceContainerHighest = Color(0xFF3E3033)
+)
+private val StrawberryLightColorScheme = lightColorScheme(
+    primary = Color(0xFFFF6B9D), onPrimary = Color(0xFFFFFFFF), primaryContainer = Color(0xFFFFD9E2), onPrimaryContainer = Color(0xFF3E001D),
+    secondary = Color(0xFFD0477E), onSecondary = Color(0xFFFFFFFF), secondaryContainer = Color(0xFFFFD9E4), onSecondaryContainer = Color(0xFF3E0021),
+    tertiary = Color(0xFFE83A59), onTertiary = Color(0xFFFFFFFF), tertiaryContainer = Color(0xFFFFD9DC), onTertiaryContainer = Color(0xFF410004),
+    error = Color(0xFFB3261E), onError = Color(0xFFFFFFFF), errorContainer = Color(0xFFFFDAD6), onErrorContainer = Color(0xFF410002),
+    background = Color(0xFFFFFBFF), onBackground = Color(0xFF201418),
+    surface = Color(0xFFFFFBFF), onSurface = Color(0xFF201418),
+    surfaceVariant = Color(0xFFF4DDE1), onSurfaceVariant = Color(0xFF524347),
+    outline = Color(0xFF847377), outlineVariant = Color(0xFFD7C2C7),
+    scrim = Color(0xFF000000), // ✅
+    inverseSurface = Color(0xFF362B2E), inverseOnSurface = Color(0xFFFAEDEF), inversePrimary = Color(0xFFFF8FB4),
+    surfaceDim = Color(0xFFE4D7D9), surfaceBright = Color(0xFFFFFBFF),
+    surfaceContainerLowest = Color(0xFFFFFFFF), surfaceContainerLow = Color(0xFFFEF0F2),
+    surfaceContainer = Color(0xFFF8EAEC), surfaceContainerHigh = Color(0xFFF2E4E7), surfaceContainerHighest = Color(0xFFECDEE1)
+)
+
+// Tako (章鱼紫)
+private val TakoDarkColorScheme = darkColorScheme(
+    primary = Color(0xFF9D7CD8), onPrimary = Color(0xFF371F5A), primaryContainer = Color(0xFF4E3571), onPrimaryContainer = Color(0xFFE3D4FF),
+    secondary = Color(0xFFB79FE8), onSecondary = Color(0xFF3E2661), secondaryContainer = Color(0xFF553C79), onSecondaryContainer = Color(0xFFEBDCFF),
+    tertiary = Color(0xFFC790FF), onTertiary = Color(0xFF401466), tertiaryContainer = Color(0xFF592A7E), onTertiaryContainer = Color(0xFFF0D9FF),
+    error = Color(0xFFFFB4AB), onError = Color(0xFF690005), errorContainer = Color(0xFF93000A), onErrorContainer = Color(0xFFFFDAD6),
+    background = Color(0xFF14101F), // 🔥 深紫黑
+    onBackground = Color(0xFFE6E1E9),
+    surface = Color(0xFF14101F), onSurface = Color(0xFFE6E1E9),
+    surfaceVariant = Color(0xFF2D2640), onSurfaceVariant = Color(0xFFCAC4D0),
+    outline = Color(0xFF938F99), outlineVariant = Color(0xFF49454F),
+    scrim = Color(0xFF000000), // ✅
+    inverseSurface = Color(0xFFE6E1E9), inverseOnSurface = Color(0xFF313033), inversePrimary = Color(0xFF6750A4),
+    surfaceDim = Color(0xFF141020), surfaceBright = Color(0xFF3B383E),
+    surfaceContainerLowest = Color(0xFF0F0B1B), surfaceContainerLow = Color(0xFF1A1625),
+    surfaceContainer = Color(0xFF211F26), surfaceContainerHigh = Color(0xFF2B2930), surfaceContainerHighest = Color(0xFF36343B)
+)
+private val TakoLightColorScheme = lightColorScheme(
+    primary = Color(0xFF825ED0), onPrimary = Color(0xFFFFFFFF), primaryContainer = Color(0xFFE3D4FF), onPrimaryContainer = Color(0xFF2A0D52),
+    secondary = Color(0xFF6B4FA3), onSecondary = Color(0xFFFFFFFF), secondaryContainer = Color(0xFFEBDCFF), onSecondaryContainer = Color(0xFF24004F),
+    tertiary = Color(0xFFA167D9), onTertiary = Color(0xFFFFFFFF), tertiaryContainer = Color(0xFFF0D9FF), onTertiaryContainer = Color(0xFF330055),
+    error = Color(0xFFB3261E), onError = Color(0xFFFFFFFF), errorContainer = Color(0xFFFFDAD6), onErrorContainer = Color(0xFF410002),
+    background = Color(0xFFF8F5FA), // 淡紫白
+    onBackground = Color(0xFF1A1625),
+    surface = Color(0xFFF8F5FA), onSurface = Color(0xFF1A1625),
+    surfaceVariant = Color(0xFFE9E4ED), onSurfaceVariant = Color(0xFF49454F),
+    outline = Color(0xFF79747E), outlineVariant = Color(0xFFCAC4D0),
+    scrim = Color(0xFF000000), // ✅
+    inverseSurface = Color(0xFF313033), inverseOnSurface = Color(0xFFF4EFF4), inversePrimary = Color(0xFF9D7CD8),
+    surfaceDim = Color(0xFFDBD9E0), surfaceBright = Color(0xFFFFFBFE),
+    surfaceContainerLowest = Color(0xFFFFFFFF), surfaceContainerLow = Color(0xFFF5F3F7),
+    surfaceContainer = Color(0xFFEFEDF1), surfaceContainerHigh = Color(0xFFE9E7EB), surfaceContainerHighest = Color(0xFFE3E1E5)
+)
 // ============================================================================
 // 2. 核心算法: HCT Color Space Functions (Google Material Utilities)
 // ============================================================================
@@ -407,56 +568,37 @@ private fun labFInv(t: Float): Float {
 // 6. 最终核弹版：原生直出方案 (What You See Is What You Get)
 // ============================================================================
 private fun generateDynamicColorScheme(seedColor: Color, isDark: Boolean): ColorScheme {
-    // 1. 获取颜色的物理属性
     val (hue, chroma, tone) = seedColor.toHct()
 
-    // 2. 确定 Primary 颜色
-    // 逻辑：如果是在深色模式，且用户选的颜色亮度适中(>40)，直接用原色！
-    // 这样 #FF0000 (Red) 就会保持 #FF0000，绝对不会变成橙色或粉色。
-    // 这样 #0665DC (Blue) 就会保持 #0665DC，绝对不会变成泛白。
+    // --- 1. 智能主色处理 (防止色彩偏移) ---
     val primaryColor = if (isDark) {
-        when {
-            // 极暗色 (Tone < 40): 必须提亮，否则看不见
-            // 这里使用 hctToColor 智能提亮到 55 (红/蓝的甜点亮度)
-            tone < 40f -> {
-                val safeTone = 55f
-                hctToColor(hue, chroma.coerceAtLeast(48f), safeTone)
-            }
-            // 正常色/亮色 (Tone >= 40): 直接用用户的颜色！不改！
-            else -> seedColor
+        if (tone < 40f) {
+            val safeTone = 55f
+            hctToColor(hue, chroma.coerceAtLeast(48f), safeTone)
+        } else {
+            seedColor
         }
     } else {
-        // 浅色模式：通常 Tone 40 是标准。
-        // 如果用户选的本来就是深色(Tone < 50)，直接用。
-        // 如果用户选的是亮色(Tone > 50)，压暗到 40 以保证对比度。
         if (tone < 50f) seedColor else hctToColor(hue, chroma.coerceAtLeast(48f), 40f)
     }
 
-    // 3. 确定文字颜色 (OnPrimary)
-    // 既然 Primary 可能是用户选的任意颜色，我们需要计算对比度来决定字是黑还是白。
-    // 简单算法：如果背景亮度 > 60，用黑字；否则白字。
-    // (纯红 Tone 54 -> 白字; 纯黄 Tone 85 -> 黑字)
     val (_, _, primaryToneActual) = primaryColor.toHct()
     val onPrimaryColor = if (primaryToneActual > 60f) Color.Black else Color.White
 
-    // 4. 生成配套颜色 (Container)
-    // Container 稍微拉开一点亮度差距
-    val containerTone = if (isDark) 30f else 90f
-    val primaryContainer = hctToColor(hue, chroma, containerTone)
-    val onPrimaryContainer = hctToColor(hue, chroma, if (isDark) 90f else 10f)
-
-    // 5. 背景微调 (让黑色背景带一点点颜色的倾向，更有质感)
-    val bgChroma = if (chroma < 5f) 0f else chroma * 0.04f
+    // --- 2. 背景与容器色系 (关键：解决 Card 颜色问题) ---
+    // 给背景一点点主色的倾向 (Tint)，让界面不那么死板，但要很低饱和度
+    val bgChroma = if (chroma < 5f) 0f else chroma * 0.06f // 稍微增加一点色相倾向
 
     if (isDark) {
+        // [深色模式] Surface 逻辑：Tone 值越低越黑
+        // 传统的 Surface 是 6，Elevated Card 需要比背景亮
         return darkColorScheme(
             primary = primaryColor,
             onPrimary = onPrimaryColor,
-            primaryContainer = primaryContainer,
-            onPrimaryContainer = onPrimaryContainer,
+            primaryContainer = hctToColor(hue, chroma, 30f),
+            onPrimaryContainer = hctToColor(hue, chroma, 90f),
 
-            // Secondary: 为了协调，还是用 HCT 生成一个稍暗的同色系版本
-            secondary = hctToColor(hue, chroma, 50f),
+            secondary = hctToColor(hue, chroma, 50f), // 稍微降低饱和度或改变色相可以做复色，这里保持同色系
             onSecondary = Color.White,
             secondaryContainer = hctToColor(hue, chroma, 30f),
             onSecondaryContainer = hctToColor(hue, chroma, 90f),
@@ -471,28 +613,43 @@ private fun generateDynamicColorScheme(seedColor: Color, isDark: Boolean): Color
             errorContainer = Color(0xFF93000A),
             onErrorContainer = Color(0xFFFFDAD6),
 
-            background = hctToColor(hue, bgChroma, 6f),
+            // --- 核心修复：完整的 Surface 定义 ---
+            background = hctToColor(hue, bgChroma, 6f),      // 极黑背景
             onBackground = hctToColor(hue, bgChroma, 90f),
-            surface = hctToColor(hue, bgChroma, 6f),
+
+            surface = hctToColor(hue, bgChroma, 6f),         // 与背景一致
             onSurface = hctToColor(hue, bgChroma, 90f),
+
+            // FilledCard 默认用这个 (Tone 30 -> 明显的卡片感)
             surfaceVariant = hctToColor(hue, bgChroma, 30f),
             onSurfaceVariant = hctToColor(hue, bgChroma, 80f),
 
+            // 边框
             outline = hctToColor(hue, bgChroma, 60f),
             outlineVariant = hctToColor(hue, bgChroma, 30f),
+
+            // --- 容器系列 (ElevatedCard, BottomSheet 用这些) ---
+            // 越 Low 越接近背景，越 High 越亮
+            surfaceContainerLowest = hctToColor(hue, bgChroma, 4f),
+            surfaceContainerLow = hctToColor(hue, bgChroma, 10f),  // ElevatedCard 默认
+            surfaceContainer = hctToColor(hue, bgChroma, 12f),
+            surfaceContainerHigh = hctToColor(hue, bgChroma, 17f),
+            surfaceContainerHighest = hctToColor(hue, bgChroma, 22f),
+
             inverseSurface = hctToColor(hue, bgChroma, 90f),
             inverseOnSurface = hctToColor(hue, bgChroma, 20f),
-            inversePrimary = hctToColor(hue, chroma, 80f), // 反转色保持标准
+            inversePrimary = hctToColor(hue, chroma, 80f),
             scrim = Color.Black
         )
     } else {
+        // [浅色模式] Surface 逻辑：Tone 值越高越白
         return lightColorScheme(
             primary = primaryColor,
             onPrimary = onPrimaryColor,
-            primaryContainer = primaryContainer,
-            onPrimaryContainer = onPrimaryContainer,
+            primaryContainer = hctToColor(hue, chroma, 90f),
+            onPrimaryContainer = hctToColor(hue, chroma, 10f),
 
-            secondary = hctToColor(hue, chroma, 50f),
+            secondary = hctToColor(hue, chroma, 40f),
             onSecondary = Color.White,
             secondaryContainer = hctToColor(hue, chroma, 90f),
             onSecondaryContainer = hctToColor(hue, chroma, 10f),
@@ -507,15 +664,28 @@ private fun generateDynamicColorScheme(seedColor: Color, isDark: Boolean): Color
             errorContainer = Color(0xFFFFDAD6),
             onErrorContainer = Color(0xFF410002),
 
-            background = hctToColor(hue, bgChroma, 98f),
+            // --- 核心修复：完整的 Surface 定义 ---
+            background = hctToColor(hue, bgChroma, 98f),     // 极亮背景
             onBackground = hctToColor(hue, bgChroma, 10f),
+
             surface = hctToColor(hue, bgChroma, 98f),
             onSurface = hctToColor(hue, bgChroma, 10f),
+
+            // FilledCard 默认用这个 (Tone 90 -> 灰调卡片)
             surfaceVariant = hctToColor(hue, bgChroma, 90f),
             onSurfaceVariant = hctToColor(hue, bgChroma, 30f),
 
             outline = hctToColor(hue, bgChroma, 50f),
             outlineVariant = hctToColor(hue, bgChroma, 80f),
+
+            // --- 容器系列 ---
+            // 浅色模式下，Lowest 是纯白，High 稍微变灰
+            surfaceContainerLowest = hctToColor(hue, bgChroma, 100f),
+            surfaceContainerLow = hctToColor(hue, bgChroma, 96f), // ElevatedCard 默认
+            surfaceContainer = hctToColor(hue, bgChroma, 94f),
+            surfaceContainerHigh = hctToColor(hue, bgChroma, 92f),
+            surfaceContainerHighest = hctToColor(hue, bgChroma, 90f),
+
             inverseSurface = hctToColor(hue, bgChroma, 20f),
             inverseOnSurface = hctToColor(hue, bgChroma, 95f),
             inversePrimary = hctToColor(hue, chroma, 80f),
