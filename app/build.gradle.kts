@@ -75,6 +75,7 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 
 dependencies {
     implementation("androidx.compose.material:material-icons-extended")
+    implementation(libs.androidx.compose.animation)
     val editorVersion = "0.24.0"
     implementation("io.github.rosemoe:editor:$editorVersion")
     implementation("io.github.rosemoe:language-textmate:$editorVersion")

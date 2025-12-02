@@ -16,22 +16,49 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.web.webide.ui.welcome.themeColors
 import com.web.webide.ui.welcome.ColorPickerDialog
-import com.web.webide.core.utils.LogCatcher // 导入日志工具
+import com.web.webide.core.utils.LogCatcher
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ThemeSelectionDialog(
     onDismiss: () -> Unit,
+    // 这个回调会更新全局 ViewModel/DataStore
     onThemeSelected: (Int, Int, Color, Boolean) -> Unit,
     initialModeIndex: Int = 0,
-    initialThemeIndex: Int = 0
+    initialThemeIndex: Int = 0,
+    initialCustomColor: Color = Color(0xFF6750A4), // 建议传入初始自定义颜色
+    initialIsCustom: Boolean = false // 建议传入初始是否为自定义
 ) {
-    var selectedModeIndex by remember { mutableStateOf(initialModeIndex) }
-    var selectedThemeIndex by remember { mutableStateOf(initialThemeIndex) }
-    var showColorPicker by remember { mutableStateOf(false) }
-    var customColor by remember { mutableStateOf(Color(0xFF6750A4)) }
+    // 1. 记录初始状态，用于"取消"时回滚
+    val originMode = remember { initialModeIndex }
+    val originTheme = remember { initialThemeIndex }
+    val originColor = remember { initialCustomColor }
+    val originIsCustom = remember { initialIsCustom }
 
-    Dialog(onDismissRequest = onDismiss) {
+    // 2. 本地 UI 状态
+    var selectedModeIndex by remember { mutableIntStateOf(initialModeIndex) }
+    var selectedThemeIndex by remember { mutableIntStateOf(initialThemeIndex) }
+    var showColorPicker by remember { mutableStateOf(false) }
+    var customColor by remember { mutableStateOf(initialCustomColor) }
+
+    // 辅助函数：立即应用主题 (实现实时预览的核心)
+    fun applyThemeNow(
+        mode: Int = selectedModeIndex,
+        themeIdx: Int = selectedThemeIndex,
+        color: Color = customColor
+    ) {
+        val isCustom = themeIdx == themeColors.size
+        // 立即触发外部回调，界面会瞬间变色
+        onThemeSelected(mode, themeIdx, color, isCustom)
+
+        LogCatcher.d("ThemeDebug_Preview", "实时预览: Mode=$mode, Theme=$themeIdx, Color=${color.value}")
+    }
+
+    Dialog(onDismissRequest = {
+        // 点击外部区域关闭时，视为"取消"，回滚状态
+        onThemeSelected(originMode, originTheme, originColor, originIsCustom)
+        onDismiss()
+    }) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -63,7 +90,11 @@ fun ThemeSelectionDialog(
                     modeOptions.forEachIndexed { index, label ->
                         SegmentedButton(
                             selected = selectedModeIndex == index,
-                            onClick = { selectedModeIndex = index },
+                            onClick = {
+                                selectedModeIndex = index
+                                // 🔥 关键修改：点击即应用
+                                applyThemeNow(mode = index)
+                            },
                             shape = SegmentedButtonDefaults.itemShape(index = index, count = modeOptions.size),
                             icon = {}
                         ) { Text(label) }
@@ -82,7 +113,11 @@ fun ThemeSelectionDialog(
                         com.web.webide.ui.welcome.ThemePreviewCard(
                             theme = theme,
                             isSelected = selectedThemeIndex == index,
-                            onClick = { selectedThemeIndex = index }
+                            onClick = {
+                                selectedThemeIndex = index
+                                // 🔥 关键修改：点击即应用
+                                applyThemeNow(themeIdx = index)
+                            }
                         )
                     }
                     // 自定义 (入口)
@@ -90,6 +125,8 @@ fun ThemeSelectionDialog(
                         isSelected = selectedThemeIndex == themeColors.size,
                         onClick = {
                             selectedThemeIndex = themeColors.size
+                            // 这里先不应用，等选完颜色再应用，或者这里先应用上次的自定义色
+                            applyThemeNow(themeIdx = themeColors.size)
                             showColorPicker = true
                         }
                     )
@@ -99,20 +136,20 @@ fun ThemeSelectionDialog(
 
                 // 底部按钮
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = onDismiss) { Text("取消") }
+                    TextButton(onClick = {
+                        // 🛑 "取消"逻辑：回滚到最初的状态
+                        onThemeSelected(originMode, originTheme, originColor, originIsCustom)
+                        onDismiss()
+                    }) { Text("取消") }
+
                     Spacer(modifier = Modifier.width(8.dp))
+
                     Button(
                         onClick = {
-                            val isCustom = selectedThemeIndex == themeColors.size
-
-                            // [Debug Log] UI层点击确认
-                            LogCatcher.i("ThemeDebug_UI", "用户点击应用: 模式=$selectedModeIndex, 主题Index=$selectedThemeIndex, 是否自定义=$isCustom")
-                            LogCatcher.i("ThemeDebug_UI", "自定义颜色Hex: #${Integer.toHexString(customColor.value.toInt())}")
-
-                            onThemeSelected(selectedModeIndex, selectedThemeIndex, customColor, isCustom)
+                            // ✅ "确定"逻辑：什么都不用做，因为已经是最新状态了，直接关闭即可
                             onDismiss()
                         }
-                    ) { Text("应用") }
+                    ) { Text("完成") }
                 }
             }
         }
@@ -125,6 +162,10 @@ fun ThemeSelectionDialog(
             onColorSelected = { color ->
                 customColor = color
                 showColorPicker = false
+                // 🔥 关键修改：选完颜色立即刷新
+                // 确保选中"自定义"选项
+                selectedThemeIndex = themeColors.size
+                applyThemeNow(themeIdx = themeColors.size, color = color)
             }
         )
     }

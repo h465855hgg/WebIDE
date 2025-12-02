@@ -267,115 +267,259 @@ private val TakoLightColorScheme = lightColorScheme( primary = Color(0xFF825ED0)
 // ============================================================================
 // 2. 核心算法: HCT Color Space Functions (Google Material Utilities)
 // ============================================================================
+// ============================================================================
+// 2. 核心算法: HCT Color Space Functions (最终修复版)
+// ============================================================================
 
-private fun Color.toHct(): Triple<Float, Float, Float> { val r = red.toLinear(); val g = green.toLinear(); val b = blue.toLinear(); val x = r * 0.4124564f + g * 0.3575761f + b * 0.1804375f; val y = r * 0.2126729f + g * 0.7151522f + b * 0.0721750f; val z = r * 0.0193339f + g * 0.1191920f + b * 0.9503041f; val l = 116f * labF(y / 100f) - 16f; val a = 500f * (labF(x / 95.047f) - labF(y / 100f)); val bLab = 200f * (labF(y / 100f) - labF(z / 108.883f)); val hue = Math.toDegrees(kotlin.math.atan2(bLab.toDouble(), a.toDouble())).toFloat(); val hueNormalized = if (hue < 0) hue + 360f else hue; val chroma = kotlin.math.sqrt(a * a + bLab * bLab); val tone = l; return Triple(hueNormalized, chroma, tone) }
-private fun Float.toLinear(): Float { return if (this <= 0.04045f) { this / 12.92f } else { ((this + 0.055f) / 1.055f).pow(2.4f) } }
-private fun labF(t: Float): Float { val delta = 6f / 29f; return if (t > delta * delta * delta) { t.pow(1f / 3f) } else { t / (3f * delta * delta) + 4f / 29f } }
-private fun hctToColor(h: Float, c: Float, t: Float): Color { val hRad = Math.toRadians(h.toDouble()); val a = (c * kotlin.math.cos(hRad)).toFloat(); val b = (c * kotlin.math.sin(hRad)).toFloat(); val l = t; val fy = (l + 16f) / 116f; val fx = a / 500f + fy; val fz = fy - b / 200f; val x = 95.047f * labFInv(fx); val y = 100f * labFInv(fy); val z = 108.883f * labFInv(fz); val r = (x * 3.2404542f - y * 1.5371385f - z * 0.4985314f) / 100f; val g = (-x * 0.9692660f + y * 1.8760108f + z * 0.0415560f) / 100f; val bColor = (x * 0.0556434f - y * 0.2040259f + z * 1.0572252f) / 100f; return Color( red = r.fromLinear().coerceIn(0f, 1f), green = g.fromLinear().coerceIn(0f, 1f), blue = bColor.fromLinear().coerceIn(0f, 1f) ) }
-private fun labFInv(t: Float): Float { val delta = 6f / 29f; return if (t > delta) { t * t * t } else { 3f * delta * delta * (t - 4f / 29f) } }
-private fun Float.fromLinear(): Float { return if (this <= 0.0031308f) { this * 12.92f } else { 1.055f * this.pow(1f / 2.4f) - 0.055f } }
+// 1. 扩展函数：将 Color 转为 HCT (Hue, Chroma, Tone)
+private fun Color.toHct(): Triple<Float, Float, Float> {
+    // 1. RGB (0-1) 转 线性 RGB
+    val r = red.toLinear()
+    val g = green.toLinear()
+    val b = blue.toLinear()
 
+    // 2. 线性 RGB 转 XYZ
+    // 🔥 修复点 1：XYZ 标准空间通常基于 0-100 的范围，而 RGB 是 0-1。
+    // 这里的转换矩阵算出来的是 0-1 范围的 XYZ，所以必须 * 100，否则算出来的 L (亮度) 永远接近 0。
+    val x = (r * 0.4124564f + g * 0.3575761f + b * 0.1804375f) * 100f
+    val y = (r * 0.2126729f + g * 0.7151522f + b * 0.0721750f) * 100f
+    val z = (r * 0.0193339f + g * 0.1191920f + b * 0.9503041f) * 100f
 
+    // 3. XYZ 转 Lab
+    // 这里的 reference white (95.047, 100, 108.883) 对应 D65 光源
+    val l = 116f * labF(y / 100f) - 16f
+    val a = 500f * (labF(x / 95.047f) - labF(y / 100f))
+    val bLab = 200f * (labF(y / 100f) - labF(z / 108.883f))
 
-// ... 前面的 HCT 算法辅助函数保持不变 ...
+    // 4. Lab 转 HCT (Hue, Chroma)
+    val hue = Math.toDegrees(kotlin.math.atan2(bLab.toDouble(), a.toDouble())).toFloat()
+    val hueNormalized = if (hue < 0) hue + 360f else hue
+    val chroma = kotlin.math.sqrt(a * a + bLab * bLab)
 
-// ✅ 修复后的生成算法
-private fun generateDynamicColorScheme(seedColor: Color, isDark: Boolean): ColorScheme {
-    val (hue, baseChroma, _) = seedColor.toHct()
+    // Tone 直接就是 Lab 的 L
+    return Triple(hueNormalized, chroma, l)
+}
 
-    // 🔥 核心修复 🔥
-    // 旧代码: val chroma = baseChroma.coerceAtLeast(48f)
-    // 问题: 这行代码强行把黑白变成了彩色。
+// 2. 内部函数：HCT 转 原始 RGB (可能包含越界值)
+private fun hctToRgbRaw(h: Float, c: Float, t: Float): FloatArray {
+    // 1. HCT 转 Lab
+    val hRad = Math.toRadians(h.toDouble())
+    val a = (c * kotlin.math.cos(hRad)).toFloat()
+    val b = (c * kotlin.math.sin(hRad)).toFloat()
+    val l = t
 
-    // 新逻辑:
-    // 1. 如果用户选的颜色饱和度很低(小于5)，说明他想要黑白/灰色主题，直接用原饱和度。
-    // 2. 如果用户选的是彩色，我们保证它至少有 48 的鲜艳度，避免颜色过于暗淡。
-    val chroma = if (baseChroma < 5.0f) {
-        baseChroma // 用户选了黑/白/灰，保持原样（生成单色主题）
-    } else {
-        baseChroma.coerceAtLeast(48f) // 用户选了彩色，确保够鲜艳
+    // 2. Lab 转 XYZ
+    val fy = (l + 16f) / 116f
+    val fx = a / 500f + fy
+    val fz = fy - b / 200f
+
+    // 这里算出来的是 0-100 范围的 XYZ
+    val x = 95.047f * labFInv(fx)
+    val y = 100f * labFInv(fy)
+    val z = 108.883f * labFInv(fz)
+
+    // 3. XYZ 转 线性 RGB (注意这里除以 100 归一化到 0-1)
+    val rLinear = (x * 3.2404542f - y * 1.5371385f - z * 0.4985314f) / 100f
+    val gLinear = (-x * 0.9692660f + y * 1.8760108f + z * 0.0415560f) / 100f
+    val bLinear = (x * 0.0556434f - y * 0.2040259f + z * 1.0572252f) / 100f
+
+    return floatArrayOf(rLinear, gLinear, bLinear)
+}
+
+// 3. 检查 RGB 是否在 sRGB 色域内 (允许极小误差)
+private fun isRgbInGamut(rgb: FloatArray): Boolean {
+    val epsilon = 0.0001f
+    // 只需要检查线性值是否在 0-1 之间即可，不需要先转 Gamma
+    return (rgb[0] >= -epsilon && rgb[0] <= 1.0f + epsilon) &&
+            (rgb[1] >= -epsilon && rgb[1] <= 1.0f + epsilon) &&
+            (rgb[2] >= -epsilon && rgb[2] <= 1.0f + epsilon)
+}
+
+// 4. 主函数：HCT 转 Color (带色域映射 Gamut Mapping)
+// 解决 0665DC 这种高饱和蓝色的关键
+private fun hctToColor(h: Float, c: Float, t: Float): Color {
+    // 步骤 A: 尝试直接转换
+    val rawRgb = hctToRgbRaw(h, c, t)
+
+    if (isRgbInGamut(rawRgb)) {
+        return Color(
+            red = rawRgb[0].fromLinear().coerceIn(0f, 1f),
+            green = rawRgb[1].fromLinear().coerceIn(0f, 1f),
+            blue = rawRgb[2].fromLinear().coerceIn(0f, 1f)
+        )
     }
+
+    // 步骤 B: 如果溢出，二分查找最佳 Chroma
+    // 保持 Hue 和 Tone 不变，降低 Chroma 直到颜色能显示
+    var low = 0f
+    var high = c
+    var bestChroma = 0f
+
+    // 6次迭代足以达到肉眼无法区分的精度
+    for (i in 0..6) {
+        val mid = (low + high) / 2
+        if (isRgbInGamut(hctToRgbRaw(h, mid, t))) {
+            bestChroma = mid
+            low = mid
+        } else {
+            high = mid
+        }
+    }
+
+    val finalRgb = hctToRgbRaw(h, bestChroma, t)
+    return Color(
+        red = finalRgb[0].fromLinear().coerceIn(0f, 1f),
+        green = finalRgb[1].fromLinear().coerceIn(0f, 1f),
+        blue = finalRgb[2].fromLinear().coerceIn(0f, 1f)
+    )
+}
+
+// 5. 数学辅助函数 (Gamma 校正与 Lab 函数)
+private fun Float.toLinear(): Float =
+    if (this <= 0.04045f) this / 12.92f else ((this + 0.055f) / 1.055f).pow(2.4f)
+
+private fun Float.fromLinear(): Float =
+    if (this <= 0.0031308f) this * 12.92f else 1.055f * this.pow(1f / 2.4f) - 0.055f
+
+private fun labF(t: Float): Float {
+    val delta = 6f / 29f
+    return if (t > delta * delta * delta) t.pow(1f / 3f) else t / (3f * delta * delta) + 4f / 29f
+}
+
+private fun labFInv(t: Float): Float {
+    val delta = 6f / 29f
+    return if (t > delta) t * t * t else 3f * delta * delta * (t - 4f / 29f)
+}
+
+// ============================================================================
+// 修复后的 scheme 生成逻辑
+// ============================================================================
+// ============================================================================
+// 3. 最终方案：智能调整 Tone 值的生成逻辑 (拒绝惨白，保留色彩)
+// ============================================================================
+// ============================================================================
+// 4. 终极方案：高保真色彩模式 (拒绝粉色/发白，还原纯正色彩)
+// ============================================================================
+// ============================================================================
+// 5. 最终完美版：自适应亮度方案 (修复红色变橙、黄色变暗的问题)
+// ============================================================================
+// ============================================================================
+// 6. 最终核弹版：原生直出方案 (What You See Is What You Get)
+// ============================================================================
+private fun generateDynamicColorScheme(seedColor: Color, isDark: Boolean): ColorScheme {
+    // 1. 获取颜色的物理属性
+    val (hue, chroma, tone) = seedColor.toHct()
+
+    // 2. 确定 Primary 颜色
+    // 逻辑：如果是在深色模式，且用户选的颜色亮度适中(>40)，直接用原色！
+    // 这样 #FF0000 (Red) 就会保持 #FF0000，绝对不会变成橙色或粉色。
+    // 这样 #0665DC (Blue) 就会保持 #0665DC，绝对不会变成泛白。
+    val primaryColor = if (isDark) {
+        when {
+            // 极暗色 (Tone < 40): 必须提亮，否则看不见
+            // 这里使用 hctToColor 智能提亮到 55 (红/蓝的甜点亮度)
+            tone < 40f -> {
+                val safeTone = 55f
+                hctToColor(hue, chroma.coerceAtLeast(48f), safeTone)
+            }
+            // 正常色/亮色 (Tone >= 40): 直接用用户的颜色！不改！
+            else -> seedColor
+        }
+    } else {
+        // 浅色模式：通常 Tone 40 是标准。
+        // 如果用户选的本来就是深色(Tone < 50)，直接用。
+        // 如果用户选的是亮色(Tone > 50)，压暗到 40 以保证对比度。
+        if (tone < 50f) seedColor else hctToColor(hue, chroma.coerceAtLeast(48f), 40f)
+    }
+
+    // 3. 确定文字颜色 (OnPrimary)
+    // 既然 Primary 可能是用户选的任意颜色，我们需要计算对比度来决定字是黑还是白。
+    // 简单算法：如果背景亮度 > 60，用黑字；否则白字。
+    // (纯红 Tone 54 -> 白字; 纯黄 Tone 85 -> 黑字)
+    val (_, _, primaryToneActual) = primaryColor.toHct()
+    val onPrimaryColor = if (primaryToneActual > 60f) Color.Black else Color.White
+
+    // 4. 生成配套颜色 (Container)
+    // Container 稍微拉开一点亮度差距
+    val containerTone = if (isDark) 30f else 90f
+    val primaryContainer = hctToColor(hue, chroma, containerTone)
+    val onPrimaryContainer = hctToColor(hue, chroma, if (isDark) 90f else 10f)
+
+    // 5. 背景微调 (让黑色背景带一点点颜色的倾向，更有质感)
+    val bgChroma = if (chroma < 5f) 0f else chroma * 0.04f
 
     if (isDark) {
         return darkColorScheme(
-            // 注意：Material 3 规范中 Primary 永远是 Tone 80 (深色模式)
-            // 如果你选了黑色，baseChroma接近0，这里就会生成灰色，这是正确的表现
-            primary = hctToColor(hue, chroma, 80f),
-            onPrimary = hctToColor(hue, chroma, 20f),
-            primaryContainer = hctToColor(hue, chroma, 30f),
-            onPrimaryContainer = hctToColor(hue, chroma, 90f),
-            secondary = hctToColor(hue, chroma, 80f), // 单色模式下，Secondary 通常与 Primary 饱和度一致
-            onSecondary = hctToColor(hue, chroma, 20f),
+            primary = primaryColor,
+            onPrimary = onPrimaryColor,
+            primaryContainer = primaryContainer,
+            onPrimaryContainer = onPrimaryContainer,
+
+            // Secondary: 为了协调，还是用 HCT 生成一个稍暗的同色系版本
+            secondary = hctToColor(hue, chroma, 50f),
+            onSecondary = Color.White,
             secondaryContainer = hctToColor(hue, chroma, 30f),
             onSecondaryContainer = hctToColor(hue, chroma, 90f),
-            tertiary = hctToColor((hue + 60f) % 360f, chroma * 0.7f, 80f), // Tertiary 可以保留一点变化，或者也改成 chroma
-            onTertiary = hctToColor((hue + 60f) % 360f, chroma * 0.7f, 20f),
+
+            tertiary = hctToColor((hue + 60f) % 360f, chroma * 0.7f, 60f),
+            onTertiary = Color.White,
             tertiaryContainer = hctToColor((hue + 60f) % 360f, chroma * 0.7f, 30f),
             onTertiaryContainer = hctToColor((hue + 60f) % 360f, chroma * 0.7f, 90f),
+
             error = Color(0xFFFFB4AB),
             onError = Color(0xFF690005),
             errorContainer = Color(0xFF93000A),
             onErrorContainer = Color(0xFFFFDAD6),
-            background = hctToColor(hue, chroma * 0.05f, 6f),
-            onBackground = hctToColor(hue, chroma * 0.05f, 90f),
-            surface = hctToColor(hue, chroma * 0.05f, 6f),
-            onSurface = hctToColor(hue, chroma * 0.05f, 90f),
-            surfaceVariant = hctToColor(hue, chroma * 0.1f, 30f),
-            onSurfaceVariant = hctToColor(hue, chroma * 0.1f, 80f),
-            surfaceDim = hctToColor(hue, chroma * 0.05f, 4f),
-            surfaceBright = hctToColor(hue, chroma * 0.05f, 24f),
-            surfaceContainerLowest = hctToColor(hue, chroma * 0.05f, 2f),
-            surfaceContainerLow = hctToColor(hue, chroma * 0.05f, 10f),
-            surfaceContainer = hctToColor(hue, chroma * 0.05f, 12f),
-            surfaceContainerHigh = hctToColor(hue, chroma * 0.05f, 17f),
-            surfaceContainerHighest = hctToColor(hue, chroma * 0.05f, 22f),
-            outline = hctToColor(hue, chroma * 0.1f, 60f),
-            outlineVariant = hctToColor(hue, chroma * 0.1f, 30f),
-            inverseSurface = hctToColor(hue, chroma * 0.05f, 90f),
-            inverseOnSurface = hctToColor(hue, chroma * 0.05f, 20f),
-            inversePrimary = hctToColor(hue, chroma, 40f),
-            scrim = Color.Black,
-            surfaceTint = hctToColor(hue, chroma, 80f)
+
+            background = hctToColor(hue, bgChroma, 6f),
+            onBackground = hctToColor(hue, bgChroma, 90f),
+            surface = hctToColor(hue, bgChroma, 6f),
+            onSurface = hctToColor(hue, bgChroma, 90f),
+            surfaceVariant = hctToColor(hue, bgChroma, 30f),
+            onSurfaceVariant = hctToColor(hue, bgChroma, 80f),
+
+            outline = hctToColor(hue, bgChroma, 60f),
+            outlineVariant = hctToColor(hue, bgChroma, 30f),
+            inverseSurface = hctToColor(hue, bgChroma, 90f),
+            inverseOnSurface = hctToColor(hue, bgChroma, 20f),
+            inversePrimary = hctToColor(hue, chroma, 80f), // 反转色保持标准
+            scrim = Color.Black
         )
     } else {
         return lightColorScheme(
-            // 浅色模式 Primary 永远是 Tone 40
-            primary = hctToColor(hue, chroma, 40f),
-            onPrimary = Color.White,
-            primaryContainer = hctToColor(hue, chroma, 90f),
-            onPrimaryContainer = hctToColor(hue, chroma, 10f),
-            secondary = hctToColor(hue, chroma, 40f),
+            primary = primaryColor,
+            onPrimary = onPrimaryColor,
+            primaryContainer = primaryContainer,
+            onPrimaryContainer = onPrimaryContainer,
+
+            secondary = hctToColor(hue, chroma, 50f),
             onSecondary = Color.White,
             secondaryContainer = hctToColor(hue, chroma, 90f),
             onSecondaryContainer = hctToColor(hue, chroma, 10f),
+
             tertiary = hctToColor((hue + 60f) % 360f, chroma * 0.7f, 40f),
             onTertiary = Color.White,
             tertiaryContainer = hctToColor((hue + 60f) % 360f, chroma * 0.7f, 90f),
             onTertiaryContainer = hctToColor((hue + 60f) % 360f, chroma * 0.7f, 10f),
+
             error = Color(0xFFB3261E),
             onError = Color.White,
             errorContainer = Color(0xFFFFDAD6),
             onErrorContainer = Color(0xFF410002),
-            background = hctToColor(hue, chroma * 0.05f, 98f),
-            onBackground = hctToColor(hue, chroma * 0.05f, 10f),
-            surface = hctToColor(hue, chroma * 0.05f, 98f),
-            onSurface = hctToColor(hue, chroma * 0.05f, 10f),
-            surfaceVariant = hctToColor(hue, chroma * 0.1f, 90f),
-            onSurfaceVariant = hctToColor(hue, chroma * 0.1f, 30f),
-            surfaceDim = hctToColor(hue, chroma * 0.05f, 87f),
-            surfaceBright = hctToColor(hue, chroma * 0.05f, 98f),
-            surfaceContainerLowest = Color.White,
-            surfaceContainerLow = hctToColor(hue, chroma * 0.05f, 96f),
-            surfaceContainer = hctToColor(hue, chroma * 0.05f, 94f),
-            surfaceContainerHigh = hctToColor(hue, chroma * 0.05f, 92f),
-            surfaceContainerHighest = hctToColor(hue, chroma * 0.05f, 90f),
-            outline = hctToColor(hue, chroma * 0.1f, 50f),
-            outlineVariant = hctToColor(hue, chroma * 0.1f, 80f),
-            inverseSurface = hctToColor(hue, chroma * 0.05f, 20f),
-            inverseOnSurface = hctToColor(hue, chroma * 0.05f, 95f),
+
+            background = hctToColor(hue, bgChroma, 98f),
+            onBackground = hctToColor(hue, bgChroma, 10f),
+            surface = hctToColor(hue, bgChroma, 98f),
+            onSurface = hctToColor(hue, bgChroma, 10f),
+            surfaceVariant = hctToColor(hue, bgChroma, 90f),
+            onSurfaceVariant = hctToColor(hue, bgChroma, 30f),
+
+            outline = hctToColor(hue, bgChroma, 50f),
+            outlineVariant = hctToColor(hue, bgChroma, 80f),
+            inverseSurface = hctToColor(hue, bgChroma, 20f),
+            inverseOnSurface = hctToColor(hue, bgChroma, 95f),
             inversePrimary = hctToColor(hue, chroma, 80f),
-            scrim = Color.Black,
-            surfaceTint = hctToColor(hue, chroma, 40f)
+            scrim = Color.Black
         )
     }
 }
