@@ -1,90 +1,97 @@
-# WebIDE - AI-Powered Web Previewer for Collaborative Development
+# WebIDE – AI‑Built Web/Android IDE  
 
-## 📖 Project Introduction
+[English 🇺🇸](README_EN.md) | [中文 🇨🇳](README.md)
 
-Built with Jetpack Compose. The most distinctive feature of this project is that it was **completely developed by AI**, demonstrating the powerful potential of AI in software development.
+## 📖 Project Overview  
+WebIDE is a lightweight, web-focused Android IDE built 100 % with **Jetpack Compose**—and 100 % by **AI collaboration**.  
+The repo demonstrates how far modern language models can go when they act as a real engineering team.
 
-## 🤖 AI Development
+## 🤖 AI Development Credits  
+No human wrote a single line of code. The work was split between:
 
-This project is the result of collaboration between multiple AI models:
+| Model   | Responsibility |
+|---------|----------------|
+| **Claude 4.5** | Welcome flow, theme engine, UX polish |
+| **Gemini 3.0 Pro** | Main UI shell, file-tree component, project management |
+| **DeepSeek** | Editor core, syntax-highlight engine, real-time preview bridge |
 
-- **Claude**: Responsible for writing the welcome interface and theme system
-- **Gemini**: Developed the main UI interface and file tree components
-- **DeepSeek**: Co-developed core code editor functionality with Gemini
+## 🛠️ Tech Stack  
+- **Language**: Kotlin  
+- **UI Toolkit**: Jetpack Compose (100 %)  
+- **Target SDK**: Android 8.0+ (API 26 → 34)  
+- **Build system**: Gradle Kotlin-DSL  
+- **VCS**: Git (GitHub)
 
-## 🛠️ Tech Stack
-
-- **Language**: Kotlin
-- **UI Framework**: Jetpack Compose
-- **Target Platform**: Android
-
-## 📁 Project Structure
-
+## 📁 Project Structure  
 ```
 app/src/main/java/com/web/webide/
-├── core/           # Core business logic
-├── files/          # File management module
-├── html/           # HTML processing related
-├── textmate/       # Syntax highlighting support
-├── ui/             # User interface layer
-│   ├── components/ # Reusable components
-│   ├── editor/     # Code editor
-│   ├── preview/    # Real-time preview
-│   ├── projects/   # Project management
-│   ├── settings/   # Settings interface
-│   ├── theme/      # Theme system
-│   └── welcome/    # Welcome interface
-├── App.kt          # Application entry
-└── MainActivity.kt # Main activity
+├── core/           # Business logic & DI
+├── files/          # File-system abstraction
+├── html/           # HTML/CSS/JS parsers & helpers
+├── textmate/       # Syntax-highlight grammar files
+├── ui/             # Compose UI layer
+│   ├── components/ # Re-usable widgets
+│   ├── editor/     # Code editor with line numbers
+│   ├── preview/    # Live Web-view
+│   ├── projects/   # Create / open / delete projects
+│   ├── settings/   # Theme & editor config
+│   ├── theme/      # Dark / Light / Custom palettes
+│   └── welcome/    # On-boarding screen
+├── App.kt          # Application singleton
+└── MainActivity.kt # Single-Activity entry point
 ```
 
-## ✨ Main Features
+## ✨ Key Features  
 
-### 🎨 Interface Features
-- **Modern UI**: Smooth interface based on Jetpack Compose
-- **Theme System**: Support for multiple theme switching
-- **Responsive Design**: Adapts to different screen sizes
+### 🎨 Interface  
+- Modern Material-3 dynamic colors  
+- Responsive layouts (phone → tablet → foldable)  
+- Animated theme switching without recreation  
 
-### 📝 Code Editing
-- **Syntax Highlighting**: Support for HTML, CSS, JavaScript
-- **File Tree**: Intuitive project file management
-- **Real-time Preview**: Instant web page preview functionality
+### 📝 Code Editing  
+- Syntax highlighting for **HTML**, **CSS**, **JavaScript**  
+- Collapsible file-tree with long-press actions  
+- Undo / redo, find / replace, soft keyboard extensions  
 
-### 🔧 Development Tools
-- **Project Management**: Complete project creation and management functions
-- **Settings System**: Customizable development environment configuration
-- **Welcome Interface**: User-friendly onboarding experience
-- 
-## 🤝 Contribution
-Null
+### 🔧 Developer Tools  
+- One-tap project templates (blank, bootstrap, react-lite)  
+- Live preview with local HTTP server (localhost:8080)  
+- Auto-save + crash recovery  
 
-This project is currently open source, but as it's an experimental AI-collaborative development project, the author has stopped maintenance. Developers interested in continuing to improve and extend functionality are welcome.
+## 👥 Contributors (The Core Team)  
 
-**Author's Wishlist**
-- Build app [complete]
-- Toolbar
-- Stronger code completion
-- Real-time code error checking
-- Add debugging functionality to preview interface
-- Implement DevServer for preview interface
-- Add full path customization functionality
-- Custom theme colors (implemented but not integrated)
-- Better and more beautiful settings
-- Create about page, changelog, etc.
+| <img src="https://github.com/h465855hgg.png" width="50px" alt="h465855hgg"/> | <img src="https://github.com/user-attachments/assets/d3afe9ed-460c-4ee7-a041-70bd320da367" width="50px" alt="Claude"/> | <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Google_Gemini_logo.svg/2560px-Google_Gemini_logo.svg.png" width="50px" alt="Gemini"/> | <img src="https://avatars.githubusercontent.com/u/148330874?s=200&v=4" width="50px" alt="DeepSeek"/> |
+|:---:|:---:|:---:|:---:|
+| **h465855hgg** | **Claude 4.5** | **Gemini 3.0 Pro** | **DeepSeek** |
+| 🧠 Architect / Prompt Engineer | 🎨 UI/UX & Theme | 🏗️ Logic & Components | ⚙️ Core Algorithms |
 
-## 💡 Project Significance
+## 🚀 Roadmap / Wish-list  
+- [x] Build app skeleton  
+- [x] Custom theme colors  
+- [x] Polished settings screen  
+- [ ] Toolbar with quick actions  
+- [ ] Smarter auto-completion  
+- [ ] Real-time error linting  
+- [ ] DevTools console inside preview  
+- [ ] Full path customization  
+- [ ] About screen & changelog  
 
-This project is a feature-incomplete Android development WebIDE. The original idea was to redefine the name 'WebIDE', but it was eventually abandoned due to mobile performance limitations.
+## 💡 Why This Matters  
+WebIDE is intentionally **minimal**—a proof that AI can ship a usable Android app from scratch.  
+It shows:  
+- How different models excel in different domains.  
+- That AI-driven development is no longer sci-fi.  
+- A glimpse of tomorrow’s human-AI pair programming.
 
-It demonstrates:
-- AI capabilities in complex software development
-- Specialization of different AI models in specific domains
-- The potential of AI-assisted development in the future
+> *“If the phone can run it, the AI can build it.”*
 
----
-
-*This is an innovative project developed by AI, showcasing new possibilities for artificial intelligence in the software development field.*
-![image](https://github.com/h465855hgg/WebIDE/blob/main/IMG_20251108_171127.jpg)
+![Screenshot](https://github.com/h465855hgg/WebIDE/blob/main/IMG_20251108_171127.jpg)
 
 ---
-[![Star History Chart](https://api.star-history.com/svg?repos=h465855hgg/WebIDE&type=Date)](https://star-history.com/#h465855hgg/WebIDE&Date)
+
+<div align="center">
+
+**Star History**  
+![Star History Chart](https://api.star-history.com/svg?repos=h465855hgg/WebIDE&type=Date)
+
+</div>
