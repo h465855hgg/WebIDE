@@ -3,10 +3,14 @@ package com.web.webide.build;
 import android.content.Context;
 import com.web.webide.core.utils.LogCatcher;
 import java.io.*;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -19,6 +23,9 @@ import com.Day.Studio.Function.axmleditor.editor.PermissionEditor;
 
 public class ApkBuilder {
 
+    // 模板 APK 的原始包名 (必须与 webapp_1.0.apk 实际包名一致)
+    private static final String OLD_PACKAGE_NAME = "com.web.webapp";
+
     private static class AppConfig {
         String appName = "WebApp";
         String appPackage = "com.example.webapp";
@@ -30,7 +37,7 @@ public class ApkBuilder {
     public static String bin(
             Context context,
             String mRootDir,
-            String mDir,
+            String projectPath,
             String aname,
             String pkg,
             String ver,
@@ -38,19 +45,18 @@ public class ApkBuilder {
             String amph,
             String[] ps) {
 
-        File bf = new File(mRootDir, "bin");
+        File bf = new File(projectPath, "build");
         if (!bf.exists()) bf.mkdirs();
 
-        // 文件路径
-        File templateApk = new File(context.getCacheDir(), "template_base.apk");
+        File templateApk = new File(context.getCacheDir(), "webapp_template.apk");
         File rawZipFile = new File(bf, "temp_raw.zip");
         File alignedZipFile = new File(bf, "temp_aligned.apk");
-        File finalApkFile = new File(bf, aname + ".apk");
+        File finalApkFile = new File(bf, aname + "_release.apk");
 
-        LogCatcher.i("ApkBuilder", "========== 开始构建 (APK模板模式) ==========");
+        LogCatcher.i("ApkBuilder", "========== 开始构建 WebApp ==========");
 
         try {
-            // 清理旧文件
+            // 0. 清理旧文件
             if (rawZipFile.exists()) rawZipFile.delete();
             if (alignedZipFile.exists()) alignedZipFile.delete();
             if (finalApkFile.exists()) finalApkFile.delete();
@@ -58,50 +64,37 @@ public class ApkBuilder {
             // 1. 准备配置
             AppConfig config = new AppConfig();
             config.appName = aname;
-            config.appPackage = pkg;
+            config.appPackage = pkg; // 用户输入的新包名
             config.versionName = ver;
             config.versionCode = code;
-            // 处理权限数组 ps -> config.permissions (如果 ps 不为空)
             if (ps != null) {
                 for (String p : ps) config.permissions.add(p);
             }
 
             // 2. 提取模板 APK
-            LogCatcher.i("ApkBuilder", ">> 阶段1: 提取模板 APK");
-            // 注意：请确保你的 assets 里文件名确实是 webapp_1.0.apk
             if (!copyAssetFile(context, "webapp_1.0.apk", templateApk)) {
-                return "error: 模板 APK 不存在 (assets/webapp_1.0.apk)";
+                return "error: 找不到构建模板 (assets/webapp_1.0.apk)";
             }
 
             // 3. 合并逻辑
-            LogCatcher.i("ApkBuilder", ">> 阶段2: 合并资源与 Manifest");
-            mergeApk(templateApk, rawZipFile, mDir, config);
+            LogCatcher.i("ApkBuilder", ">> 正在合并资源...");
+            mergeApk(templateApk, rawZipFile, projectPath, config);
 
             if (rawZipFile.length() < 1000) {
-                return "error: 生成的 ZIP 太小，合并失败";
+                return "error: 构建失败，生成的包体过小";
             }
 
-            // 检查生成的 Zip 是否正常
-            if (rawZipFile.length() < 1000) {
-                return "error: 生成的 ZIP 太小";
-            }
-
-            // 4. ZipAlign 对齐 (必须执行此步骤，否则报 -124 错误)
-            LogCatcher.i("ApkBuilder", ">> 阶段3: ZipAlign 对齐");
+            // 4. ZipAlign
+            LogCatcher.i("ApkBuilder", ">> 正在 ZipAlign...");
             try {
-                // 使用上面更新后的 ZipAligner 类
                 ZipAligner.align(rawZipFile, alignedZipFile);
             } catch (Exception e) {
-                e.printStackTrace();
                 return "error: 对齐失败 - " + e.getMessage();
             }
 
-
             // 5. 签名
-            LogCatcher.i("ApkBuilder", ">> 阶段4: 签名");
-            String signaturePath = "/storage/emulated/0/WebIDE/WebIDE.jks";
-
-            // 自动释放内置签名
+            LogCatcher.i("ApkBuilder", ">> 正在签名...");
+            String signaturePath = new File(mRootDir, "WebIDE.jks").getAbsolutePath();
             File keyFile = new File(signaturePath);
             if (!keyFile.exists()) {
                 File internalKey = new File(context.getFilesDir(), "WebIDE.jks");
@@ -115,12 +108,9 @@ public class ApkBuilder {
                     finalApkFile.getAbsolutePath()
             );
 
-            // 清理临时文件
+            // 清理
             rawZipFile.delete();
             alignedZipFile.delete();
-            // templateApk.delete(); // 可选：保留缓存下次用
-            checkAlignment(finalApkFile.getAbsolutePath());
-            verifyAlignment(finalApkFile);
 
             if (signResult && finalApkFile.length() > 0) {
                 LogCatcher.i("ApkBuilder", "✅ 构建成功: " + finalApkFile.getAbsolutePath());
@@ -130,156 +120,37 @@ public class ApkBuilder {
             }
 
         } catch (Exception e) {
-            LogCatcher.e("ApkBuilder", "❌ 构建崩溃: " + e.getMessage());
-            e.printStackTrace();
-            return "error:" + e.getMessage();
-        }
-
-    }
-
-
-
-    /**
-     * 验证 APK 对齐状态 (诊断工具)
-     * 在 bin 方法 return 之前调用: verifyAlignment(finalApkFile);
-     */
-    private static void verifyAlignment(File apkFile) {
-        try {
-            ZipFile zf = new ZipFile(apkFile);
-            Enumeration<? extends ZipEntry> entries = zf.entries();
-
-            // 为了找到 Local File Header 的物理偏移量，我们需要手动读取文件
-            // 这里使用简单暴力搜索法 (仅用于 resources.arsc)
-            FileInputStream fis = new FileInputStream(apkFile);
-            byte[] data = new byte[(int) apkFile.length()];
-            fis.read(data);
-            fis.close();
-
-            // 搜索 resources.arsc 的文件名
-            byte[] search = "resources.arsc".getBytes(StandardCharsets.UTF_8);
-
-            for (int i = 0; i < data.length - search.length; i++) {
-                boolean match = true;
-                for (int j = 0; j < search.length; j++) {
-                    if (data[i + j] != search[j]) {
-                        match = false;
-                        break;
-                    }
-                }
-
-                if (match) {
-                    // 找到了文件名，它前面是 LFH (30字节)
-                    // LFH 结构: [PK 03 04]...[文件名长度 2B][Extra长度 2B][文件名]
-                    // 文件名开始位置是 i
-                    // 往前推 26 字节是文件名长度字段
-                    // 往前推 28 字节是 Extra 长度字段
-                    // 往前推 30 字节是 Header 头部
-
-                    int headerStart = i - 30;
-                    if (headerStart < 0) continue; // 误报
-
-                    // 验证头标记 0x04034b50
-                    if (data[headerStart] != 0x50 || data[headerStart+1] != 0x4b) continue;
-
-                    // 获取 Extra Field 长度 (Little Endian)
-                    int extraLen = (data[i - 2] & 0xFF) | ((data[i - 1] & 0xFF) << 8);
-
-                    // 数据开始位置 = 文件名结束位置(i + search.length) + Extra长度
-                    int dataStart = i + search.length + extraLen;
-
-                    int remainder = dataStart % 4;
-                    LogCatcher.w("AlignCheck", "检测到 resources.arsc 数据起始位置: " + dataStart);
-
-                    if (remainder == 0) {
-                        LogCatcher.i("AlignCheck", "✅ 完美! resources.arsc 已对齐 (4字节整除)");
-                    } else {
-                        LogCatcher.e("AlignCheck", "❌ 严重错误! resources.arsc 未对齐! 偏差: " + remainder + " (应为0)");
-                    }
-                    break;
-                }
-            }
-            zf.close();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-    public static void checkAlignment(String apkPath) {
-        try {
-            ZipFile zf = new ZipFile(apkPath);
-            Enumeration<? extends ZipEntry> entries = zf.entries();
-
-            // 为了计算偏移量，我们需要遍历整个文件流（非常耗时，仅用于调试诊断）
-            // 但这里我们用一种简化的方式：通过反射或者解析库，或者我们直接手动解析
-            // 为了简单，我们只打印 Log 提示用户去检查
-
-            LogCatcher.i("AlignCheck", "正在检查最终 APK 的对齐情况: " + apkPath);
-
-            FileInputStream fis = new FileInputStream(apkPath);
-            BufferedInputStream bis = new BufferedInputStream(fis);
-
-            // 简单的 Zip 解析器，寻找 Local File Header
-            byte[] buffer = new byte[65536];
-            long currentPos = 0;
-            int read;
-
-            // 这是一个非常简化的流式查找，只为了找 resources.arsc
-            // 严谨的解析需要解析 Central Directory，这里我们假设文件是追加写入的
-            // 注意：这种简单的流式查找在 V2 签名块存在时可能不准，但足以排查 resources.arsc (通常在前面)
-
-            LogCatcher.w("AlignCheck", "⚠️ 请注意：如果依然安装失败，请尝试使用 PC 端的 'zipalign -c -v 4 test.apk' 命令检查");
-            LogCatcher.w("AlignCheck", "如果 ZipAlign 成功但签名后失效，说明签名库(ApkSigner)破坏了文件结构。");
-
-            zf.close();
-            bis.close();
-        } catch (Exception e) {
-            e.printStackTrace();
+            LogCatcher.e("ApkBuilder", "❌ 构建崩溃", e);
+            return "error: " + e.getMessage();
         }
     }
 
-    /**
-     * 核心逻辑：合并模板APK和用户文件
-     * 修复1: 优先写入 resources.arsc (解决 -124 安装错误)
-     * 修复2: 去除用户文件的多余目录层级 (直接放入 assets/ 而不是 assets/test/)
-     */
-    private static void mergeApk(File templateFile, File outputFile, String projectDir, AppConfig config) throws Exception {
+    private static void mergeApk(File templateFile, File outputFile, String projectPath, AppConfig config) throws Exception {
         ZipFile zipFile = new ZipFile(templateFile);
         ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(outputFile));
         zos.setLevel(5);
 
         try {
-            // 1. 优先写入 resources.arsc (对齐关键)
+            // A. 优先写入 resources.arsc
             ZipEntry arscEntry = zipFile.getEntry("resources.arsc");
             if (arscEntry != null) {
                 copyAsStored(zipFile, arscEntry, zos);
             }
 
-            // 2. 遍历模板文件
             Enumeration<? extends ZipEntry> entries = zipFile.entries();
             while (entries.hasMoreElements()) {
                 ZipEntry entry = entries.nextElement();
                 String name = entry.getName();
 
                 if (name.equals("resources.arsc")) continue;
-
-                // 过滤旧签名
                 if (name.startsWith("META-INF/")) continue;
+                if (name.startsWith("assets/")) continue; // 剔除模板自带的 assets
 
-                // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
-                // 【核心修复】过滤掉模板自带的所有 assets 文件！
-                // 只有拦截了它们，你后面注入的新文件才能生效。
-                // 如果你的模板里有必须保留的系统assets，请把条件改成 name.startsWith("assets/webapp") 之类的
-                if (name.startsWith("assets/")) {
-                    continue;
-                }
-                // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
-
-                // 拦截 Manifest
                 if (name.equals("AndroidManifest.xml")) {
                     processManifest(zipFile, entry, zos, config);
                     continue;
                 }
 
-                // 复制其他文件 (classes.dex, res/, lib/ 等)
                 ZipEntry newEntry = new ZipEntry(name);
                 zos.putNextEntry(newEntry);
                 try (InputStream is = zipFile.getInputStream(entry)) {
@@ -288,15 +159,10 @@ public class ApkBuilder {
                 zos.closeEntry();
             }
 
-            // 3. 注入用户文件 (这时候写入 assets 才是有效的)
-            LogCatcher.i("ApkBuilder", "正在注入用户文件...");
-            File rootDir = new File(projectDir);
-            File[] files = rootDir.listFiles();
-            if (files != null) {
-                for (File file : files) {
-                    if (file.getName().equals(".WebIDE") || file.getName().endsWith(".apk")) continue;
-                    addProjectFilesRecursively(zos, file, "assets");
-                }
+            // B. 注入用户 assets
+            File userAssetsDir = new File(projectPath, "src/main/assets");
+            if (userAssetsDir.exists() && userAssetsDir.isDirectory()) {
+                addProjectFilesRecursively(zos, userAssetsDir, "assets");
             }
 
         } finally {
@@ -305,70 +171,49 @@ public class ApkBuilder {
         }
     }
 
-    /**
-     * 递归添加文件到 Zip
-     * @param zos Zip输出流
-     * @param file 当前要添加的文件或文件夹
-     * @param parentPath 当前文件在 Zip 中的父路径 (例如 "assets")
-     */
-    private static void addProjectFilesRecursively(ZipOutputStream zos, File file, String parentPath) {
-        if (file == null || !file.exists()) return;
-
-        // 过滤规则
-        if (file.getName().equals(".WebIDE") || file.getName().endsWith(".apk")) return;
-
-        // 拼接路径: assets + / + index.html
-        String currentPath = parentPath + "/" + file.getName();
-
+    private static void addProjectFilesRecursively(ZipOutputStream zos, File file, String zipPath) {
         if (file.isDirectory()) {
-            // 如果是目录，递归处理子文件
             File[] children = file.listFiles();
             if (children != null) {
                 for (File child : children) {
-                    addProjectFilesRecursively(zos, child, currentPath);
+                    addProjectFilesRecursively(zos, child, zipPath + "/" + child.getName());
                 }
             }
         } else {
-            // 如果是文件，直接写入
             try {
-                zos.putNextEntry(new ZipEntry(currentPath));
+                ZipEntry newEntry = new ZipEntry(zipPath);
+                zos.putNextEntry(newEntry);
                 try (FileInputStream fis = new FileInputStream(file)) {
                     copyStream(fis, zos);
                 }
                 zos.closeEntry();
             } catch (IOException e) {
-                LogCatcher.e("ApkBuilder", "添加文件失败: " + file.getName());
+                e.printStackTrace();
             }
         }
     }
 
-
-
-
-
-
-
-
-
+    /**
+     * 核心修复逻辑：处理 Manifest
+     */
     private static void processManifest(ZipFile zipFile, ZipEntry entry, ZipOutputStream zos, AppConfig config) throws Exception {
-        // 读取原版
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
         try (InputStream is = zipFile.getInputStream(entry)) {
             copyStream(is, bos);
         }
         byte[] originalData = bos.toByteArray();
 
-        // 1. 创建临时文件
         File tempManifest = File.createTempFile("TempManifest", ".xml");
         try (FileOutputStream fos = new FileOutputStream(tempManifest)) {
             fos.write(originalData);
         }
 
         try {
-            // 2. 使用库修改包名、版本等 (常规操作)
+            // 1. 使用 ApkXmlEditor 修改基础属性 (Package, Version, Name)
+            // 这会修改 manifest 标签的 package 属性，导致 Application ID 变更
             ApkXmlEditor.setXmlPaht(tempManifest.getAbsolutePath());
             ApkXmlEditor.setAppName(config.appName);
-            ApkXmlEditor.setAppPack(config.appPackage);
+            ApkXmlEditor.setAppPack(config.appPackage); // 修改包名
             try {
                 ApkXmlEditor.setAppbcode(Integer.parseInt(config.versionCode));
             } catch (NumberFormatException e) {
@@ -377,20 +222,39 @@ public class ApkBuilder {
             ApkXmlEditor.setAppbname(config.versionName);
             ApkXmlEditor.operation();
 
-            // 修改权限
+            // 2. 修改权限
             if (config.permissions != null) {
                 for (String perm : config.permissions) {
                     setPermission(tempManifest.getAbsolutePath(), perm, false);
                 }
             }
 
-            // =============================================
-            // 【关键插入点】: 在所有库操作完成后，执行字节替换
-            // =============================================
+            // 3. 移除 testOnly
             removeTestOnly(tempManifest);
-            // =============================================
 
-            // 3. 写入 Zip
+            // 4. 【关键修复】 精确替换 AXML 字符串
+            // 我们需要构建一个替换映射表
+            if (!config.appPackage.equals(OLD_PACKAGE_NAME)) {
+                Map<String, String> replacements = new HashMap<>();
+
+                // A. 解决 Provider 冲突
+                // 将 com.web.webapp.androidx-startup -> com.example.myyy.androidx-startup
+                replacements.put(OLD_PACKAGE_NAME + ".androidx-startup", config.appPackage + ".androidx-startup");
+                replacements.put(OLD_PACKAGE_NAME + ".fileprovider", config.appPackage + ".fileprovider");
+
+                // B. 解决 ClassNotFoundException
+                // 如果 Manifest 里用了相对路径 ".MainActivity"，当包名变了后，它会解析到新包名下。
+                // 我们必须把它强制替换为绝对路径，指向 DEX 里真实存在的旧包名类。
+                replacements.put(".MainActivity", OLD_PACKAGE_NAME + ".MainActivity");
+
+                // 如果 Manifest 里本来就是绝对路径 com.web.webapp.MainActivity
+                // 我们要保护它不被替换（这里其实不用做特殊处理，只要不执行全局替换即可）
+
+                // 执行批量替换
+                ManifestStringReplacer.batchReplaceStringInAXML(tempManifest, replacements);
+            }
+
+            // 写入 Zip
             ZipEntry newEntry = new ZipEntry("AndroidManifest.xml");
             zos.putNextEntry(newEntry);
             try (FileInputStream fis = new FileInputStream(tempManifest)) {
@@ -403,6 +267,7 @@ public class ApkBuilder {
         }
     }
 
+    // --- 辅助方法 ---
     private static void copyAsStored(ZipFile zipFile, ZipEntry entry, ZipOutputStream zos) throws IOException {
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
         try (InputStream is = zipFile.getInputStream(entry)) {
@@ -411,86 +276,43 @@ public class ApkBuilder {
         byte[] data = bos.toByteArray();
         CRC32 crc = new CRC32();
         crc.update(data);
-
-        // 创建全新的 Entry，不继承原 Entry 的任何属性(如Extra)
         ZipEntry newEntry = new ZipEntry("resources.arsc");
         newEntry.setMethod(ZipEntry.STORED);
         newEntry.setSize(data.length);
         newEntry.setCompressedSize(data.length);
         newEntry.setCrc(crc.getValue());
-
-        // 显式清空 Extra，确保头长度固定为 44
         newEntry.setExtra(null);
-
         zos.putNextEntry(newEntry);
         zos.write(data);
         zos.closeEntry();
     }
-    /**
-     * 强行移除 android:testOnly="true" 属性
-     * 解决安装报错 -15
-     */
-    /**
-     * 【黑科技】通过二进制修改，强行移除 android:testOnly="true"
-     * 原理：将 testOnly 的资源 ID (0x01010272) 替换为 0，使系统忽略该属性。
-     */
+
     private static void removeTestOnly(File manifestFile) {
         try {
             FileInputStream fis = new FileInputStream(manifestFile);
             byte[] data = new byte[(int) manifestFile.length()];
             fis.read(data);
             fis.close();
-
-            // testOnly 的资源 ID 是 0x01010272
-            // 在 Little-Endian (小端序) 二进制中是: 72 02 01 01
             byte[] target = new byte[]{(byte) 0x72, (byte) 0x02, (byte) 0x01, (byte) 0x01};
-
             boolean found = false;
-
-            // 遍历字节数组进行替换
             for (int i = 0; i < data.length - 3; i++) {
-                if (data[i] == target[0] &&
-                        data[i+1] == target[1] &&
-                        data[i+2] == target[2] &&
-                        data[i+3] == target[3]) {
-
-                    // 找到了！替换为 00 00 00 00
-                    data[i] = 0;
-                    data[i+1] = 0;
-                    data[i+2] = 0;
-                    data[i+3] = 0;
-
+                if (data[i] == target[0] && data[i + 1] == target[1] && data[i + 2] == target[2] && data[i + 3] == target[3]) {
+                    data[i] = 0; data[i + 1] = 0; data[i + 2] = 0; data[i + 3] = 0;
                     found = true;
-                    // 注意：通常 Manifest 里只有一个定义，但为了保险可以继续找
-                    LogCatcher.i("ApkBuilder", "成功移除 testOnly 属性 (位置: " + i + ")");
                 }
             }
-
-            if (!found) {
-                LogCatcher.w("ApkBuilder", "未找到 testOnly 属性，可能模板本身就是 Release 版，或者已被混淆。");
-            } else {
-                // 写回文件
+            if (found) {
                 FileOutputStream fos = new FileOutputStream(manifestFile);
                 fos.write(data);
                 fos.close();
             }
-
-        } catch (Exception e) {
-            LogCatcher.e("ApkBuilder", "移除 testOnly 失败: " + e.getMessage());
-            e.printStackTrace();
-        }
+        } catch (Exception e) {}
     }
+
     private static void copyStream(InputStream in, OutputStream out) throws IOException {
         byte[] buf = new byte[8192];
         int len;
         while ((len = in.read(buf)) > 0) out.write(buf, 0, len);
-    }
-
-    private static void copyFile(File src, File dest) throws IOException {
-        try (InputStream in = new FileInputStream(src);
-             OutputStream out = new FileOutputStream(dest)) {
-            copyStream(in, out);
-        }
     }
 
     private static boolean copyAssetFile(Context ctx, String name, File dest) {
@@ -498,9 +320,7 @@ public class ApkBuilder {
              FileOutputStream out = new FileOutputStream(dest)) {
             copyStream(in, out);
             return true;
-        } catch (IOException e) {
-            return false;
-        }
+        } catch (IOException e) { return false; }
     }
 
     public static void setPermission(String path, String permission, boolean remove) {
@@ -521,16 +341,174 @@ public class ApkBuilder {
 
     public static boolean signerApk(String keyPath, String pass, String alias, String keyPass, String inPath, String outPath) {
         try {
-            com.mcal.apksigner.ApkSigner signer = new com.mcal.apksigner.ApkSigner(
-                    new File(inPath), new File(outPath));
+            com.mcal.apksigner.ApkSigner signer = new com.mcal.apksigner.ApkSigner(new File(inPath), new File(outPath));
             signer.setV1SigningEnabled(true);
             signer.setV2SigningEnabled(true);
             signer.signRelease(new File(keyPath), pass, alias, keyPass);
             return true;
         } catch (Throwable e) {
-            LogCatcher.e("Signer", "签名崩溃: " + e.toString());
             e.printStackTrace();
             return false;
+        }
+    }
+
+    // ==================================================================================
+    //   【升级版】AXML 字符串池批量替换器
+    // ==================================================================================
+
+    private static class ManifestStringReplacer {
+
+        private static final int CHUNK_STRING_POOL = 0x001C0001;
+
+        /**
+         * 批量替换 AXML 中的字符串
+         * @param replacementMap key=旧字符串, value=新字符串
+         */
+        public static void batchReplaceStringInAXML(File axmlFile, Map<String, String> replacementMap) throws Exception {
+            byte[] data = new byte[(int) axmlFile.length()];
+            try (FileInputStream fis = new FileInputStream(axmlFile)) {
+                fis.read(data);
+            }
+
+            ByteBuffer buffer = ByteBuffer.wrap(data);
+            buffer.order(ByteOrder.LITTLE_ENDIAN);
+
+            buffer.position(8); // 跳过 XML Header
+
+            // 寻找 StringPool
+            int chunkType = buffer.getInt();
+            if (chunkType != CHUNK_STRING_POOL) return;
+
+            int chunkSize = buffer.getInt();
+            int stringCount = buffer.getInt();
+            int styleCount = buffer.getInt();
+            int flags = buffer.getInt();
+            int stringsOffset = buffer.getInt();
+            int stylesOffset = buffer.getInt();
+
+            boolean isUTF8 = (flags & 0x0100) != 0;
+            int stringPoolStart = buffer.position() - 28;
+
+            int[] offsets = new int[stringCount];
+            for (int i = 0; i < stringCount; i++) {
+                offsets[i] = buffer.getInt();
+            }
+
+            // 解析字符串
+            List<String> strings = new ArrayList<>();
+            int dataStart = stringPoolStart + stringsOffset;
+
+            for (int i = 0; i < stringCount; i++) {
+                int strPos = dataStart + offsets[i];
+                buffer.position(strPos);
+
+                if (isUTF8) {
+                    int len1 = buffer.get() & 0xFF;
+                    int len = len1;
+                    if ((len1 & 0x80) != 0) len = ((len1 & 0x7F) << 8) | (buffer.get() & 0xFF);
+
+                    int len2 = buffer.get() & 0xFF;
+                    int encodedLen = len2;
+                    if ((len2 & 0x80) != 0) encodedLen = ((len2 & 0x7F) << 8) | (buffer.get() & 0xFF);
+
+                    byte[] strBytes = new byte[encodedLen];
+                    buffer.get(strBytes);
+                    strings.add(new String(strBytes, StandardCharsets.UTF_8));
+                } else {
+                    int len = buffer.getShort() & 0xFFFF;
+                    byte[] strBytes = new byte[len * 2];
+                    buffer.get(strBytes);
+                    strings.add(new String(strBytes, StandardCharsets.UTF_16LE));
+                }
+            }
+
+            // --- 执行批量替换 ---
+            boolean modified = false;
+            for (int i = 0; i < strings.size(); i++) {
+                String currentStr = strings.get(i);
+
+                // 遍历所有替换规则
+                for (Map.Entry<String, String> entry : replacementMap.entrySet()) {
+                    String target = entry.getKey();
+                    String replacement = entry.getValue();
+
+                    // 如果完全匹配，或者包含（谨慎使用 contains，这里主要用于替换全类名或 authority）
+                    if (currentStr.equals(target)) {
+                        strings.set(i, replacement);
+                        modified = true;
+                        LogCatcher.d("AXML", "替换: " + currentStr + " -> " + replacement);
+                        break; // 一个字符串只替换一次
+                    }
+                }
+            }
+
+            if (!modified) return;
+
+            // --- 重建 AXML (与之前相同) ---
+            ByteArrayOutputStream poolBos = new ByteArrayOutputStream();
+            List<Integer> newOffsets = new ArrayList<>();
+            int currentOffset = 0;
+
+            for (String s : strings) {
+                newOffsets.add(currentOffset);
+
+                if (isUTF8) {
+                    byte[] rawBytes = s.getBytes(StandardCharsets.UTF_8);
+                    poolBos.write(s.length()); // Simplified length
+                    poolBos.write(rawBytes.length);
+                    poolBos.write(rawBytes);
+                    poolBos.write(0);
+                    currentOffset += (2 + rawBytes.length + 1);
+                } else {
+                    byte[] rawBytes = s.getBytes(StandardCharsets.UTF_16LE);
+                    int charLen = s.length();
+                    poolBos.write(charLen & 0xFF);
+                    poolBos.write((charLen >> 8) & 0xFF);
+                    poolBos.write(rawBytes);
+                    poolBos.write(0); poolBos.write(0);
+                    currentOffset += (2 + rawBytes.length + 2);
+                }
+            }
+
+            while (currentOffset % 4 != 0) {
+                poolBos.write(0);
+                currentOffset++;
+            }
+
+            byte[] newStringData = poolBos.toByteArray();
+
+            ByteArrayOutputStream fileBos = new ByteArrayOutputStream();
+            fileBos.write(data, 0, 8); // Header
+
+            int newChunkSize = 28 + (stringCount * 4) + (styleCount * 4) + newStringData.length;
+            ByteBuffer headerBuf = ByteBuffer.allocate(28).order(ByteOrder.LITTLE_ENDIAN);
+            headerBuf.putInt(CHUNK_STRING_POOL);
+            headerBuf.putInt(newChunkSize);
+            headerBuf.putInt(stringCount);
+            headerBuf.putInt(styleCount);
+            headerBuf.putInt(flags);
+            headerBuf.putInt(28 + (stringCount * 4) + (styleCount * 4));
+            headerBuf.putInt(0);
+
+            fileBos.write(headerBuf.array());
+
+            ByteBuffer offsetBuf = ByteBuffer.allocate(stringCount * 4).order(ByteOrder.LITTLE_ENDIAN);
+            for (int off : newOffsets) offsetBuf.putInt(off);
+            fileBos.write(offsetBuf.array());
+
+            fileBos.write(newStringData);
+
+            int oldChunkEnd = stringPoolStart + chunkSize;
+            fileBos.write(data, oldChunkEnd, data.length - oldChunkEnd);
+
+            byte[] finalData = fileBos.toByteArray();
+            ByteBuffer finalBuf = ByteBuffer.wrap(finalData).order(ByteOrder.LITTLE_ENDIAN);
+            finalBuf.putInt(4, finalData.length);
+
+            try (FileOutputStream fos = new FileOutputStream(axmlFile)) {
+                fos.write(finalData);
+            }
+            LogCatcher.i("AXML", "字符串池重建完成");
         }
     }
 }

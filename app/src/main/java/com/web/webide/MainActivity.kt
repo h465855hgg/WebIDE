@@ -1,6 +1,10 @@
 package com.web.webide
 
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -26,6 +30,7 @@ import com.web.webide.ui.editor.components.TextMateInitializer
 import com.web.webide.ui.theme.MyComposeApplicationTheme
 import com.web.webide.ui.welcome.WelcomeScreen
 
+
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,7 +42,15 @@ class MainActivity : ComponentActivity() {
     private fun initApp() {
         // 初始化基础组件
         TextMateInitializer.initialize(this)
-        
+
+        // 简单示例
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (!getPackageManager().canRequestPackageInstalls()) {
+                val intent: Intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
+                intent.setData(Uri.parse("package:" + getPackageName()))
+                startActivityForResult(intent, 1)
+            }
+        }
         setContent {
             val context = LocalContext.current
             val themeViewModel: ThemeViewModel = viewModel(factory = ThemeViewModelFactory(context))
@@ -102,3 +115,4 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
