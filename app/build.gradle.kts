@@ -89,9 +89,6 @@ dependencies {
 
     implementation(files("libs/xml.jar"))
 
-    // 如果以后还有别的 jar 可以一次性扫进来
-    // implementation file:sTree(dir: \"libs\", include: [\"*.jar\"])\n"+
-
     implementation(project(":signer"))
 
 
