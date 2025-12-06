@@ -35,7 +35,7 @@ android {
         }
 
         release {
-            applicationIdSuffix = ".release"
+           // applicationIdSuffix = ".release"
 
 
             isMinifyEnabled = true

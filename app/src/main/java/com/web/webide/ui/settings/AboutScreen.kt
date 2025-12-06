@@ -464,6 +464,7 @@ private fun ImprovedLibraryListItem(lib: Library, onClick: () -> Unit) {
 @Composable
 fun LibraryDetailDialog(lib: Library, onDismiss: () -> Unit) {
     val context = LocalContext.current
+    @Suppress("DEPRECATION")
     val clipboardManager = LocalClipboardManager.current
 
     val licenseText = remember(lib) {
