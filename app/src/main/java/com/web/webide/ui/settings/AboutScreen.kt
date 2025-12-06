@@ -2,7 +2,6 @@ package com.web.webide.ui.settings
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -621,7 +620,7 @@ fun LibraryDetailDialog(lib: Library, onDismiss: () -> Unit) {
                         Button(
                             onClick = {
                                 try {
-                                    val intent = Intent(Intent.ACTION_VIEW, git lib.website!!.toUri())
+                                    val intent = Intent(Intent.ACTION_VIEW, lib.website!!.toUri())
                                     context.startActivity(intent)
                                 } catch (e: Exception) { e.printStackTrace() }
                             },
