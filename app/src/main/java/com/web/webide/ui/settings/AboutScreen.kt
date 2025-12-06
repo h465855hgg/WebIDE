@@ -422,6 +422,7 @@ private fun ImprovedLibraryListItem(lib: Library, onClick: () -> Unit) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = subtitle,
+                    fontSize = 10.sp,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -469,7 +470,7 @@ fun LibraryDetailDialog(lib: Library, onDismiss: () -> Unit) {
         if (lib.licenses.isNotEmpty()) {
             lib.licenses.joinToString("\n\n") { license ->
                 val content = license.licenseContent ?: license.url ?: "See project website for license."
-                "${license.name}\n$content"
+                content
             }
         } else {
             "No license info."

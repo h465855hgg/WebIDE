@@ -62,14 +62,18 @@ android.applicationVariants.configureEach {
     outputs.configureEach {
         val appName = "WebIDE"
         val buildType = buildType.name
-        val ver = versionName          // 读取 defaultConfig 里配置的 versionName
+        val ver = versionName
         (this as? com.android.build.gradle.internal.api.ApkVariantOutputImpl)?.let {
             it.outputFileName = "${appName}-${ver}-${buildType}.apk"
         }
     }
 }
 
+aboutLibraries {
 
+    prettyPrint = true
+
+}
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     compilerOptions {
