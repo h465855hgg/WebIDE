@@ -14,13 +14,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.web.webide.core.utils.LogConfigRepository
 import com.web.webide.core.utils.WorkspaceManager
 import com.web.webide.ui.components.DirectorySelector
-
+import kotlinx.coroutines.launch // 导入
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WorkspaceSelectionScreen(navController: NavController) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope() // 获取协程作用域
     var selectedWorkspace by remember { mutableStateOf(WorkspaceManager.getWorkspacePath(context)) }
     
     // ✅ 改动 2: 只有在需要时才显示文件选择器，而不是默认就显示
@@ -114,11 +116,15 @@ fun WorkspaceSelectionScreen(navController: NavController) {
 
             Button(
                 onClick = {
-                    // ✅ 关键改动 3: 保存并清空导航栈，防止返回
+                    // 保存新工作目录
                     WorkspaceManager.saveWorkspacePath(context, selectedWorkspace)
+
+                    // ✅ 新增：重置日志路径，让其重新跟随工作目录
+                    scope.launch {
+                        LogConfigRepository(context).resetLogPath()
+                    }
+
                     navController.navigate("project_list") {
-                        // 这个操作会把"选择页面"从导航历史中移除
-                        // 就像关上了身后的门，不能再回去了
                         popUpTo("workspace_selection") {
                             inclusive = true
                         }

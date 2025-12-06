@@ -10,7 +10,7 @@ android {
 
     defaultConfig {
         applicationId = "com.web.webide"
-        minSdk = 33
+        minSdk = 30
         targetSdk = 36
         versionCode = 8
         versionName = "0.0.8"
@@ -34,6 +34,9 @@ android {
         }
 
         release {
+            applicationIdSuffix = ".release"
+
+
             isMinifyEnabled = true
             isShrinkResources = true // 资源缩减
 

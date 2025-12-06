@@ -1,5 +1,7 @@
 // LogConfigRepository.kt
 
+// LogConfigRepository.kt
+
 package com.web.webide.core.utils
 
 import android.content.Context
@@ -12,76 +14,77 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
+private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "webide_log_config")
 
-// ✅ 核心修复：将 LogConfigState 从 LogConfigRepository 类中移出，成为一个独立的顶层类。
-/**
- * 日志配置状态
- */
+
 data class LogConfigState(
-    val isLogEnabled: Boolean = true,  // 默认启用日志
-    val logFilePath: String = "/sdcard/WebIDE/logs",  // 默认日志路径
+    val isLogEnabled: Boolean = true,
+    val logFilePath: String = "",
     val isLoaded: Boolean = false
 )
 
-/**
- * 日志配置管理器
- */
 class LogConfigRepository(private val context: Context) {
 
-    private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "webide_log_config")
 
-    // Preferences Keys
     private object PreferencesKeys {
         val LOG_ENABLED = booleanPreferencesKey("log_enabled")
         val LOG_FILE_PATH = stringPreferencesKey("log_file_path")
     }
 
     /**
-     * 日志配置的Flow
+     * ✅ 核心修复：使用 combine 合并 DataStore 和 WorkspaceManager 的流
+     * 这样无论是修改了日志设置，还是修改了工作目录，这里都会重新计算
      */
     val logConfigFlow: Flow<LogConfigState> = context.dataStore.data
-        .map { preferences ->
+        .combine(WorkspaceManager.getWorkspacePathFlow(context)) { preferences, workspacePath ->
+
+            // 1. 获取动态的工作目录
+            // workspacePath 是从 Flow 实时传过来的
+
+            // 2. 构建默认的日志目录：工作目录/logs
+            val defaultLogPath = File(workspacePath, "logs").absolutePath
+
+            // 3. 确定最终路径：
+            // 如果 DataStore 中用户手动指定了路径（savedPath 不为空），则优先使用手动指定的
+            // 如果没有手动指定（null 或空），则自动跟随工作目录
+            val savedPath = preferences[PreferencesKeys.LOG_FILE_PATH]
+            val finalPath = if (savedPath.isNullOrEmpty()) defaultLogPath else savedPath
+
             LogConfigState(
                 isLogEnabled = preferences[PreferencesKeys.LOG_ENABLED] ?: true,
-                logFilePath = preferences[PreferencesKeys.LOG_FILE_PATH] ?: "/sdcard/WebIDE/logs",
+                logFilePath = finalPath,
                 isLoaded = true
             )
         }
 
-    /**
-     * 保存日志配置
-     */
     suspend fun saveLogConfig(isEnabled: Boolean, filePath: String) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.LOG_ENABLED] = isEnabled
-            preferences[PreferencesKeys.LOG_FILE_PATH] = filePath
+
+            // 可选优化：如果用户保存的路径和当前的默认路径一致，则存为 null/empty，
+            // 这样以后修改工作目录时，日志路径能继续自动跟随。
+            val currentWorkspace = WorkspaceManager.getWorkspacePath(context)
+            val defaultPath = File(currentWorkspace, "logs").absolutePath
+
+            if (filePath == defaultPath) {
+                preferences.remove(PreferencesKeys.LOG_FILE_PATH)
+            } else {
+                preferences[PreferencesKeys.LOG_FILE_PATH] = filePath
+            }
         }
     }
-
-    /**
-     * 切换日志开关状态
-     */
-    suspend fun toggleLogging(enabled: Boolean) {
+    suspend fun resetLogPath() {
         context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.LOG_ENABLED] = enabled
-        }
-    }
-
-    /**
-     * 更新日志文件路径
-     */
-    suspend fun updateLogFilePath(filePath: String) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.LOG_FILE_PATH] = filePath
+            preferences.remove(PreferencesKeys.LOG_FILE_PATH)
         }
     }
 }
-
+// LogCatcher 保持不变 ...
 /**
  * 增强的日志捕获器，支持文件输出和开关控制
  */
@@ -175,8 +178,4 @@ object LogCatcher {
         }
     }
 
-    @JvmStatic
-    fun getCurrentConfig(): LogConfigState? {
-        return logConfig
-    }
 }

@@ -43,14 +43,7 @@ class MainActivity : ComponentActivity() {
         // 初始化基础组件
         TextMateInitializer.initialize(this)
 
-        // 简单示例
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            if (!getPackageManager().canRequestPackageInstalls()) {
-                val intent: Intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
-                intent.setData(Uri.parse("package:" + getPackageName()))
-                startActivityForResult(intent, 1)
-            }
-        }
+
         setContent {
             val context = LocalContext.current
             val themeViewModel: ThemeViewModel = viewModel(factory = ThemeViewModelFactory(context))

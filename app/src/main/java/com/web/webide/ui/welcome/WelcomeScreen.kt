@@ -23,14 +23,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.web.webide.core.utils.PermissionManager
 import com.web.webide.ui.ThemeViewModel
 
@@ -124,10 +122,11 @@ fun WelcomeScreen(
                             },
                             onRequestInstallPermission = {
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                    val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-                                        data = Uri.parse("package:${context.packageName}")
+                                    if (!context.packageManager.canRequestPackageInstalls()) {
+                                        val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
+                                        intent.setData(Uri.parse("package:" + context.packageName))
+                                        context.startActivity(intent)
                                     }
-                                    context.startActivity(intent)
                                 }
                             }
                         )
