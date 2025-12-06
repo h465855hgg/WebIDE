@@ -332,7 +332,6 @@ private suspend fun ensureKeystoreExists(context: Context, workspacePath: String
 // 安装 APK
 private fun installApk(context: Context, apkFile: File) {
     if (!apkFile.exists()) {
-        Toast.makeText(context, "找不到文件: ${apkFile.name}", Toast.LENGTH_LONG).show()
         return
     }
 
@@ -362,8 +361,7 @@ private fun installApk(context: Context, apkFile: File) {
         context.startActivity(intent)
 
     } catch (e: Exception) {
-        Toast.makeText(context, "安装失败: ${e.message}", Toast.LENGTH_LONG).show()
-        LogCatcher.e("Install", "Error", e)
+         LogCatcher.e("Install", "Error", e)
     }
 }
 

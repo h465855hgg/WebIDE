@@ -19,7 +19,6 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.widget.Toast
 import androidx.annotation.RequiresPermission
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -174,10 +173,6 @@ class PreviewWebAppInterface(private val context: Context, private val webView: 
 
     // --- 基础功能 ---
 
-    @JavascriptInterface
-    fun showToast(toast: String) {
-        Toast.makeText(context, "[预览] $toast", Toast.LENGTH_SHORT).show()
-    }
 
     @RequiresPermission(Manifest.permission.VIBRATE)
     @JavascriptInterface
@@ -215,7 +210,6 @@ class PreviewWebAppInterface(private val context: Context, private val webView: 
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             val clip = ClipData.newPlainText("WebIDE Preview", text)
             clipboard.setPrimaryClip(clip)
-            Toast.makeText(context, "已复制到剪贴板", Toast.LENGTH_SHORT).show()
         }
     }
 

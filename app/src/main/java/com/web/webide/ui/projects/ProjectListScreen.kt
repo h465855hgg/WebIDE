@@ -31,7 +31,13 @@ fun ProjectListScreen(navController: NavController) {
     LaunchedEffect(projectDir) {
         folderList = withContext(Dispatchers.IO) {
             if (projectDir.exists() && projectDir.isDirectory) {
-                projectDir.listFiles { file -> file.isDirectory }?.map { it.name } ?: emptyList()
+                // ✅ 修改点：在 listFiles 中增加过滤条件，排除 logs 文件夹
+                projectDir.listFiles { file ->
+                    file.isDirectory && file.name != "logs"
+                }
+                    ?.map { it.name }
+                    ?.sorted() // 建议加上排序，让项目列表更整洁
+                    ?: emptyList()
             } else {
                 emptyList()
             }

@@ -20,6 +20,7 @@ import com.web.webide.ui.projects.ProjectListScreen
 import com.web.webide.ui.projects.NewProjectScreen
 import com.web.webide.ui.projects.WorkspaceSelectionScreen
 import com.web.webide.ui.settings.SettingsScreen
+import com.web.webide.ui.settings.AboutScreen // 导入 AboutScreen
 import kotlinx.coroutines.launch
 
 @Composable
@@ -37,12 +38,13 @@ fun App(
         mainViewModel.initializePermissions(context)
     }
 
-    val startDestination = if (WorkspaceManager.getWorkspacePath(context) != "/storage/emulated/0") {
+    val startDestination = if (
+        WorkspaceManager.getWorkspacePath(context) != WorkspaceManager.getDefaultPath(context)
+    ) {
         "project_list"
     } else {
         "workspace_selection"
     }
-
     val themeState by themeViewModel.themeState.collectAsState()
 
     NavHost(navController = navController, startDestination = startDestination) {
@@ -86,7 +88,6 @@ fun App(
                 navController = navController,
                 currentThemeState = themeState,
                 logConfigState = logConfigState,
-                // ✅ 核心修复: 更新 lambda 以匹配新的5参数签名
                 onThemeChange = { mode: Int, theme: Int, color: Color, isMonet: Boolean, isCustom: Boolean ->
                     themeViewModel.saveThemeConfig(mode, theme, color, isMonet, isCustom)
                 },
@@ -96,6 +97,10 @@ fun App(
                     }
                 }
             )
+        }
+        // 新增：关于页面路由
+        composable("about") {
+            AboutScreen(navController = navController)
         }
     }
 }

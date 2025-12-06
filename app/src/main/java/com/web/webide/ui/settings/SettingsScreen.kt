@@ -111,6 +111,28 @@ fun SettingsScreen(
                 )
             }
 
+            // ================= 新增部分 =================
+            // 4. 其他设置标题
+            item {
+                Text(
+                    text = "其他",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(start = 4.dp, top = 8.dp)
+                )
+            }
+
+            // 5. 关于卡片
+            item {
+                SimpleSettingsCard(
+                    icon = Icons.Outlined.Info,
+                    title = "关于",
+                    subtitle = "版本信息与介绍",
+                    onClick = { navController.navigate("about") }
+                )
+            }
+            // ===========================================
+
             item { Spacer(modifier = Modifier.height(32.dp)) }
         }
     }
@@ -160,11 +182,7 @@ fun SettingsScreen(
 }
 
 // ==========================================
-// 核心组件：ThemeSettingsItem (极速瞬开版)
-// ==========================================
-
-// ==========================================
-// 核心组件：ThemeSettingsItem (极速瞬开 + 右上角弹窗动效版)
+// 核心组件：ThemeSettingsItem
 // ==========================================
 
 @Composable
@@ -239,20 +257,18 @@ fun ThemeSettingsItem(
                 )
             }
 
-            // Expanded Content (核心修改区域)
+            // Expanded Content
             AnimatedVisibility(
                 visible = expanded,
-                // 修改为：标准的垂直展开 + 淡入
                 enter = fadeIn(tween(expandDuration)) +
                         expandVertically(
                             animationSpec = tween(expandDuration, easing = snappyEasing),
-                            expandFrom = Alignment.Top // 从顶部向下展开
+                            expandFrom = Alignment.Top
                         ),
-                // 修改为：标准的垂直收缩 + 淡出
                 exit = fadeOut(tween(textFadeDuration)) +
                         shrinkVertically(
                             animationSpec = tween(textFadeDuration, easing = snappyEasing),
-                            shrinkTowards = Alignment.Top // 向上收缩
+                            shrinkTowards = Alignment.Top
                         )
             ) {
                 Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
@@ -279,29 +295,27 @@ fun ThemeSettingsItem(
                         }
                     }
 
-
                     AnimatedVisibility(
                         visible = !currentThemeState.isMonetEnabled,
                         enter = fadeIn(tween(expandDuration)) +
                                 expandIn(
                                     animationSpec = tween(expandDuration, easing = snappyEasing),
-                                    expandFrom = Alignment.TopStart // 核心：从左上角开始撑开
+                                    expandFrom = Alignment.TopStart
                                 ) +
                                 scaleIn(
                                     animationSpec = tween(expandDuration, easing = snappyEasing),
-                                    transformOrigin = TransformOrigin(0f, 0f) // 核心：视觉缩放中心设为左上角
+                                    transformOrigin = TransformOrigin(0f, 0f)
                                 ),
                         exit = fadeOut(tween(expandDuration)) +
                                 shrinkOut(
                                     animationSpec = tween(expandDuration, easing = snappyEasing),
-                                    shrinkTowards = Alignment.TopStart // 向左上角收缩
+                                    shrinkTowards = Alignment.TopStart
                                 ) +
                                 scaleOut(
                                     animationSpec = tween(expandDuration, easing = snappyEasing),
                                     transformOrigin = TransformOrigin(0f, 0f)
                                 )
                     ) {
-                        // 这里的 Column 不需要再加 animateContentSize 了，外层已经处理了动画
                         Column {
                             Text(
                                 "主题色",
@@ -340,7 +354,6 @@ fun ThemeSettingsItem(
                         }
                     }
 
-                    // ... (下方的显示模式 Chip 代码保持不变) ...
                     // 3. 模式选择 (Chip)
                     Text("显示模式", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                     Row(
@@ -362,6 +375,7 @@ fun ThemeSettingsItem(
         }
     }
 }
+
 @Composable
 fun SmoothFilterChip(
     selected: Boolean,
@@ -401,7 +415,6 @@ fun SmoothFilterChip(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
-            // 图标动画：极速滑入
             AnimatedVisibility(
                 visible = selected,
                 enter = expandHorizontally(tween(duration, easing = fastEasing), expandFrom = Alignment.Start) +
@@ -543,4 +556,3 @@ fun CustomColorButton(isSelected: Boolean, customColor: Color, onClick: () -> Un
         Text("自定义", style = MaterialTheme.typography.labelSmall, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
-

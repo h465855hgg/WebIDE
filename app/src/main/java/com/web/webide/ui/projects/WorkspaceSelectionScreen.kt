@@ -30,7 +30,8 @@ fun WorkspaceSelectionScreen(navController: NavController) {
     
     // 如果是首次进入（路径为默认值），则自动弹出选择器
     LaunchedEffect(Unit) {
-        if (WorkspaceManager.getWorkspacePath(context) == "/storage/emulated/0") {
+        // ✅ 修复：不再对比 "/storage/emulated/0"，而是对比 getDefaultPath
+        if (WorkspaceManager.getWorkspacePath(context) == WorkspaceManager.getDefaultPath(context)) {
             showFileSelector = true
         }
     }

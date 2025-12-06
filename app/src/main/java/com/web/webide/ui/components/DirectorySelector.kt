@@ -1,7 +1,6 @@
 package com.web.webide.ui.components
 
 import android.annotation.SuppressLint
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -60,8 +59,7 @@ fun DirectorySelector(
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
-                Toast.makeText(context, "无法读取目录: ${e.message}", Toast.LENGTH_SHORT).show()
-                emptyList()
+                 emptyList()
             }
         }
     }
@@ -75,19 +73,15 @@ fun DirectorySelector(
                 try {
                     val newFolder = File(currentPath, newFolderName)
                     if (newFolder.exists()) {
-                        Toast.makeText(context, "文件夹已存在", Toast.LENGTH_SHORT).show()
-                    } else if (newFolder.mkdir()) {
-                        Toast.makeText(context, "文件夹创建成功", Toast.LENGTH_SHORT).show()
-                        // 刷新列表 - 通过切换到新创建的文件夹再返回来触发重组
+                         } else if (newFolder.mkdir()) {
+                          // 刷新列表 - 通过切换到新创建的文件夹再返回来触发重组
                         val tempPath = currentPath
                         currentPath = newFolder.absolutePath
                         currentPath = tempPath
                     } else {
-                        Toast.makeText(context, "文件夹创建失败", Toast.LENGTH_SHORT).show()
-                    }
+                         }
                 } catch (e: Exception) {
-                    Toast.makeText(context, "创建失败: ${e.message}", Toast.LENGTH_SHORT).show()
-                }
+                     }
                 showCreateFolderDialog = false
             }
         )

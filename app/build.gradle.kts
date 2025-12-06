@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.aboutlibraries)
 }
 
 android {
@@ -12,8 +13,8 @@ android {
         applicationId = "com.web.webide"
         minSdk = 30
         targetSdk = 36
-        versionCode = 8
-        versionName = "0.0.8"
+        versionCode = 9
+        versionName = "0.0.9"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
@@ -77,6 +78,7 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 }
 
 dependencies {
+    implementation("com.mikepenz:aboutlibraries-compose:11.2.3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation(libs.androidx.compose.animation)
     implementation(libs.androidx.compose.ui)

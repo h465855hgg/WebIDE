@@ -4,7 +4,6 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
-import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -67,11 +66,8 @@ fun WelcomeScreen(
     // 存储权限请求器
     val permissionState = PermissionManager.rememberPermissionRequest(
         onPermissionGranted = {
-            storageGranted = true
-            Toast.makeText(context, "存储权限已授予", Toast.LENGTH_SHORT).show()
-        },
+            storageGranted = true },
         onPermissionDenied = {
-            Toast.makeText(context, "需要权限才能正常使用文件功能", Toast.LENGTH_LONG).show()
         }
     )
 

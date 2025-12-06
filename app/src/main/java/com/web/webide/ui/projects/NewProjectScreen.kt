@@ -1,14 +1,11 @@
 package com.web.webide.ui.projects
 
 import android.content.Context
-import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -19,7 +16,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -177,12 +173,10 @@ fun NewProjectScreen(navController: NavController) {
             Button(
                 onClick = {
                     if (projectName.isBlank()) {
-                        Toast.makeText(context, "请输入项目名称", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
                     if (selectedType == ProjectType.WEBAPP && packageName.isBlank()) {
-                        Toast.makeText(context, "请输入包名", Toast.LENGTH_SHORT).show()
-                        return@Button
+                         return@Button
                     }
 
                     isLoading = true
@@ -197,7 +191,6 @@ fun NewProjectScreen(navController: NavController) {
                         },
                         onError = { error ->
                             isLoading = false
-                            Toast.makeText(context, "创建失败: $error", Toast.LENGTH_SHORT).show()
                         }
                     )
                 },
@@ -325,8 +318,7 @@ private fun createNewProject(
             }
 
             withContext(Dispatchers.Main) {
-                Toast.makeText(context, "项目 '$projectName' 创建成功", Toast.LENGTH_SHORT).show()
-                onSuccess()
+                 onSuccess()
             }
         } catch (e: Exception) {
             e.printStackTrace()

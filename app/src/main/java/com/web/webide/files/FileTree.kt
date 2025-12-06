@@ -208,8 +208,7 @@ fun FileTree(
                                 val success = withContext(Dispatchers.IO) {
                                     if (node.isDirectory) node.file.deleteRecursively() else node.file.delete()
                                 }
-                                Toast.makeText(context, if (success) "删除成功" else "删除失败", Toast.LENGTH_SHORT).show()
-                                if (success) refreshDirectory(parent)
+                                  if (success) refreshDirectory(parent)
                             }
                         }
                     },
