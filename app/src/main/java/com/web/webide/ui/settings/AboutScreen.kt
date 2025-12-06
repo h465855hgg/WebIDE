@@ -290,13 +290,13 @@ private fun AppHeaderSection() {
                     painter = painterResource(id = R.drawable.ic_w),
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
-                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
                 )
                 Icon(
                     painter = painterResource(id = R.drawable.ic_code),
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
-                    tint = MaterialTheme.colorScheme.surfaceBright
+                    tint = MaterialTheme.colorScheme.primary
                 )
                 Column(
                     modifier = Modifier
