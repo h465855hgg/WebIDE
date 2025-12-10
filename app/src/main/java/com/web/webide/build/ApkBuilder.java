@@ -164,20 +164,15 @@ public class ApkBuilder {
                 }
 
                 // --- 2. 处理图标替换 ---
-                // 如果当前 entry 是目标图标，且用户配置了新图标
                 if (config.iconPath != null && (name.equals(ICON_RES_1) || name.equals(ICON_RES_2))) {
                     LogCatcher.d("ApkBuilder", "正在替换图标: " + name);
-
-                    // 创建新 Entry，保持原名字 (Android 根据 resources.arsc 找名字，不管内容是 png 还是 webp)
                     ZipEntry iconEntry = new ZipEntry(name);
                     zos.putNextEntry(iconEntry);
-
-                    // 读取用户的图标文件并写入
                     try (FileInputStream fis = new FileInputStream(new File(config.iconPath))) {
                         copyStream(fis, zos);
                     }
                     zos.closeEntry();
-                    continue; // 跳过原文件拷贝
+                    continue;
                 }
 
                 // --- 3. 普通文件拷贝 ---
@@ -195,12 +190,29 @@ public class ApkBuilder {
                 addProjectFilesRecursively(zos, userAssetsDir, "assets");
             }
 
+            // C. 将 webapp.json 配置文件打包到 assets 目录
+            File configFile = new File(projectPath, "webapp.json");
+            if (configFile.exists()) {
+                LogCatcher.i("ApkBuilder", "正在打包配置文件: webapp.json");
+                try (FileInputStream fis = new FileInputStream(configFile)) {
+                    ZipEntry configEntry = new ZipEntry("assets/webapp.json");
+                    zos.putNextEntry(configEntry);
+                    copyStream(fis, zos);
+                    zos.closeEntry();
+                }
+            } else {
+                LogCatcher.w("ApkBuilder", "未找到 webapp.json 配置文件");
+            }
+
         } finally {
             zipFile.close();
             zos.close();
         }
     }
 
+    /**
+     * Manifest 处理逻辑：包名修改、版本修改、权限修改
+     */
     /**
      * Manifest 处理逻辑：包名修改、版本修改、权限修改
      */
@@ -249,6 +261,13 @@ public class ApkBuilder {
 
                 ManifestStringReplacer.batchReplaceStringInAXML(tempManifest, replacements);
             }
+
+            // 5. 【新增】处理 Provider 授权冲突
+            LogCatcher.i("ApkBuilder", "正在处理 Provider 授权冲突...");
+            ProviderAuthReplacer.replaceProviderAuthorities(tempManifest, OLD_PACKAGE_NAME, config.appPackage);
+
+            // 可选：快速检查修复
+            ProviderAuthReplacer.fixProviderConflicts(tempManifest, config.appPackage);
 
             // 写入 Zip
             ZipEntry newEntry = new ZipEntry("AndroidManifest.xml");

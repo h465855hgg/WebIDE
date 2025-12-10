@@ -172,14 +172,14 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                                 isBuilding = true
                                                 viewModel.saveAllModifiedFiles(context)
 
-                                                // ================== 修复开始 ==================
-                                                // 1. 读取项目配置 (webapp.json)
+
                                                 val configFile = File(projectPath, "webapp.json")
                                                 var pkg: String? = null
                                                 var verName: String? = null
                                                 var verCode: String? = null
                                                 var iconPath: String = ""
                                                 var permissions: Array<String>? = null
+                                                var statusBarConfig: String? = null // 新增：状态栏配置
 
                                                 if (configFile.exists()) {
                                                     try {
@@ -191,11 +191,10 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                                         verName = json.optString("versionName", "1.0")
                                                         verCode = json.optString("versionCode", "1")
 
-                                                        // 解析 Icon 路径 (需要绝对路径)
+                                                        // 解析 Icon 路径
                                                         val iconName = json.optString("icon", "")
                                                         if (iconName.isNotEmpty()) {
                                                             val iconFile = File(projectPath, iconName)
-                                                            // 只有当图片文件真实存在时才传递路径
                                                             if (iconFile.exists()) {
                                                                 iconPath = iconFile.absolutePath
                                                             } else {
@@ -213,11 +212,18 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                                             permissions = list.toTypedArray()
                                                         }
 
+                                                        // 新增：解析状态栏配置
+                                                        val statusBarJson = json.optJSONObject("statusBar")
+                                                        if (statusBarJson != null) {
+                                                            statusBarConfig = statusBarJson.toString()
+                                                            LogCatcher.d("Build", "状态栏配置: $statusBarConfig")
+                                                        }
+
                                                     } catch (e: Exception) {
                                                         LogCatcher.e("Build", "解析 webapp.json 失败", e)
                                                     }
                                                 }
-                                                // ================== 修复结束 ==================
+
 
                                                 val result = withContext(Dispatchers.IO) {
                                                     // 2. 将解析出来的数据显式传递给 ApkBuilder
@@ -226,11 +232,13 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                                         workspacePath,     // String mRootDir
                                                         projectPath,       // String projectPath
                                                         folderName,        // String aname
-                                                        pkg,               // String pkg (✅ 传入解析后的包名)
-                                                        verName,           // String ver (✅ 传入版本名)
-                                                        verCode,           // String code (✅ 传入版本号)
-                                                        iconPath,          // String amph (✅ 传入图标绝对路径)
-                                                        permissions        // String[] ps (✅ 传入权限数组)
+                                                        pkg,               // String pkg
+                                                        verName,           // String ver
+                                                        verCode,           // String code
+                                                        iconPath,          // String amph
+                                                        permissions        // String[] ps
+                                                        // 注意：ApkBuilder.bin 方法的参数列表没有 statusBarConfig
+                                                        // 但我们已在 mergeApk 方法中将 webapp.json 打包到 assets
                                                     )
                                                 }
 

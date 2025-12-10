@@ -144,6 +144,7 @@ window.NativeAPI = {
 </body>
 </html>
     """.trimIndent()
+
     val webAppIndexJs = """
 const info = NativeAPI.info();
 if(info) document.getElementById('info').innerText = `Running on ${'$'}{info.model}`;
@@ -154,7 +155,7 @@ body { font-family: sans-serif; padding: 20px; text-align: center; }
 button { margin: 10px; padding: 10px 20px; font-size: 16px; display: block; width: 100%; }
     """.trimIndent()
 
-    // 🚀 通用配置生成器：支持传入 targetUrl
+    // 🚀 通用配置生成器：支持传入 targetUrl，并包含状态栏配置
     fun getConfigFile(packageName: String, appName: String, targetUrl: String): String = """
 {
   "name": "$appName",
@@ -166,6 +167,13 @@ button { margin: 10px; padding: 10px 20px; font-size: 16px; display: block; widt
   "fullscreen": false,
   "targetUrl": "$targetUrl",
   "icon": "icon.png",
+  
+  "statusBar": {
+    "backgroundColor": "#FFFFFF",
+    "style": "dark",
+    "translucent": false,
+    "hidden": false
+  },
   
   "webview": {
     "zoomEnabled": false,
@@ -182,7 +190,74 @@ button { margin: 10px; padding: 10px 20px; font-size: 16px; display: block; widt
     "android.permission.ACCESS_NETWORK_STATE",
     "android.permission.CAMERA",
     "android.permission.READ_EXTERNAL_STORAGE",
-    "android.permission.WRITE_EXTERNAL_STORAGE"
+    "android.permission.WRITE_EXTERNAL_STORAGE",
+    "android.permission.RECORD_AUDIO"
+  ]
+}
+    """.trimIndent()
+
+    // 简化的配置生成器（不带权限）
+    fun getSimpleConfigFile(packageName: String, appName: String, targetUrl: String): String = """
+{
+  "name": "$appName",
+  "package": "$packageName",
+  "versionName": "1.0.0",
+  "versionCode": 1,
+  
+  "orientation": "portrait",
+  "fullscreen": false,
+  "targetUrl": "$targetUrl",
+  
+  "statusBar": {
+    "backgroundColor": "#FFFFFF",
+    "style": "dark",
+    "translucent": false,
+    "hidden": false
+  },
+  
+  "webview": {
+    "zoomEnabled": false,
+    "javascriptEnabled": true,
+    "domStorageEnabled": true,
+    "allowFileAccess": true,
+    "textZoom": 100
+  },
+
+  "permissions": [
+    "android.permission.INTERNET"
+  ]
+}
+    """.trimIndent()
+
+    // 用于演示多种状态栏配置的示例
+    fun getStatusBarDemoConfig(packageName: String, appName: String): String = """
+{
+  "name": "$appName 状态栏演示",
+  "package": "$packageName",
+  "versionName": "1.0.0",
+  "versionCode": 1,
+  
+  "orientation": "portrait",
+  "fullscreen": false,
+  "targetUrl": "index.html",
+  
+  "statusBar": {
+    "backgroundColor": "#FF5722",
+    "style": "light",
+    "translucent": true,
+    "hidden": false
+  },
+  
+  "webview": {
+    "zoomEnabled": false,
+    "javascriptEnabled": true,
+    "domStorageEnabled": true,
+    "allowFileAccess": true,
+    "textZoom": 100
+  },
+
+  "permissions": [
+    "android.permission.INTERNET"
   ]
 }
     """.trimIndent()

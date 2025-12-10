@@ -1,6 +1,7 @@
 package com.web.webide
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
@@ -24,7 +25,6 @@ import com.web.webide.ui.settings.AboutScreen
 import com.web.webide.ui.settings.SettingsScreen
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun App(
     themeViewModel: ThemeViewModel,
@@ -49,88 +49,116 @@ fun App(
     }
     val themeState by themeViewModel.themeState.collectAsState()
 
-    val animationDuration = 400
-    val animationSpec = tween<Float>(animationDuration)
-    val slideSpec = tween<androidx.compose.ui.unit.IntOffset>(animationDuration)
+    // 优化后的动画配置
+    // 使用更自然的缓动曲线（类似iOS的平滑感）
+    val predictiveEasing = CubicBezierEasing(0.2f, 0.0f, 0.2f, 1.0f)
+    val duration = 350 // 稍微缩短时间，让响应更快
+
+    // 进入动画（向前导航）
+    val enterTransition = {
+        slideInHorizontally(
+            initialOffsetX = { it },
+            animationSpec = tween(duration, easing = predictiveEasing)
+        ) + fadeIn(
+            animationSpec = tween(duration, easing = predictiveEasing)
+        )
+    }
+
+    // 退出动画（向前导航时）
+    val exitTransition = {
+        slideOutHorizontally(
+            targetOffsetX = { -(it * 0.3f).toInt() },
+            animationSpec = tween(duration, easing = predictiveEasing)
+        ) + fadeOut(
+            targetAlpha = 0.7f,
+            animationSpec = tween(duration, easing = predictiveEasing)
+        )
+    }
+
+    // 返回进入动画（返回时底层页面重新出现）
+    val popEnterTransition = {
+        slideInHorizontally(
+            initialOffsetX = { -(it * 0.3f).toInt() },
+            animationSpec = tween(duration, easing = predictiveEasing)
+        ) + fadeIn(
+            initialAlpha = 0.7f,
+            animationSpec = tween(duration, easing = predictiveEasing)
+        ) + scaleIn(
+            initialScale = 0.95f,
+            animationSpec = tween(duration, easing = predictiveEasing)
+        )
+    }
+
+    // 返回退出动画（返回时当前页面消失）
+    val popExitTransition = {
+        slideOutHorizontally(
+            targetOffsetX = { it },
+            animationSpec = tween(duration, easing = predictiveEasing)
+        ) + fadeOut(
+            targetAlpha = 0f,
+            animationSpec = tween(duration, easing = predictiveEasing)
+        ) + scaleOut(
+            targetScale = 1.1f,
+            animationSpec = tween(duration, easing = predictiveEasing)
+        )
+    }
 
     NavHost(
         navController = navController,
         startDestination = startDestination,
 
-        // ✅ 打开动画: 水平滑入 + 垂直向上
-        enterTransition = {
-            slideInHorizontally(initialOffsetX = { it }, animationSpec = slideSpec) +
-                    slideInVertically(initialOffsetY = { it / 4 }, animationSpec = slideSpec) +
-                    fadeIn(animationSpec = animationSpec)
-        },
-        // 当打开新页面时，旧页面的退出动画（保持水平对称）
-        exitTransition = {
-            slideOutHorizontally(targetOffsetX = { -it }, animationSpec = slideSpec) +
-                    fadeOut(animationSpec = animationSpec)
-        },
-
-        // ✅ 返回动画: 水平滑出
-        popExitTransition = {
-            slideOutHorizontally(targetOffsetX = { it }, animationSpec = slideSpec) +
-                    fadeOut(animationSpec = animationSpec)
-        },
-        // 当返回时，目标页面的进入动画（保持水平对称）
-        popEnterTransition = {
-            slideInHorizontally(initialOffsetX = { -it }, animationSpec = slideSpec) +
-                    fadeIn(animationSpec = animationSpec)
-        }
+        // 应用优化后的动画
+        enterTransition = { enterTransition() },
+        exitTransition = { exitTransition() },
+        popEnterTransition = { popEnterTransition() },
+        popExitTransition = { popExitTransition() }
     ) {
-
         composable("workspace_selection") {
             WorkspaceSelectionScreen(navController = navController)
         }
+
         composable("project_list") {
             ProjectListScreen(navController = navController)
         }
+
         composable(
             route = "code_edit/{folderName}",
             arguments = listOf(navArgument("folderName") { type = NavType.StringType })
         ) { backStackEntry ->
             val folderName = backStackEntry.arguments?.getString("folderName")
             if (folderName != null) {
-                CodeEditScreen(
-                    folderName = folderName,
-                    navController = navController,
-                    viewModel = mainViewModel
-                )
+                CodeEditScreen(folderName, navController, mainViewModel)
             }
         }
+
         composable(
             route = "preview/{folderName}",
             arguments = listOf(navArgument("folderName") { type = NavType.StringType })
         ) { backStackEntry ->
             val folderName = backStackEntry.arguments?.getString("folderName")
             if (folderName != null) {
-                WebPreviewScreen(
-                    folderName = folderName,
-                    navController = navController,
-                    viewModel = mainViewModel
-                )
+                WebPreviewScreen(folderName, navController, mainViewModel)
             }
         }
+
         composable("new_project") {
             NewProjectScreen(navController = navController)
         }
+
         composable("settings") {
             SettingsScreen(
-                navController = navController,
-                currentThemeState = themeState,
-                logConfigState = logConfigState,
+                navController,
+                themeState,
+                logConfigState,
                 onThemeChange = { mode, theme, color, isMonet, isCustom ->
                     themeViewModel.saveThemeConfig(mode, theme, color, isMonet, isCustom)
                 },
                 onLogConfigChange = { enabled, filePath ->
-                    scope.launch {
-                        logConfigRepository.saveLogConfig(enabled, filePath)
-                    }
+                    scope.launch { logConfigRepository.saveLogConfig(enabled, filePath) }
                 }
             )
         }
+
         composable("about") {
             AboutScreen(navController = navController)
         }

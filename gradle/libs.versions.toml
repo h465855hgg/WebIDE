@@ -37,6 +37,7 @@ androidx-compose-ui = { group = "androidx.compose.ui", name = "ui", version.ref 
 # --- Add these library definitions ---
 appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 
 [plugins]

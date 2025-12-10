@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -20,7 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.web.webide.core.utils.WorkspaceManager
-import com.web.webide.ui.common.PredictiveBackHandler
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -51,7 +52,6 @@ fun NewProjectScreen(navController: NavController) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    PredictiveBackHandler(onBack = { navController.popBackStack() }) { modifier ->
 
         Scaffold(
             snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
@@ -60,14 +60,14 @@ fun NewProjectScreen(navController: NavController) {
                     title = { Text("新建项目") },
                     navigationIcon = {
                         IconButton(onClick = { navController.popBackStack() }) {
-                            Icon(Icons.Default.ArrowBack, "返回")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
                         }
                     }
                 )
             }
         ) { innerPadding ->
             Column(
-                modifier = modifier
+                modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
                     .padding(horizontal = 16.dp)
@@ -256,7 +256,6 @@ fun NewProjectScreen(navController: NavController) {
             }
         }
     }
-}
 
 @Composable
 fun TemplateSelectionCard(modifier: Modifier = Modifier, title: String, icon: ImageVector, isSelected: Boolean, onClick: () -> Unit) {
@@ -272,6 +271,7 @@ fun TemplateSelectionCard(modifier: Modifier = Modifier, title: String, icon: Im
     }
 }
 
+@OptIn(DelicateCoroutinesApi::class)
 private fun createNewProject(
     context: Context, projectName: String, packageName: String, targetUrl: String, type: ProjectType,
     onSuccess: () -> Unit, onError: (String) -> Unit

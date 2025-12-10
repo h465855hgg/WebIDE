@@ -8,6 +8,7 @@ import android.content.pm.ActivityInfo
 import android.net.Uri
 import android.os.*
 import android.util.Base64
+import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.webkit.*
@@ -24,6 +25,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -77,23 +79,72 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
     }
     val config = webAppConfig.value
 
-    // --- 2. 屏幕方向与全屏 (保持不变) ---
+    // --- 2. 应用状态栏配置 ---
     DisposableEffect(config) {
-        if (config != null && activity != null) {
-            val orientation = config.optString("orientation", "portrait")
-            activity.requestedOrientation = when (orientation) {
-                "landscape" -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                "portrait" -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                "sensor" -> ActivityInfo.SCREEN_ORIENTATION_SENSOR
-                else -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        val statusBarConfig = config?.optJSONObject("statusBar")
+        if (statusBarConfig != null && activity != null) {
+            val window = activity.window
+            val decorView = window.decorView
+
+            // 处理状态栏隐藏
+            if (statusBarConfig.optBoolean("hidden", false)) {
+                // 隐藏状态栏
+                val flags = View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                decorView.systemUiVisibility = flags
+            } else {
+                // 显示状态栏
+                decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
+
+                // 设置状态栏颜色
+                try {
+                    val colorStr = statusBarConfig.optString("backgroundColor", "")
+                    if (colorStr.isNotEmpty() && colorStr.startsWith("#")) {
+                        val color = Color(android.graphics.Color.parseColor(colorStr))
+                        window.statusBarColor = color.toArgb()
+                    }
+                } catch (e: Exception) {
+                    LogCatcher.e("WebPreview", "设置状态栏颜色失败", e)
+                }
+
+                // 设置状态栏文字颜色
+                val style = statusBarConfig.optString("style", "dark")
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    when (style) {
+                        "light" -> {
+                            // 浅色文字（深色背景）
+                            decorView.systemUiVisibility = decorView.systemUiVisibility or
+                                    View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+                        }
+                        "dark" -> {
+                            // 深色文字（浅色背景）
+                            decorView.systemUiVisibility = decorView.systemUiVisibility and
+                                    View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv()
+                        }
+                    }
+                }
+
+                // 设置透明状态栏
+                if (statusBarConfig.optBoolean("translucent", false)) {
+                    window.addFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
+                } else {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
+                }
             }
-            val isFullscreen = config.optBoolean("fullscreen", false)
-            if (isFullscreen) hideSystemUI(activity)
-            onDispose {
-                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-                if (isFullscreen) showSystemUI(activity)
+        }
+
+        onDispose {
+            // 恢复默认状态栏设置
+            if (activity != null) {
+                val window = activity.window
+                val decorView = window.decorView
+                decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
+                window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
+                // 恢复默认状态栏颜色
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    window.statusBarColor = android.graphics.Color.TRANSPARENT
+                }
             }
-        } else { onDispose { } }
+        }
     }
 
     // --- 3. URL 计算 (保持不变) ---
