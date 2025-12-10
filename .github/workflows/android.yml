@@ -1,44 +1,18 @@
-# 示例：在 ubuntu-latest 上安装 JDK 17、命令行 SDK、并运行 gradle（含 --stacktrace）
 name: Android CI
-on:
-  push:
-  pull_request:
+on: [push, pull_request]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      ANDROID_SDK_ROOT: ${{ runner.temp }}/android-sdk
-      ANDROID_HOME: ${{ runner.temp }}/android-sdk
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Set up JDK  (use version required by your project)
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
-
-      - name: Show Java and Gradle versions
-        run: |
-          java -version
-          ./gradlew -v
-
-      - name: Install Android SDK command-line tools and packages
-        run: |
-          set -e
-          SDK_ROOT=${{ runner.temp }}/android-sdk
-          mkdir -p "$SDK_ROOT/cmdline-tools"
-          curl -fsSL "https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip" -o /tmp/cmdline-tools.zip
-          unzip -q /tmp/cmdline-tools.zip -d "$SDK_ROOT/cmdline-tools"
-          # 确保路径正确，部分 cmdline-tools 需要放到 cmdline-tools/latest 或类似结构
-          mv "$SDK_ROOT/cmdline-tools/cmdline-tools" "$SDK_ROOT/cmdline-tools/latest" || true
-          yes | "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK_ROOT" --licenses
-          "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK_ROOT" "platform-tools" "platforms;android-33" "build-tools;33.0.2"
-        env:
-          ANDROID_SDK_ROOT: ${{ runner.temp }}/android-sdk
+          java-version: '11'
 
       - name: Cache Gradle
         uses: actions/cache@v4
@@ -46,13 +20,18 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/gradle-wrapper.properties') }}
+          restore-keys: ${{ runner.os }}-gradle-
 
-      - name: Build (with stacktrace)
+      - name: Install Android SDK components
         run: |
-          ./gradlew clean assembleDebug --stacktrace
-        env:
-          ANDROID_SDK_ROOT: ${{ runner.temp }}/android-sdk
-          ANDROID_HOME: ${{ runner.temp }}/android-sdk
+          sudo apt-get update
+          # sdkmanager 路径可能随 runner 版本不同，下面用 sdkmanager 示例
+          yes | sdkmanager --licenses
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Build (debug)
+        run: ./gradlew assembleDebug --no-daemon -S
