@@ -85,7 +85,8 @@ Null
 
 
 *这是一个由AI开发的创新项目，体现了人工智能在软件开发领域的新可能性。*
-![image](https://github.com/h465855hgg/WebIDE/blob/main/IMG_20251108_171127.jpg)
+![4E4F3CE84A52E0F7F44184A31D7B88C1](https://github.com/user-attachments/assets/2eac6ea4-25a1-4a02-b814-2925ffb2092e)
+![64BCA2DEE442663508A919A2156299F6](https://github.com/user-attachments/assets/7999b42a-af56-4aea-b705-920e7e168844)
 
 ---
 [![Star History Chart](https://api.star-history.com/svg?repos=h465855hgg/WebIDE&type=Date)](https://star-history.com/#h465855hgg/WebIDE&Date)
