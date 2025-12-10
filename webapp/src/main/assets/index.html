@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Android JS Bridge Pro</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .card { background: white; padding: 15px; margin-bottom: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .btn { background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; margin: 5px; cursor: pointer; }
+        .btn:active { background: #0056b3; }
+        code { background: #eee; padding: 2px 5px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+<h2>WebIDE Bridge 测试</h2>
+
+<!-- 设备信息 -->
+<div class="card">
+    <h3>📱 设备信息</h3>
+    <div id="device-info">加载中...</div>
+</div>
+
+<!-- 交互功能 -->
+<div class="card">
+    <h3>🔔 交互反馈</h3>
+    <button class="btn" onclick="NativeAPI.toast('这是原生 Toast')">Toast</button>
+    <button class="btn" onclick="NativeAPI.vibrate(100)">震动 100ms</button>
+</div>
+
+<!-- 剪贴板 -->
+<div class="card">
+    <h3>📋 剪贴板</h3>
+    <label for="copy-input"></label><input type="text" id="copy-input" value="Hello Android" style="padding:5px;">
+    <button class="btn" onclick="NativeAPI.clipboard.copy(document.getElementById('copy-input').value)">复制</button>
+    <button class="btn" onclick="readClip()">读取</button>
+    <div id="clip-result" style="margin-top:5px; color:green;"></div>
+</div>
+
+<!-- 网络请求 -->
+<div class="card">
+    <h3>🌐 跨域请求</h3>
+    <button class="btn" onclick="doRequest()">GitHub API</button>
+    <pre id="net-result" style="font-size:12px; overflow:auto; max-height:150px;"></pre>
+</div>
+
+<!-- 本地存储 -->
+<div class="card">
+    <h3>💾 原生存储</h3>
+    <button class="btn" onclick="saveTime()">保存当前时间</button>
+    <button class="btn" onclick="readTime()">读取时间</button>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+    // 1. 显示设备信息
+    const info = NativeAPI.getDeviceInfo();
+    if (info) {
+        document.getElementById('device-info').innerHTML =
+            `型号: ${info.model}<br>SDK: ${info.sdk_int}<br>系统: Android ${info.android_version}`;
+    }
+
+    // 2. 剪贴板读取
+    async function readClip() {
+        try {
+            const text = await NativeAPI.clipboard.read();
+            document.getElementById('clip-result').innerText = "剪贴板内容: " + text;
+            NativeAPI.toast("读取成功");
+        } catch(e) {
+            NativeAPI.toast("读取失败: " + e);
+        }
+    }
+
+    // 3. 网络请求
+    async function doRequest() {
+        const div = document.getElementById('net-result');
+        div.innerText = "请求中...";
+        try {
+            const res = await NativeAPI.http.get("https://api.github.com/users/google");
+            div.innerText = JSON.stringify(res, null, 2);
+            NativeAPI.vibrate(50); // 成功震动一下
+        } catch(e) {
+            div.innerText = "Error: " + e;
+        }
+    }
+
+    // 4. 存储测试
+    function saveTime() {
+        const time = new Date().toLocaleString();
+        NativeAPI.storage.set("saved_time", time);
+        NativeAPI.toast("已保存: " + time);
+    }
+
+    function readTime() {
+        const time = NativeAPI.storage.get("saved_time");
+        NativeAPI.toast("读取到: " + (time || "空"));
+    }
+</script>
+</body>
+</html>

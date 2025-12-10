@@ -31,4 +31,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "WebIDE"
-include(":app",":signer")
+include(":app",":signer",":webapp")

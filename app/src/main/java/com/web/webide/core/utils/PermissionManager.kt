@@ -1,7 +1,6 @@
 package com.web.webide.core.utils
 
 import android.Manifest
-import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -13,7 +12,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
-import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 
 /**
@@ -98,80 +96,86 @@ object PermissionManager {
     ): PermissionRequestState {
         val context = LocalContext.current
         var showRationale by remember { mutableStateOf(false) }
-        
-        // 基础存储权限请求器
+
+        // 1. 定义 Android 11+ 的启动器
+        // 专门处理 "所有文件访问权限" 的回调
+        val allFilesAccessLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.StartActivityForResult()
+        ) {
+            // 当从设置页面返回时，无论结果代码是什么，都检查一次权限
+            if (hasAllFilesAccess()) {
+                LogCatcher.i("PermissionManager", "所有文件访问权限已授予 (Callback)")
+                onPermissionGranted()
+            } else {
+                LogCatcher.w("PermissionManager", "所有文件访问权限仍未授予 (Callback)")
+                onPermissionDenied()
+                // 对于这个特殊权限，通常不显示Rationale，或者你可以根据需求开启
+            }
+        }
+
+        // 2. 定义 Android 10及以下的普通权限启动器
         val basicPermissionLauncher = rememberLauncherForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions()
         ) { permissions ->
             val allGranted = permissions.values.all { it }
             if (allGranted) {
                 LogCatcher.i("PermissionManager", "基础存储权限已授予")
-                // 基础权限授予后，检查是否需要请求所有文件访问权限
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                    if (hasAllFilesAccess()) {
-                        onPermissionGranted()
-                    } else {
-                        // 需要跳转到设置页面
-                        requestAllFilesAccess(context)
-                    }
-                } else {
-                    onPermissionGranted()
-                }
+                onPermissionGranted()
             } else {
                 LogCatcher.w("PermissionManager", "部分基础权限被拒绝: $permissions")
                 onPermissionDenied()
                 showRationale = true
             }
         }
-        
-        // 所有文件访问权限检查器（从设置返回后）
-        val allFilesAccessLauncher = rememberLauncherForActivityResult(
-            ActivityResultContracts.StartActivityForResult()
-        ) { _ ->
-            if (hasAllFilesAccess()) {
-                LogCatcher.i("PermissionManager", "所有文件访问权限已授予")
-                onPermissionGranted()
-            } else {
-                LogCatcher.w("PermissionManager", "所有文件访问权限被拒绝")
-                onPermissionDenied()
-                showRationale = true
-            }
-        }
-        
-        return PermissionRequestState(
-            requestPermissions = {
-                LogCatcher.d("PermissionManager", "开始请求权限")
-                
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                    // Android 11+ 直接请求所有文件访问权限
-                    if (!hasAllFilesAccess()) {
-                        requestAllFilesAccess(context)
+
+        return remember(context) { // 使用 remember 优化性能
+            PermissionRequestState(
+                requestPermissions = {
+                    LogCatcher.d("PermissionManager", "开始请求权限")
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        // Android 11+ 逻辑：检查是否有权限，没有则通过 Launcher 跳转
+                        if (hasAllFilesAccess()) {
+                            onPermissionGranted()
+                        } else {
+                            try {
+                                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                                    data = Uri.parse("package:${context.packageName}")
+                                }
+                                // ✅ 关键修复：使用 launcher 启动，而不是 context.startActivity
+                                allFilesAccessLauncher.launch(intent)
+                            } catch (_: Exception) {
+                                // 容错处理：部分机型可能不支持该 Intent，尝试通用设置页
+                                val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                                allFilesAccessLauncher.launch(intent)
+                            }
+                        }
+                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        // Android 6-10 逻辑
+                        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            // Android 13+ 实际上也更推荐走 Photo Picker，但如果是全文件管理类应用，逻辑会很复杂
+                            // 这里保留你原有的逻辑，或者根据 targetSdk 调整
+                            arrayOf(
+                                Manifest.permission.READ_MEDIA_IMAGES,
+                                Manifest.permission.READ_MEDIA_VIDEO,
+                                Manifest.permission.READ_MEDIA_AUDIO
+                            )
+                        } else {
+                            arrayOf(
+                                Manifest.permission.READ_EXTERNAL_STORAGE,
+                                Manifest.permission.WRITE_EXTERNAL_STORAGE
+                            )
+                        }
+                        basicPermissionLauncher.launch(permissions)
                     } else {
+                        // Android 5 及以下
                         onPermissionGranted()
                     }
-                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    // Android 6-10 请求传统存储权限
-                    val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        arrayOf(
-                            Manifest.permission.READ_MEDIA_IMAGES,
-                            Manifest.permission.READ_MEDIA_VIDEO,
-                            Manifest.permission.READ_MEDIA_AUDIO
-                        )
-                    } else {
-                        arrayOf(
-                            Manifest.permission.READ_EXTERNAL_STORAGE,
-                            Manifest.permission.WRITE_EXTERNAL_STORAGE
-                        )
-                    }
-                    basicPermissionLauncher.launch(permissions)
-                } else {
-                    // Android 5 及以下不需要运行时权限
-                    onPermissionGranted()
-                }
-            },
-            showRationale = showRationale,
-            hasPermissions = { hasRequiredPermissions(context) }
-        )
+                },
+                showRationale = showRationale,
+                hasPermissions = { hasRequiredPermissions(context) }
+            )
+        }
     }
     
     /**

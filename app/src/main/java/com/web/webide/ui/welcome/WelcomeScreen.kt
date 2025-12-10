@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.web.webide.core.utils.LogCatcher
 import com.web.webide.core.utils.PermissionManager
 import com.web.webide.ui.ThemeViewModel
 
@@ -66,8 +67,12 @@ fun WelcomeScreen(
     // 存储权限请求器
     val permissionState = PermissionManager.rememberPermissionRequest(
         onPermissionGranted = {
-            storageGranted = true },
+            storageGranted = true
+            // 可以加个日志
+            LogCatcher.i("WelcomeScreen", "回调：权限已授予，UI应更新")
+        },
         onPermissionDenied = {
+            // 可以在这里提示用户需要权限
         }
     )
 
@@ -105,18 +110,17 @@ fun WelcomeScreen(
                     when (step) {
                         WelcomeStep.INTRO -> IntroContent()
 
-                        // 权限页面：传入两个权限的状态和请求回调
+                        // ✅ 修复：PermissionsContent 的调用逻辑简化
                         WelcomeStep.PERMISSIONS -> PermissionsContent(
                             storageGranted = storageGranted,
                             installGranted = installGranted,
                             onRequestStoragePermission = {
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                                    PermissionManager.requestAllFilesAccess(context)
-                                } else {
-                                    permissionState.requestPermissions()
-                                }
+                                // ✅ 关键修复：不再手动判断 SDK_INT，统一交给 permissionState 处理
+                                // 这样 Android 11+ 也会通过 launcher 启动，能收到回调
+                                permissionState.requestPermissions()
                             },
                             onRequestInstallPermission = {
+                                // 安装权限逻辑保持不变（因为它不影响文件核心功能，且 ResultAPI 对它支持较弱）
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                                     if (!context.packageManager.canRequestPackageInstalls()) {
                                         val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
@@ -126,6 +130,7 @@ fun WelcomeScreen(
                                 }
                             }
                         )
+
 
                         WelcomeStep.THEME_SETUP -> ThemeSetupContent(
                             selectedModeIndex = selectedModeIndex,

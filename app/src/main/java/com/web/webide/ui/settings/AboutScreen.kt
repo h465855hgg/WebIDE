@@ -90,6 +90,7 @@ fun AboutScreen(navController: NavController) {
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             val libs = Libs.Builder().withContext(context).build()
+
             libraries = libs.libraries.sortedBy { it.name.lowercase() }
         }
         isLoading = false
@@ -113,7 +114,7 @@ fun AboutScreen(navController: NavController) {
                     }
                 },
                 scrollBehavior = scrollBehavior,
-                colors = TopAppBarDefaults.largeTopAppBarColors(
+                colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                     scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer
                 )

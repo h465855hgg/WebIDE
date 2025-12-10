@@ -2,10 +2,6 @@ package com.web.webide.ui.projects
 
 object ProjectTemplates {
 
-    // ==========================================
-    // 1. 普通 Web 项目模板 (纯前端)
-    // ==========================================
-
     val normalIndexHtml = """
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -28,109 +24,40 @@ object ProjectTemplates {
     """.trimIndent()
 
     val normalCss = """
-body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #f0f2f5;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    margin: 0;
-}
-.container {
-    background: white;
-    padding: 2rem;
-    border-radius: 10px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    text-align: center;
-}
-button {
-    background-color: #007bff;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 16px;
-}
-button:hover {
-    background-color: #0056b3;
-}
+body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #f0f2f5; }
+.container { background: white; padding: 2rem; border-radius: 8px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+button { background-color: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; font-size: 16px; }
     """.trimIndent()
 
     val normalJs = """
-console.log('Script loaded!');
-
 document.getElementById('clickBtn').addEventListener('click', function() {
-    const output = document.getElementById('output');
-    const now = new Date().toLocaleTimeString();
-    output.innerText = '你点击了按钮，时间：' + now;
-    console.log('Button clicked');
+    document.getElementById('output').innerText = '时间：' + new Date().toLocaleTimeString();
 });
     """.trimIndent()
 
-
-    // ==========================================
-    // 2. Android WebApp 模板 (带 Native 接口)
-    // ==========================================
-
     val apiJs = """
-// Native Bridge 初始化
 window.requestCallbacks = {};
-
-window.onAndroidResponse = function(callbackId, base64Response) {
-    const callback = window.requestCallbacks[callbackId];
-    if (!callback) return;
+window.onAndroidResponse = function(id, b64) {
+    const cb = window.requestCallbacks[id];
+    if(!cb) return;
     try {
-        const jsonString = decodeURIComponent(escape(window.atob(base64Response)));
-        const response = JSON.parse(jsonString);
-        if (response.success) {
-            let finalData = response.data;
-            try {
-                if (typeof finalData === 'string' && (finalData.startsWith('{') || finalData.startsWith('['))) {
-                    finalData = JSON.parse(finalData);
-                }
-            } catch (e) {}
-            callback.resolve(finalData);
-        } else {
-            callback.reject(response.data);
-        }
-    } catch (e) {
-        callback.reject("Bridge Error: " + e.message);
-    }
-    delete window.requestCallbacks[callbackId];
+        const res = JSON.parse(decodeURIComponent(escape(window.atob(b64))));
+        res.success ? cb.resolve(res.data) : cb.reject(res.data);
+    } catch(e) { cb.reject(e.message); }
+    delete window.requestCallbacks[id];
 };
-
-const callAsync = (methodName, ...args) => {
-    return new Promise((resolve, reject) => {
-        if (!window.Android || !window.Android[methodName]) {
-            console.warn(`Native method '${'$'}{methodName}' not found.`);
-            return reject("Native method not found");
-        }
-        const callbackId = 'cb_' + Date.now() + Math.random();
-        window.requestCallbacks[callbackId] = { resolve, reject };
-        window.Android[methodName](...args, callbackId);
-    });
-};
-
+const call = (m, ...a) => new Promise((res, rej) => {
+    if(!window.Android || !window.Android[m]) return rej("Native API not found");
+    const id = 'cb_'+Math.random();
+    window.requestCallbacks[id] = {resolve: res, reject: rej};
+    window.Android[m](...a, id);
+});
 window.NativeAPI = {
-    toast: (msg) => window.Android?.showToast(msg),
-    vibrate: (ms = 50) => window.Android?.vibrate(ms),
-    getDeviceInfo: () => {
-        if (!window.Android) return null;
-        try { return JSON.parse(window.Android.getDeviceInfo()); } catch(e) { return null; }
-    },
-    clipboard: {
-        copy: (text) => window.Android?.copyToClipboard(text),
-        read: () => callAsync('getFromClipboard')
-    },
-    storage: {
-        set: (key, value) => window.Android?.saveStorage(key, typeof value === 'object' ? JSON.stringify(value) : value),
-        get: (key) => {
-            const val = window.Android?.getStorage(key);
-            try { return JSON.parse(val); } catch(e) { return val; }
-        }
-    }
+    toast: (m) => window.Android?.showToast(m),
+    vibrate: (ms=50) => window.Android?.vibrate(ms),
+    share: (t) => window.Android?.shareText(t),
+    openBrowser: (u) => window.Android?.openBrowser(u),
+    info: () => { try { return JSON.parse(window.Android.getDeviceInfo()); } catch(e){ return null; } }
 };
     """.trimIndent()
 
@@ -140,64 +67,123 @@ window.NativeAPI = {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web App</title>
+    <title>Universal Camera</title>
     <link rel="stylesheet" href="css/style.css">
+    <style>
+        #video-container { width: 100%; max-width: 400px; height: 300px; background: #000; margin: 10px auto; display: none; }
+        video { width: 100%; height: 100%; object-fit: cover; }
+        #fallback-container { display: none; margin: 20px; }
+        .btn { padding: 10px 20px; background: #007bff; color: white; border-radius: 5px; text-decoration: none; display: inline-block; cursor: pointer; }
+    </style>
 </head>
 <body>
     <div class="container">
-        <h1>Web App Demo</h1>
-        <p>点击下方按钮测试原生能力</p>
+        <h1>万能相机演示</h1>
+        <p>兼容 PC 浏览器、手机浏览器 & Android WebView</p>
         
-        <div class="card">
-            <button onclick="NativeAPI.toast('来自 WebIDE 的原生 Toast！')">原生 Toast</button>
-            <button onclick="NativeAPI.vibrate(100)">手机震动</button>
-            <button onclick="copyInfo()">复制设备信息</button>
+        <!-- 方案 A: HTML5 直播流 (PC/Https 完美, file:// 协议部分受限) -->
+        <div id="video-container">
+            <video id="video" autoplay playsinline></video>
         </div>
-        <p id="info" style="margin-top: 20px; color: #888; font-size: 12px;"></p>
+        <button class="btn" onclick="startCamera()">尝试打开摄像头 (直播流)</button>
+        
+        <hr>
+
+        <!-- 方案 B: 通用 Input (所有环境兼容，包括 file://) -->
+        <p>如果上方直播流失败，请使用下方按钮：</p>
+        <label class="btn">
+            📷 拍照 / 上传
+            <!-- capture="environment" 在手机上会直接调起后置摄像头 -->
+            <input type="file" accept="image/*" capture="environment" style="display:none" onchange="handleFile(this)">
+        </label>
+        
+        <div id="preview-img" style="margin-top:10px"></div>
+        <p id="log" style="color:red; font-size: 12px;"></p>
     </div>
+
     <script src="js/api.js"></script>
-    <script src="js/index.js"></script>
+    <script>
+        function log(msg) { document.getElementById('log').innerText = msg; console.log(msg); }
+
+        // 方案 A: 尝试 getUserMedia
+        async function startCamera() {
+            try {
+                const constraints = { video: { facingMode: "environment" } };
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                const video = document.getElementById('video');
+                video.srcObject = stream;
+                document.getElementById('video-container').style.display = 'block';
+                log("摄像头启动成功 (Stream Mode)");
+            } catch (err) {
+                log("直播流启动失败: " + err.name + " - " + err.message + "\n建议使用下方的【拍照/上传】按钮");
+                // 失败不强求，引导用户用 Input
+            }
+        }
+
+        // 方案 B: 处理 Input 拍照结果
+        function handleFile(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.style.maxWidth = '100%';
+                    img.style.marginTop = '10px';
+                    const container = document.getElementById('preview-img');
+                    container.innerHTML = '';
+                    container.appendChild(img);
+                    log("图片获取成功 (Input Mode)");
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+        
+        // 自动尝试一次
+        // startCamera(); 
+    </script>
 </body>
 </html>
     """.trimIndent()
-
     val webAppIndexJs = """
-// 显示设备信息
-setTimeout(() => {
-    const info = NativeAPI.getDeviceInfo();
-    if(info) {
-        document.getElementById('info').innerText = `运行于: ${'$'}{info.model} (Android ${'$'}{info.android_version})`;
-    } else {
-         document.getElementById('info').innerText = "未检测到原生环境";
-    }
-}, 100);
-
-function copyInfo() {
-    const info = document.getElementById('info').innerText;
-    NativeAPI.clipboard.copy(info);
-}
+const info = NativeAPI.info();
+if(info) document.getElementById('info').innerText = `Running on ${'$'}{info.model}`;
     """.trimIndent()
 
     val webAppCss = """
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
-.container { text-align: center; width: 100%; max-width: 400px; }
-.card { background: white; padding: 20px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
-button { background: #6200ee; color: white; border: none; padding: 12px; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; }
-button:active { opacity: 0.8; }
-h1 { color: #333; margin-bottom: 5px; font-size: 24px; }
-p { color: #666; margin: 0; }
+body { font-family: sans-serif; padding: 20px; text-align: center; }
+button { margin: 10px; padding: 10px 20px; font-size: 16px; display: block; width: 100%; }
     """.trimIndent()
 
-    // WebApp 配置文件
-    fun getConfigFile(packageName: String, appName: String): String = """
+    // 🚀 通用配置生成器：支持传入 targetUrl
+    fun getConfigFile(packageName: String, appName: String, targetUrl: String): String = """
 {
   "name": "$appName",
   "package": "$packageName",
   "versionName": "1.0.0",
   "versionCode": 1,
+  
   "orientation": "portrait",
   "fullscreen": false,
-  "targetUrl": "index.html"
+  "targetUrl": "$targetUrl",
+  "icon": "icon.png",
+  
+  "webview": {
+    "zoomEnabled": false,
+    "javascriptEnabled": true,
+    "domStorageEnabled": true,
+    "allowFileAccess": true,
+    "textZoom": 100,
+    "userAgent": ""
+  },
+
+  "permissions": [
+    "android.permission.INTERNET",
+    "android.permission.VIBRATE",
+    "android.permission.ACCESS_NETWORK_STATE",
+    "android.permission.CAMERA",
+    "android.permission.READ_EXTERNAL_STORAGE",
+    "android.permission.WRITE_EXTERNAL_STORAGE"
+  ]
 }
     """.trimIndent()
 }

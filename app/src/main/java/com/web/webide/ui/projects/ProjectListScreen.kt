@@ -26,7 +26,8 @@ fun ProjectListScreen(navController: NavController) {
     val projectDir = File(projectDirPath)
 
     var folderList by remember { mutableStateOf<List<String>>(emptyList()) }
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
+    val scrollBehavior =
+        TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
 
     LaunchedEffect(projectDir) {
         folderList = withContext(Dispatchers.IO) {
@@ -44,49 +45,50 @@ fun ProjectListScreen(navController: NavController) {
         }
     }
 
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            LargeTopAppBar(
-                title = { Text("Web Projects") },
-                scrollBehavior = scrollBehavior,
-                actions = {
-                    IconButton(onClick = { navController.navigate("settings") }) {
-                        Icon(Icons.Default.Settings, "设置")
+        Scaffold(
+            modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection), // 将 'Modifier' 改为 'modifier'
+            topBar = {
+                LargeTopAppBar(
+                    title = { Text("Web Projects") },
+                    scrollBehavior = scrollBehavior,
+                    actions = {
+                        IconButton(onClick = { navController.navigate("settings") }) {
+                            Icon(Icons.Default.Settings, "设置")
+                        }
                     }
-                }
-            )
-        },
-        floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { navController.navigate("new_project") },
-                icon = { Icon(Icons.Default.Add, "新建项目") },
-                text = { Text("新建项目") }
-            )
-        }
-    ) { innerPadding ->
-        if (folderList.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize().padding(innerPadding),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("没有找到项目")
+                )
+            },
+            floatingActionButton = {
+                ExtendedFloatingActionButton(
+                    onClick = { navController.navigate("new_project") },
+                    icon = { Icon(Icons.Default.Add, "新建项目") },
+                    text = { Text("新建项目") }
+                )
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(innerPadding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(folderList, key = { it }) { folderName ->
-                    ProjectCard(folderName = folderName) {
-                        navController.navigate("code_edit/$folderName")
+        ) { innerPadding ->
+            if (folderList.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize().padding(innerPadding),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("没有找到项目")
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize().padding(innerPadding),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(folderList, key = { it }) { folderName ->
+                        ProjectCard(folderName = folderName) {
+                            navController.navigate("code_edit/$folderName")
+                        }
                     }
                 }
             }
         }
     }
-}
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

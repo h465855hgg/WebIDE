@@ -36,7 +36,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import androidx.core.content.FileProvider
 import androidx.navigation.NavController
-import com.web.webide.build.ApkBuilder
 import com.web.webide.core.utils.LogCatcher
 import com.web.webide.core.utils.WorkspaceManager
 import com.web.webide.files.FileTree
@@ -49,7 +48,7 @@ import androidx.compose.ui.geometry.lerp
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.util.Locale
+import org.json.JSONObject
 
 // 构建结果状态
 sealed class BuildResultState {
@@ -161,70 +160,92 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                     }
                                 )
 
-                                // 如果存在 webapp.json 则显示 Build 选项
+
                                 if (hasWebAppConfig) {
+
                                     DropdownMenuItem(
                                         text = { Text("构建 APK") },
-                                        enabled = !isBuilding, // 构建中禁止重复点击
+                                        enabled = !isBuilding,
                                         onClick = {
                                             isMoreMenuExpanded = false
                                             scope.launch {
-                                                // 1. 开始构建
                                                 isBuilding = true
                                                 viewModel.saveAllModifiedFiles(context)
 
-                                                // 2. 准备 Keystore
-                                                val keystorePath = ensureKeystoreExists(context, workspacePath)
+                                                // ================== 修复开始 ==================
+                                                // 1. 读取项目配置 (webapp.json)
+                                                val configFile = File(projectPath, "webapp.json")
+                                                var pkg: String? = null
+                                                var verName: String? = null
+                                                var verCode: String? = null
+                                                var iconPath: String = ""
+                                                var permissions: Array<String>? = null
 
-                                                withContext(Dispatchers.IO) {
-                                                    val args = if (keystorePath != null) arrayOf(keystorePath) else arrayOf()
+                                                if (configFile.exists()) {
+                                                    try {
+                                                        val jsonStr = withContext(Dispatchers.IO) { configFile.readText() }
+                                                        val json = JSONObject(jsonStr)
 
-                                                    // 包名生成
-                                                    val cleanPackageName = "com.example.${folderName.replace("[^a-zA-Z0-9]".toRegex(), "").lowercase(Locale.ROOT)}"
+                                                        // 解析包名、版本
+                                                        pkg = json.optString("package", "com.example.webapp")
+                                                        verName = json.optString("versionName", "1.0")
+                                                        verCode = json.optString("versionCode", "1")
 
-                                                    // 执行构建
-                                                    // 根据你的 Java 代码，成功时返回路径，失败时返回 "error: ..."
-                                                    val resultString = ApkBuilder.bin(
-                                                        context,
-                                                        workspacePath,
-                                                        projectPath,
-                                                        folderName, // 这里传的是 folderName，作为 aname
-                                                        cleanPackageName,
-                                                        "1.0",
-                                                        "1",
-                                                        "",
-                                                        args
-                                                    )
-
-                                                    // 3. 解析结果
-                                                    val isError = resultString.startsWith("error:")
-                                                    var finalApkPath: String? = null
-
-                                                    if (!isError) {
-                                                        // 如果不是 error，Java代码返回的就是绝对路径
-                                                        val file = File(resultString)
-                                                        if (file.exists()) {
-                                                            finalApkPath = file.absolutePath
-                                                        } else {
-                                                            // 如果返回了路径但文件不存在，尝试去 build 目录手动找
-                                                            delay(500) // 等待文件系统
-                                                            val found = findBuiltApk(projectPath, folderName)
-                                                            finalApkPath = found?.absolutePath
+                                                        // 解析 Icon 路径 (需要绝对路径)
+                                                        val iconName = json.optString("icon", "")
+                                                        if (iconName.isNotEmpty()) {
+                                                            val iconFile = File(projectPath, iconName)
+                                                            // 只有当图片文件真实存在时才传递路径
+                                                            if (iconFile.exists()) {
+                                                                iconPath = iconFile.absolutePath
+                                                            } else {
+                                                                LogCatcher.w("Build", "未找到图标文件: ${iconFile.absolutePath}")
+                                                            }
                                                         }
-                                                    }
 
-                                                    // 调试日志
-                                                    if (finalApkPath != null) {
-                                                        LogCatcher.i("Build", "构建成功，APK路径: $finalApkPath")
-                                                    } else {
-                                                        LogCatcher.e("Build", "构建结束，未找到APK。返回信息: $resultString")
-                                                    }
+                                                        // 解析权限列表
+                                                        val jsonPerms = json.optJSONArray("permissions")
+                                                        if (jsonPerms != null && jsonPerms.length() > 0) {
+                                                            val list = ArrayList<String>()
+                                                            for (i in 0 until jsonPerms.length()) {
+                                                                list.add(jsonPerms.getString(i))
+                                                            }
+                                                            permissions = list.toTypedArray()
+                                                        }
 
-                                                    withContext(Dispatchers.Main) {
-                                                        // 4. 构建结束，显示结果
-                                                        isBuilding = false
-                                                        buildResult = BuildResultState.Finished(resultString, finalApkPath)
+                                                    } catch (e: Exception) {
+                                                        LogCatcher.e("Build", "解析 webapp.json 失败", e)
                                                     }
+                                                }
+                                                // ================== 修复结束 ==================
+
+                                                val result = withContext(Dispatchers.IO) {
+                                                    // 2. 将解析出来的数据显式传递给 ApkBuilder
+                                                    com.web.webide.build.ApkBuilder.bin(
+                                                        context,           // Context context
+                                                        workspacePath,     // String mRootDir
+                                                        projectPath,       // String projectPath
+                                                        folderName,        // String aname
+                                                        pkg,               // String pkg (✅ 传入解析后的包名)
+                                                        verName,           // String ver (✅ 传入版本名)
+                                                        verCode,           // String code (✅ 传入版本号)
+                                                        iconPath,          // String amph (✅ 传入图标绝对路径)
+                                                        permissions        // String[] ps (✅ 传入权限数组)
+                                                    )
+                                                }
+
+                                                isBuilding = false
+
+                                                if (result.startsWith("error:")) {
+                                                    LogCatcher.e("Build", "构建失败: $result")
+                                                    buildResult =
+                                                        BuildResultState.Finished(result, null)
+                                                } else {
+                                                    LogCatcher.i("Build", "构建成功: $result")
+                                                    buildResult = BuildResultState.Finished(
+                                                        "构建成功",
+                                                        result
+                                                    )
                                                 }
                                             }
                                         }

@@ -16,21 +16,26 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
-// 引入你的库
+// 引入你的库 (确保这些类在你的 classpath 中)
 import com.Day.Studio.Function.axmleditor.decode.AXMLDoc;
 import com.Day.Studio.Function.ApkXmlEditor;
 import com.Day.Studio.Function.axmleditor.editor.PermissionEditor;
 
 public class ApkBuilder {
 
-    // 模板 APK 的原始包名 (必须与 webapp_1.0.apk 实际包名一致)
+    // 模板 APK 的原始包名
     private static final String OLD_PACKAGE_NAME = "com.web.webapp";
+
+    // 需要替换图标的资源路径 (模板中的路径)
+    private static final String ICON_RES_1 = "res/MO.webp"; // 桌面图标
+    private static final String ICON_RES_2 = "res/fq.webp"; // 前景/圆图标
 
     private static class AppConfig {
         String appName = "WebApp";
         String appPackage = "com.example.webapp";
         String versionName = "1.0.0";
         String versionCode = "1";
+        String iconPath = null; // 新增：用户图标路径
         List<String> permissions = new ArrayList<>();
     }
 
@@ -42,7 +47,7 @@ public class ApkBuilder {
             String pkg,
             String ver,
             String code,
-            String amph,
+            String amph, // 图标路径 (CodeEditScreen 传入的 absolutePath)
             String[] ps) {
 
         File bf = new File(projectPath, "build");
@@ -64,9 +69,15 @@ public class ApkBuilder {
             // 1. 准备配置
             AppConfig config = new AppConfig();
             config.appName = aname;
-            config.appPackage = pkg; // 用户输入的新包名
+            config.appPackage = pkg;
             config.versionName = ver;
             config.versionCode = code;
+
+            // 设置图标路径 (如果不为空且文件存在)
+            if (amph != null && !amph.isEmpty() && new File(amph).exists()) {
+                config.iconPath = amph;
+            }
+
             if (ps != null) {
                 for (String p : ps) config.permissions.add(p);
             }
@@ -76,7 +87,7 @@ public class ApkBuilder {
                 return "error: 找不到构建模板 (assets/webapp_1.0.apk)";
             }
 
-            // 3. 合并逻辑
+            // 3. 合并逻辑 (包含图标替换)
             LogCatcher.i("ApkBuilder", ">> 正在合并资源...");
             mergeApk(templateApk, rawZipFile, projectPath, config);
 
@@ -108,7 +119,7 @@ public class ApkBuilder {
                     finalApkFile.getAbsolutePath()
             );
 
-            // 清理
+            // 清理临时文件
             rawZipFile.delete();
             alignedZipFile.delete();
 
@@ -131,7 +142,7 @@ public class ApkBuilder {
         zos.setLevel(5);
 
         try {
-            // A. 优先写入 resources.arsc
+            // A. 优先写入 resources.arsc (保持 STORED)
             ZipEntry arscEntry = zipFile.getEntry("resources.arsc");
             if (arscEntry != null) {
                 copyAsStored(zipFile, arscEntry, zos);
@@ -144,13 +155,32 @@ public class ApkBuilder {
 
                 if (name.equals("resources.arsc")) continue;
                 if (name.startsWith("META-INF/")) continue;
-                if (name.startsWith("assets/")) continue; // 剔除模板自带的 assets
+                if (name.startsWith("assets/")) continue;
 
+                // --- 1. 处理 Manifest (修改包名、权限) ---
                 if (name.equals("AndroidManifest.xml")) {
                     processManifest(zipFile, entry, zos, config);
                     continue;
                 }
 
+                // --- 2. 处理图标替换 ---
+                // 如果当前 entry 是目标图标，且用户配置了新图标
+                if (config.iconPath != null && (name.equals(ICON_RES_1) || name.equals(ICON_RES_2))) {
+                    LogCatcher.d("ApkBuilder", "正在替换图标: " + name);
+
+                    // 创建新 Entry，保持原名字 (Android 根据 resources.arsc 找名字，不管内容是 png 还是 webp)
+                    ZipEntry iconEntry = new ZipEntry(name);
+                    zos.putNextEntry(iconEntry);
+
+                    // 读取用户的图标文件并写入
+                    try (FileInputStream fis = new FileInputStream(new File(config.iconPath))) {
+                        copyStream(fis, zos);
+                    }
+                    zos.closeEntry();
+                    continue; // 跳过原文件拷贝
+                }
+
+                // --- 3. 普通文件拷贝 ---
                 ZipEntry newEntry = new ZipEntry(name);
                 zos.putNextEntry(newEntry);
                 try (InputStream is = zipFile.getInputStream(entry)) {
@@ -170,6 +200,99 @@ public class ApkBuilder {
             zos.close();
         }
     }
+
+    /**
+     * Manifest 处理逻辑：包名修改、版本修改、权限修改
+     */
+    private static void processManifest(ZipFile zipFile, ZipEntry entry, ZipOutputStream zos, AppConfig config) throws Exception {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        try (InputStream is = zipFile.getInputStream(entry)) {
+            copyStream(is, bos);
+        }
+        byte[] originalData = bos.toByteArray();
+
+        File tempManifest = File.createTempFile("TempManifest", ".xml");
+        try (FileOutputStream fos = new FileOutputStream(tempManifest)) {
+            fos.write(originalData);
+        }
+
+        try {
+            // 1. 基础属性修改
+            ApkXmlEditor.setXmlPaht(tempManifest.getAbsolutePath());
+            ApkXmlEditor.setAppName(config.appName);
+            ApkXmlEditor.setAppPack(config.appPackage);
+            try {
+                ApkXmlEditor.setAppbcode(Integer.parseInt(config.versionCode));
+            } catch (NumberFormatException e) {
+                ApkXmlEditor.setAppbcode(1);
+            }
+            ApkXmlEditor.setAppbname(config.versionName);
+            ApkXmlEditor.operation();
+
+            // 2. 权限修改 (使用 PermissionEditor)
+            if (config.permissions != null && !config.permissions.isEmpty()) {
+                LogCatcher.i("ApkBuilder", "正在添加权限: " + config.permissions.size() + " 个");
+                for (String perm : config.permissions) {
+                    setPermission(tempManifest.getAbsolutePath(), perm, false); // false = add
+                }
+            }
+
+            // 3. 移除 testOnly 标志
+            removeTestOnly(tempManifest);
+
+            // 4. AXML 字符串池修正 (解决包名变更导致的 Provider/Class 问题)
+            if (!config.appPackage.equals(OLD_PACKAGE_NAME)) {
+                Map<String, String> replacements = new HashMap<>();
+                replacements.put(OLD_PACKAGE_NAME + ".androidx-startup", config.appPackage + ".androidx-startup");
+                replacements.put(OLD_PACKAGE_NAME + ".fileprovider", config.appPackage + ".fileprovider");
+                replacements.put(".MainActivity", OLD_PACKAGE_NAME + ".MainActivity");
+
+                ManifestStringReplacer.batchReplaceStringInAXML(tempManifest, replacements);
+            }
+
+            // 写入 Zip
+            ZipEntry newEntry = new ZipEntry("AndroidManifest.xml");
+            zos.putNextEntry(newEntry);
+            try (FileInputStream fis = new FileInputStream(tempManifest)) {
+                copyStream(fis, zos);
+            }
+            zos.closeEntry();
+
+        } finally {
+            tempManifest.delete();
+        }
+    }
+
+    /**
+     * 使用 PermissionEditor 修改权限
+     * @param path Manifest 文件路径
+     * @param permission 权限字符串 (如 android.permission.INTERNET)
+     * @param remove true=删除, false=添加
+     */
+    public static void setPermission(String path, String permission, boolean remove) {
+        try {
+            File file = new File(path);
+            AXMLDoc doc = new AXMLDoc();
+            doc.parse(new FileInputStream(file));
+
+            PermissionEditor pe = new PermissionEditor(doc);
+            PermissionEditor.EditorInfo info = new PermissionEditor.EditorInfo();
+            PermissionEditor.PermissionOpera op = new PermissionEditor.PermissionOpera(permission);
+
+            // 根据你的库实现调用 add 或 remove
+            info.with(remove ? op.remove() : op.add());
+
+            pe.setEditorInfo(info);
+            pe.commit();
+
+            doc.build(new FileOutputStream(file));
+            doc.release();
+        } catch (Exception e) {
+            LogCatcher.e("ApkBuilder", "权限修改失败: " + permission, e);
+        }
+    }
+
+    // --- 以下保持原有的辅助方法 ---
 
     private static void addProjectFilesRecursively(ZipOutputStream zos, File file, String zipPath) {
         if (file.isDirectory()) {
@@ -193,81 +316,6 @@ public class ApkBuilder {
         }
     }
 
-    /**
-     * 核心修复逻辑：处理 Manifest
-     */
-    private static void processManifest(ZipFile zipFile, ZipEntry entry, ZipOutputStream zos, AppConfig config) throws Exception {
-        ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        try (InputStream is = zipFile.getInputStream(entry)) {
-            copyStream(is, bos);
-        }
-        byte[] originalData = bos.toByteArray();
-
-        File tempManifest = File.createTempFile("TempManifest", ".xml");
-        try (FileOutputStream fos = new FileOutputStream(tempManifest)) {
-            fos.write(originalData);
-        }
-
-        try {
-            // 1. 使用 ApkXmlEditor 修改基础属性 (Package, Version, Name)
-            // 这会修改 manifest 标签的 package 属性，导致 Application ID 变更
-            ApkXmlEditor.setXmlPaht(tempManifest.getAbsolutePath());
-            ApkXmlEditor.setAppName(config.appName);
-            ApkXmlEditor.setAppPack(config.appPackage); // 修改包名
-            try {
-                ApkXmlEditor.setAppbcode(Integer.parseInt(config.versionCode));
-            } catch (NumberFormatException e) {
-                ApkXmlEditor.setAppbcode(1);
-            }
-            ApkXmlEditor.setAppbname(config.versionName);
-            ApkXmlEditor.operation();
-
-            // 2. 修改权限
-            if (config.permissions != null) {
-                for (String perm : config.permissions) {
-                    setPermission(tempManifest.getAbsolutePath(), perm, false);
-                }
-            }
-
-            // 3. 移除 testOnly
-            removeTestOnly(tempManifest);
-
-            // 4. 【关键修复】 精确替换 AXML 字符串
-            // 我们需要构建一个替换映射表
-            if (!config.appPackage.equals(OLD_PACKAGE_NAME)) {
-                Map<String, String> replacements = new HashMap<>();
-
-                // A. 解决 Provider 冲突
-                // 将 com.web.webapp.androidx-startup -> com.example.myyy.androidx-startup
-                replacements.put(OLD_PACKAGE_NAME + ".androidx-startup", config.appPackage + ".androidx-startup");
-                replacements.put(OLD_PACKAGE_NAME + ".fileprovider", config.appPackage + ".fileprovider");
-
-                // B. 解决 ClassNotFoundException
-                // 如果 Manifest 里用了相对路径 ".MainActivity"，当包名变了后，它会解析到新包名下。
-                // 我们必须把它强制替换为绝对路径，指向 DEX 里真实存在的旧包名类。
-                replacements.put(".MainActivity", OLD_PACKAGE_NAME + ".MainActivity");
-
-                // 如果 Manifest 里本来就是绝对路径 com.web.webapp.MainActivity
-                // 我们要保护它不被替换（这里其实不用做特殊处理，只要不执行全局替换即可）
-
-                // 执行批量替换
-                ManifestStringReplacer.batchReplaceStringInAXML(tempManifest, replacements);
-            }
-
-            // 写入 Zip
-            ZipEntry newEntry = new ZipEntry("AndroidManifest.xml");
-            zos.putNextEntry(newEntry);
-            try (FileInputStream fis = new FileInputStream(tempManifest)) {
-                copyStream(fis, zos);
-            }
-            zos.closeEntry();
-
-        } finally {
-            tempManifest.delete();
-        }
-    }
-
-    // --- 辅助方法 ---
     private static void copyAsStored(ZipFile zipFile, ZipEntry entry, ZipOutputStream zos) throws IOException {
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
         try (InputStream is = zipFile.getInputStream(entry)) {
@@ -323,22 +371,6 @@ public class ApkBuilder {
         } catch (IOException e) { return false; }
     }
 
-    public static void setPermission(String path, String permission, boolean remove) {
-        try {
-            File file = new File(path);
-            AXMLDoc doc = new AXMLDoc();
-            doc.parse(new FileInputStream(file));
-            PermissionEditor pe = new PermissionEditor(doc);
-            PermissionEditor.EditorInfo info = new PermissionEditor.EditorInfo();
-            PermissionEditor.PermissionOpera op = new PermissionEditor.PermissionOpera(permission);
-            info.with(remove ? op.remove() : op.add());
-            pe.setEditorInfo(info);
-            pe.commit();
-            doc.build(new FileOutputStream(file));
-            doc.release();
-        } catch (Exception e) {}
-    }
-
     public static boolean signerApk(String keyPath, String pass, String alias, String keyPass, String inPath, String outPath) {
         try {
             com.mcal.apksigner.ApkSigner signer = new com.mcal.apksigner.ApkSigner(new File(inPath), new File(outPath));
@@ -353,17 +385,13 @@ public class ApkBuilder {
     }
 
     // ==================================================================================
-    //   【升级版】AXML 字符串池批量替换器
+    //   AXML 字符串池批量替换器 (保持原样)
     // ==================================================================================
 
     private static class ManifestStringReplacer {
 
         private static final int CHUNK_STRING_POOL = 0x001C0001;
 
-        /**
-         * 批量替换 AXML 中的字符串
-         * @param replacementMap key=旧字符串, value=新字符串
-         */
         public static void batchReplaceStringInAXML(File axmlFile, Map<String, String> replacementMap) throws Exception {
             byte[] data = new byte[(int) axmlFile.length()];
             try (FileInputStream fis = new FileInputStream(axmlFile)) {
@@ -372,10 +400,8 @@ public class ApkBuilder {
 
             ByteBuffer buffer = ByteBuffer.wrap(data);
             buffer.order(ByteOrder.LITTLE_ENDIAN);
+            buffer.position(8);
 
-            buffer.position(8); // 跳过 XML Header
-
-            // 寻找 StringPool
             int chunkType = buffer.getInt();
             if (chunkType != CHUNK_STRING_POOL) return;
 
@@ -394,7 +420,6 @@ public class ApkBuilder {
                 offsets[i] = buffer.getInt();
             }
 
-            // 解析字符串
             List<String> strings = new ArrayList<>();
             int dataStart = stringPoolStart + stringsOffset;
 
@@ -422,39 +447,31 @@ public class ApkBuilder {
                 }
             }
 
-            // --- 执行批量替换 ---
             boolean modified = false;
             for (int i = 0; i < strings.size(); i++) {
                 String currentStr = strings.get(i);
-
-                // 遍历所有替换规则
                 for (Map.Entry<String, String> entry : replacementMap.entrySet()) {
                     String target = entry.getKey();
                     String replacement = entry.getValue();
-
-                    // 如果完全匹配，或者包含（谨慎使用 contains，这里主要用于替换全类名或 authority）
                     if (currentStr.equals(target)) {
                         strings.set(i, replacement);
                         modified = true;
-                        LogCatcher.d("AXML", "替换: " + currentStr + " -> " + replacement);
-                        break; // 一个字符串只替换一次
+                        break;
                     }
                 }
             }
 
             if (!modified) return;
 
-            // --- 重建 AXML (与之前相同) ---
             ByteArrayOutputStream poolBos = new ByteArrayOutputStream();
             List<Integer> newOffsets = new ArrayList<>();
             int currentOffset = 0;
 
             for (String s : strings) {
                 newOffsets.add(currentOffset);
-
                 if (isUTF8) {
                     byte[] rawBytes = s.getBytes(StandardCharsets.UTF_8);
-                    poolBos.write(s.length()); // Simplified length
+                    poolBos.write(s.length());
                     poolBos.write(rawBytes.length);
                     poolBos.write(rawBytes);
                     poolBos.write(0);
@@ -508,7 +525,6 @@ public class ApkBuilder {
             try (FileOutputStream fos = new FileOutputStream(axmlFile)) {
                 fos.write(finalData);
             }
-            LogCatcher.i("AXML", "字符串池重建完成");
         }
     }
 }

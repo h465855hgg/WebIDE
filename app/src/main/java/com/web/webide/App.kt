@@ -1,7 +1,8 @@
 package com.web.webide
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.*
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
@@ -14,15 +15,16 @@ import com.web.webide.core.utils.LogConfigState
 import com.web.webide.core.utils.WorkspaceManager
 import com.web.webide.ui.ThemeViewModel
 import com.web.webide.ui.editor.CodeEditScreen
-import com.web.webide.ui.preview.WebPreviewScreen
 import com.web.webide.ui.editor.viewmodel.EditorViewModel
-import com.web.webide.ui.projects.ProjectListScreen
+import com.web.webide.ui.preview.WebPreviewScreen
 import com.web.webide.ui.projects.NewProjectScreen
+import com.web.webide.ui.projects.ProjectListScreen
 import com.web.webide.ui.projects.WorkspaceSelectionScreen
+import com.web.webide.ui.settings.AboutScreen
 import com.web.webide.ui.settings.SettingsScreen
-import com.web.webide.ui.settings.AboutScreen // 导入 AboutScreen
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun App(
     themeViewModel: ThemeViewModel,
@@ -47,7 +49,38 @@ fun App(
     }
     val themeState by themeViewModel.themeState.collectAsState()
 
-    NavHost(navController = navController, startDestination = startDestination) {
+    val animationDuration = 400
+    val animationSpec = tween<Float>(animationDuration)
+    val slideSpec = tween<androidx.compose.ui.unit.IntOffset>(animationDuration)
+
+    NavHost(
+        navController = navController,
+        startDestination = startDestination,
+
+        // ✅ 打开动画: 水平滑入 + 垂直向上
+        enterTransition = {
+            slideInHorizontally(initialOffsetX = { it }, animationSpec = slideSpec) +
+                    slideInVertically(initialOffsetY = { it / 4 }, animationSpec = slideSpec) +
+                    fadeIn(animationSpec = animationSpec)
+        },
+        // 当打开新页面时，旧页面的退出动画（保持水平对称）
+        exitTransition = {
+            slideOutHorizontally(targetOffsetX = { -it }, animationSpec = slideSpec) +
+                    fadeOut(animationSpec = animationSpec)
+        },
+
+        // ✅ 返回动画: 水平滑出
+        popExitTransition = {
+            slideOutHorizontally(targetOffsetX = { it }, animationSpec = slideSpec) +
+                    fadeOut(animationSpec = animationSpec)
+        },
+        // 当返回时，目标页面的进入动画（保持水平对称）
+        popEnterTransition = {
+            slideInHorizontally(initialOffsetX = { -it }, animationSpec = slideSpec) +
+                    fadeIn(animationSpec = animationSpec)
+        }
+    ) {
+
         composable("workspace_selection") {
             WorkspaceSelectionScreen(navController = navController)
         }
@@ -88,7 +121,7 @@ fun App(
                 navController = navController,
                 currentThemeState = themeState,
                 logConfigState = logConfigState,
-                onThemeChange = { mode: Int, theme: Int, color: Color, isMonet: Boolean, isCustom: Boolean ->
+                onThemeChange = { mode, theme, color, isMonet, isCustom ->
                     themeViewModel.saveThemeConfig(mode, theme, color, isMonet, isCustom)
                 },
                 onLogConfigChange = { enabled, filePath ->
@@ -98,7 +131,6 @@ fun App(
                 }
             )
         }
-        // 新增：关于页面路由
         composable("about") {
             AboutScreen(navController = navController)
         }
