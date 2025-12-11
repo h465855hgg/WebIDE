@@ -13,12 +13,11 @@ import androidx.lifecycle.viewModelScope
 import com.web.webide.ui.editor.components.TextMateInitializer
 import com.web.webide.ui.editor.EditorColorSchemeManager
 import io.github.rosemoe.sora.langs.textmate.TextMateColorScheme
-import com.web.webide.textmate.TextMateLanguage;
+import io.github.rosemoe.sora.langs.textmate.TextMateLanguage
 import io.github.rosemoe.sora.langs.textmate.registry.ThemeRegistry
 import io.github.rosemoe.sora.text.Content
 import io.github.rosemoe.sora.text.ContentListener
 import io.github.rosemoe.sora.widget.CodeEditor
-import io.github.rosemoe.sora.widget.schemes.EditorColorScheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext

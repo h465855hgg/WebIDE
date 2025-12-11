@@ -30,7 +30,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
+        getExternalFilesDir("logs")
 
         enableEdgeToEdge(
             statusBarStyle = androidx.activity.SystemBarStyle.auto(

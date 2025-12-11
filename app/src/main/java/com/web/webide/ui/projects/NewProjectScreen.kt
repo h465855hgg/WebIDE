@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.web.webide.core.utils.PermissionManager
 import com.web.webide.core.utils.WorkspaceManager
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
@@ -41,7 +42,6 @@ enum class ProjectType {
 fun NewProjectScreen(navController: NavController) {
     var projectName by remember { mutableStateOf("") }
     var packageName by remember { mutableStateOf("com.example.myapp") }
-    // 新增：目标网址
     var targetUrl by remember { mutableStateOf("https://") }
 
     var selectedType by remember { mutableStateOf(ProjectType.NORMAL) }
@@ -52,215 +52,199 @@ fun NewProjectScreen(navController: NavController) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-        Scaffold(
-            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-            topBar = {
-                TopAppBar(
-                    title = { Text("新建项目") },
-                    navigationIcon = {
-                        IconButton(onClick = { navController.popBackStack() }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
-                        }
+    // 获取当前工作空间路径
+    val workspacePath = WorkspaceManager.getWorkspacePath(context)
+
+    // 权限请求状态
+    val permissionState = PermissionManager.rememberPermissionRequest(
+        onPermissionGranted = {
+            scope.launch { snackbarHostState.showSnackbar("权限已获取，请再次点击创建") }
+        },
+        onPermissionDenied = {
+            scope.launch { snackbarHostState.showSnackbar("无权限，无法在 SD 卡创建项目") }
+        }
+    )
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        topBar = {
+            TopAppBar(
+                title = { Text("新建项目") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
                     }
-                )
-            }
-        ) { innerPadding ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .padding(horizontal = 16.dp)
-                    .verticalScroll(scrollState)
-                    .animateContentSize(
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioLowBouncy,
-                            stiffness = Spring.StiffnessLow
-                        )
+                }
+            )
+        }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(horizontal = 16.dp)
+                .verticalScroll(scrollState)
+                .animateContentSize(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioLowBouncy,
+                        stiffness = Spring.StiffnessLow
                     )
+                )
+        ) {
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 显示路径，方便调试
+            Text(
+                text = "存储位置: $workspacePath",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // --- 1. 项目类型选择 ---
+            Text(
+                "选择模板",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Spacer(modifier = Modifier.height(16.dp))
+                TemplateSelectionCard(Modifier.weight(1f), "Web", Icons.Default.Language, selectedType == ProjectType.NORMAL) { selectedType = ProjectType.NORMAL }
+                TemplateSelectionCard(Modifier.weight(1f), "WebApp", Icons.Default.Android, selectedType == ProjectType.WEBAPP) { selectedType = ProjectType.WEBAPP }
+                TemplateSelectionCard(Modifier.weight(1f), "套壳", Icons.Default.Public, selectedType == ProjectType.WEBSITE) { selectedType = ProjectType.WEBSITE }
+            }
 
-                // --- 1. 项目类型选择 ---
+            AnimatedContent(targetState = selectedType, label = "desc") { type ->
                 Text(
-                    "选择模板",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    text = when (type) {
+                        ProjectType.NORMAL -> "创建标准的 HTML/CSS/JS 项目。"
+                        ProjectType.WEBAPP -> "创建包含 Native 接口的本地 WebApp。"
+                        ProjectType.WEBSITE -> "输入网址，直接打包成 App。"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp, bottom = 24.dp)
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+            }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    TemplateSelectionCard(
-                        Modifier.weight(1f),
-                        "Web",
-                        Icons.Default.Language,
-                        selectedType == ProjectType.NORMAL
-                    ) { selectedType = ProjectType.NORMAL }
-                    TemplateSelectionCard(
-                        Modifier.weight(1f),
-                        "WebApp",
-                        Icons.Default.Android,
-                        selectedType == ProjectType.WEBAPP
-                    ) { selectedType = ProjectType.WEBAPP }
-                    TemplateSelectionCard(
-                        Modifier.weight(1f),
-                        "套壳",
-                        Icons.Default.Public,
-                        selectedType == ProjectType.WEBSITE
-                    ) { selectedType = ProjectType.WEBSITE }
-                }
+            // --- 2. 基本信息 ---
+            Text("项目信息", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            Spacer(modifier = Modifier.height(16.dp))
 
-                AnimatedContent(targetState = selectedType, label = "desc") { type ->
-                    Text(
-                        text = when (type) {
-                            ProjectType.NORMAL -> "创建标准的 HTML/CSS/JS 项目，适用于纯前端开发。"
-                            ProjectType.WEBAPP -> "创建包含 Native 接口的本地 WebApp，支持构建 APK。"
-                            ProjectType.WEBSITE -> "输入一个网址 (如 Google)，直接打包成 App，无需写代码。"
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 8.dp, bottom = 24.dp)
+            OutlinedTextField(
+                value = projectName,
+                onValueChange = {
+                    projectName = it
+                    if (selectedType != ProjectType.NORMAL) {
+                        val cleanName = it.filter { c -> c.isLetterOrDigit() }.lowercase(Locale.ROOT)
+                        if (cleanName.isNotEmpty()) packageName = "com.example.$cleanName"
+                    }
+                },
+                label = { Text("项目名称") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            AnimatedVisibility(visible = selectedType != ProjectType.NORMAL) {
+                Column {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = packageName,
+                        onValueChange = { packageName = it },
+                        label = { Text("包名 (Package Name)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
-
-                // --- 2. 基本信息 ---
-                Text(
-                    "项目信息",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-
-                OutlinedTextField(
-                    value = projectName,
-                    onValueChange = {
-                        projectName = it
-                        if (selectedType != ProjectType.NORMAL) {
-                            val cleanName =
-                                it.replace(Regex("[^a-zA-Z0-9]"), "").lowercase(Locale.ROOT)
-                            if (cleanName.isNotEmpty()) packageName = "com.example.$cleanName"
-                        }
-                    },
-                    label = { Text("项目名称") },
-                    placeholder = { Text("") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                // 包名输入框 (仅 App 模式显示)
-                AnimatedVisibility(visible = selectedType != ProjectType.NORMAL) {
-                    Column {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        OutlinedTextField(
-                            value = packageName,
-                            onValueChange = { packageName = it },
-                            label = { Text("包名 (Package Name)") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                }
-
-                // 网址输入框 (仅套壳模式显示)
-                AnimatedVisibility(visible = selectedType == ProjectType.WEBSITE) {
-                    Column {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        OutlinedTextField(
-                            value = targetUrl,
-                            onValueChange = { targetUrl = it },
-                            label = { Text("目标网址 (URL)") },
-                            placeholder = { Text("https://www.example.com") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(32.dp))
-
-                // --- 3. 提交按钮 ---
-                Button(
-                    onClick = {
-                        // --- 1. 统一校验逻辑 ---
-
-                        // 校验项目名称
-                        if (projectName.isBlank()) {
-                            scope.launch { snackbarHostState.showSnackbar("请输入项目名称") }
-                            return@Button // 显示完提示后，终止后续操作
-                        }
-
-                        // 校验包名 (非普通项目)
-                        if (selectedType != ProjectType.NORMAL && packageName.isBlank()) {
-                            scope.launch { snackbarHostState.showSnackbar("请输入包名") }
-                            return@Button
-                        }
-
-                        // 校验网址 (套壳项目)
-                        if (selectedType == ProjectType.WEBSITE && targetUrl.isBlank()) {
-                            scope.launch { snackbarHostState.showSnackbar("请输入目标网址") }
-                            return@Button
-                        }
-
-                        // --- 2. 校验通过，执行创建 ---
-                        isLoading = true
-                        createNewProject(
-                            context, projectName, packageName, targetUrl, selectedType,
-                            onSuccess = {
-                                isLoading = false
-                                scope.launch {
-                                    // 显示成功提示 (Short 持续时间较短)
-                                    // 注意：这里使用 Short 让它快点结束，或者你可以用 delay 控制
-                                    val job = launch {
-                                        snackbarHostState.showSnackbar(
-                                            message = "创建成功！",
-                                            duration = SnackbarDuration.Short
-                                        )
-                                    }
-                                    // 延迟 800ms 让用户看到提示，然后退出
-                                    // 如果不加延迟直接 pop，Snackbar 会随页面销毁而看不见
-                                    kotlinx.coroutines.delay(800)
-                                    navController.popBackStack()
-                                    job.cancel() // 退出时取消 Snackbar
-                                }
-                            },
-                            onError = { errorMsg ->
-                                isLoading = false
-                                scope.launch {
-                                    snackbarHostState.showSnackbar("创建失败: $errorMsg")
-                                }
-                            }
-                        )
-                    },
-                    modifier = Modifier.fillMaxWidth().height(54.dp),
-                    enabled = !isLoading,
-                    shape = MaterialTheme.shapes.medium
-                ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(
-                            Modifier.size(20.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text("创建中...")
-                    } else {
-                        Text(text = "创建项目", fontWeight = FontWeight.Bold)
-                    }
-                }
-                Spacer(modifier = Modifier.height(32.dp))
             }
+
+            AnimatedVisibility(visible = selectedType == ProjectType.WEBSITE) {
+                Column {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = targetUrl,
+                        onValueChange = { targetUrl = it },
+                        label = { Text("目标网址 (URL)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // --- 3. 提交按钮 ---
+            Button(
+                onClick = {
+                    if (projectName.isBlank()) {
+                        scope.launch { snackbarHostState.showSnackbar("请输入项目名称") }
+                        return@Button
+                    }
+                    if (projectName.contains(Regex("[/\\\\:*?\"<>|]"))) {
+                        scope.launch { snackbarHostState.showSnackbar("项目名称不能包含特殊字符") }
+                        return@Button
+                    }
+                    if (selectedType != ProjectType.NORMAL && packageName.isBlank()) {
+                        scope.launch { snackbarHostState.showSnackbar("请输入包名") }
+                        return@Button
+                    }
+                    if (selectedType == ProjectType.WEBSITE && targetUrl.isBlank()) {
+                        scope.launch { snackbarHostState.showSnackbar("请输入目标网址") }
+                        return@Button
+                    }
+
+                    // 权限检查：只有在非私有目录时才检查权限
+                    // isSystemPermissionRequiredForPath 返回 false 表示是私有目录，不需要检查
+                    if (PermissionManager.isSystemPermissionRequiredForPath(context, workspacePath) &&
+                        !PermissionManager.hasRequiredPermissions(context)) {
+                        permissionState.requestPermissions()
+                        return@Button
+                    }
+
+                    isLoading = true
+                    createNewProject(
+                        context, projectName, packageName, targetUrl, selectedType,
+                        onSuccess = {
+                            isLoading = false
+                            scope.launch {
+                                val job = launch { snackbarHostState.showSnackbar("创建成功！", duration = SnackbarDuration.Short) }
+                                kotlinx.coroutines.delay(800)
+                                navController.popBackStack()
+                                job.cancel()
+                            }
+                        },
+                        onError = { errorMsg ->
+                            isLoading = false
+                            scope.launch { snackbarHostState.showSnackbar("创建失败: $errorMsg") }
+                        }
+                    )
+                },
+                modifier = Modifier.fillMaxWidth().height(54.dp),
+                enabled = !isLoading,
+                shape = MaterialTheme.shapes.medium
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                    Spacer(Modifier.width(8.dp))
+                    Text("创建中...")
+                } else {
+                    Text(text = "创建项目", fontWeight = FontWeight.Bold)
+                }
+            }
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
+}
 
 @Composable
 fun TemplateSelectionCard(modifier: Modifier = Modifier, title: String, icon: ImageVector, isSelected: Boolean, onClick: () -> Unit) {
     val borderColor by animateColorAsState(if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant)
     val containerColor by animateColorAsState(if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)
-
     Card(onClick = onClick, modifier = modifier, colors = CardDefaults.cardColors(containerColor = containerColor), border = BorderStroke(if (isSelected) 2.dp else 1.dp, borderColor)) {
         Column(Modifier.padding(vertical = 16.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(icon, null, tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(32.dp))
@@ -275,56 +259,129 @@ private fun createNewProject(
     context: Context, projectName: String, packageName: String, targetUrl: String, type: ProjectType,
     onSuccess: () -> Unit, onError: (String) -> Unit
 ) {
-    val projectDir = File(WorkspaceManager.getWorkspacePath(context), projectName)
+    // 1. 获取当前配置的路径字符串
+    val savedPath = WorkspaceManager.getWorkspacePath(context)
+    val appPackageName = context.packageName
+
     GlobalScope.launch(Dispatchers.IO) {
         try {
-            if (projectDir.exists()) { withContext(Dispatchers.Main) { onError("项目已存在") }; return@launch }
-            projectDir.mkdirs()
+            val projectParentDir: File
 
+            // 🔥🔥🔥 核心判断：如果路径里包含包名，说明是私有目录，强制走系统API 🔥🔥🔥
+            if (savedPath.contains("/Android/data/$appPackageName")) {
+                // 不要信任 savedPath 字符串！直接找系统要最新的对象！
+                // 这一步是 100% 成功的关键，系统会保证返回的 File 对象有写入权限
+                val systemPrivateDir = context.getExternalFilesDir(null)
+
+                if (systemPrivateDir == null) {
+                    withContext(Dispatchers.Main) { onError("系统错误：无法访问私有存储 (ExternalFilesDir is null)") }
+                    return@launch
+                }
+                projectParentDir = systemPrivateDir
+            } else {
+                // 如果是用户选的 SD 卡其他目录（非私有），才使用字符串构建 File
+                projectParentDir = File(savedPath)
+            }
+
+            // 2. 目标项目文件夹
+            val projectDir = File(projectParentDir, projectName)
+
+            // 3. 打印调试信息 (如果失败，能在报错里看到真实路径)
+            println("正在创建项目于: ${projectDir.absolutePath}")
+
+            // 4. 检查是否存在
+            if (projectDir.exists()) {
+                withContext(Dispatchers.Main) { onError("该项目已存在") }
+                return@launch
+            }
+
+            // 5. 暴力创建目录
+            // 先尝试直接创建
+            var success = projectDir.mkdirs()
+
+            // 如果失败，尝试先创建父级（针对某些极端情况）
+            if (!success) {
+                if (!projectParentDir.exists()) {
+                    projectParentDir.mkdirs() // 尝试创建 /files 目录
+                }
+                success = projectDir.mkdirs() // 再试一次
+            }
+
+            // 6. 最终审判
+            if (!success && !projectDir.exists()) {
+                // 获取具体的错误原因很困难，但通常是权限或路径问题
+                withContext(Dispatchers.Main) {
+                    onError("无法创建目录！\n尝试路径: ${projectDir.absolutePath}\n请确认不是在根目录或受保护的系统目录。")
+                }
+                return@launch
+            }
+
+            // 7. 开始写入文件 (逻辑保持不变)
             when (type) {
                 ProjectType.NORMAL -> createNormalStructure(projectDir)
                 ProjectType.WEBAPP -> createWebAppStructure(projectDir, packageName)
                 ProjectType.WEBSITE -> createWebsiteStructure(projectDir, packageName, targetUrl)
             }
+
             withContext(Dispatchers.Main) { onSuccess() }
-        } catch (e: Exception) { withContext(Dispatchers.Main) { onError(e.message ?: "未知错误") } }
+
+        } catch (e: Exception) {
+            e.printStackTrace()
+            withContext(Dispatchers.Main) {
+                onError("发生未知异常: ${e.javaClass.simpleName}\n${e.message}")
+            }
+        }
     }
 }
-
 private fun createNormalStructure(projectDir: File) {
-    val css = File(projectDir, "css").apply { mkdirs() }
-    val js = File(projectDir, "js").apply { mkdirs() }
-    File(projectDir, "index.html").writeText(ProjectTemplates.normalIndexHtml)
-    File(css, "style.css").writeText(ProjectTemplates.normalCss)
-    File(js, "script.js").writeText(ProjectTemplates.normalJs)
+    // 确保子目录存在
+    val css = File(projectDir, "css"); css.mkdirs()
+    val js = File(projectDir, "js"); js.mkdirs()
+
+    // 写入文件 (使用 safe write)
+    safeWrite(File(projectDir, "index.html"), ProjectTemplates.normalIndexHtml)
+    safeWrite(File(css, "style.css"), ProjectTemplates.normalCss)
+    safeWrite(File(js, "script.js"), ProjectTemplates.normalJs)
 }
 
 private fun createWebAppStructure(projectDir: File, packageName: String) {
-    val assets = File(projectDir, "src/main/assets").apply { mkdirs() }
-    File(assets, "js").mkdirs(); File(assets, "css").mkdirs()
-    File(assets, "index.html").writeText(ProjectTemplates.webAppIndexHtml)
-    File(assets, "js/api.js").writeText(ProjectTemplates.apiJs)
-    File(assets, "js/index.js").writeText(ProjectTemplates.webAppIndexJs)
-    File(assets, "css/style.css").writeText(ProjectTemplates.webAppCss)
-    File(projectDir, "webapp.json").writeText(ProjectTemplates.getConfigFile(packageName, projectDir.name, "index.html"))
+    val assets = File(projectDir, "src/main/assets")
+    assets.mkdirs()
+    File(assets, "js").mkdirs()
+    File(assets, "css").mkdirs()
+
+    safeWrite(File(assets, "index.html"), ProjectTemplates.webAppIndexHtml)
+    safeWrite(File(assets, "js/api.js"), ProjectTemplates.apiJs)
+    safeWrite(File(assets, "js/index.js"), ProjectTemplates.webAppIndexJs)
+    safeWrite(File(assets, "css/style.css"), ProjectTemplates.webAppCss)
+
+    // 生成配置
+    safeWrite(File(projectDir, "webapp.json"), ProjectTemplates.getConfigFile(packageName, projectDir.name, "index.html"))
 }
 
-// 🔥 新增：创建套壳项目结构
 private fun createWebsiteStructure(projectDir: File, packageName: String, targetUrl: String) {
-    // 即使是套壳，我们也创建一个假的 index.html，防止 APK 模板因为找不到入口而崩溃
-    // 并且这个 HTML 会自动跳转到目标网址，作为双重保险
-    val assets = File(projectDir, "src/main/assets").apply { mkdirs() }
-    File(assets, "index.html").writeText("""
+    val assets = File(projectDir, "src/main/assets")
+    assets.mkdirs()
+
+    safeWrite(File(assets, "index.html"), """
         <!DOCTYPE html>
         <html>
         <head><meta charset="UTF-8"><title>Redirecting...</title></head>
-        <body>
-            <p>Loading...</p>
-            <script>window.location.href = "$targetUrl";</script>
-        </body>
+        <body><script>window.location.href = "$targetUrl";</script></body>
         </html>
     """.trimIndent())
 
-    // 生成 webapp.json，重点是 targetUrl
-    File(projectDir, "webapp.json").writeText(ProjectTemplates.getConfigFile(packageName, projectDir.name, targetUrl))
+    safeWrite(File(projectDir, "webapp.json"), ProjectTemplates.getConfigFile(packageName, projectDir.name, targetUrl))
+}
+
+// 辅助方法：安全写入，防止父目录不存在导致崩溃
+private fun safeWrite(file: File, content: String) {
+    try {
+        if (!file.parentFile!!.exists()) {
+            file.parentFile!!.mkdirs()
+        }
+        file.writeText(content)
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
 }
