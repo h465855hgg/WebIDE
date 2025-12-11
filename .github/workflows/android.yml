@@ -36,7 +36,7 @@ jobs:
           echo "事件名称: ${{ github.event_name }}"
           echo "引用: ${{ github.ref }}"
           echo "分支: ${{ github.ref_name }}"
-          echo "提交信息: ${{ github.event.head_commit.message }}"
+          echo "是否为 main 分支构建: ${{ github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' }}"
           echo "=== 结束 ==="
 
       - name: Checkout
@@ -55,49 +55,62 @@ jobs:
       - name: Grant execute permission
         run: chmod +x gradlew
 
-      - name: Always create keystore directory
+      - name: Setup keystore for signed builds
+        id: setup-keystore
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         run: |
-          echo "创建 app 目录..."
-          mkdir -p app
-          echo "当前目录内容:"
-          ls -la
-          echo "app 目录内容:"
-          ls -la app/ || echo "app 目录不存在"
-
-      - name: Decode keystore for main branch
-        id: decode-keystore
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          echo "=== 开始解码 keystore ==="
+          echo "=== 开始设置 keystore ==="
           
-          # 检查 secrets 是否存在
-          echo "检查 KEYSTORE_B64 长度: ${#KEYSTORE_B64}"
-          
+          # 检查 secrets
           if [ -z "$KEYSTORE_B64" ]; then
             echo "错误: KEYSTORE_B64 为空或未设置!"
+            echo "请检查 GitHub Secrets 配置"
             exit 1
           fi
           
+          if [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "错误: KEYSTORE_PASSWORD 为空!"
+            exit 1
+          fi
+          
+          echo "Base64 长度: ${#KEYSTORE_B64}"
+          echo "密码长度: ${#KEYSTORE_PASSWORD}"
+          
+          # 创建目录
+          mkdir -p app
+          
+          # 清理旧文件
+          rm -f app/WebIDE.jks
+          
           # 解码 keystore
+          echo "正在解码 keystore..."
           echo "$KEYSTORE_B64" | base64 -d > app/WebIDE.jks
           
           # 验证文件
-          echo "Keystore 文件信息:"
+          echo "文件信息:"
           ls -la app/WebIDE.jks
-          echo "文件大小: $(wc -c < app/WebIDE.jks) bytes"
+          file_size=$(wc -c < app/WebIDE.jks)
+          echo "文件大小: ${file_size} 字节"
           
-          # 测试 keystore
-          echo "测试 keystore..."
-          if keytool -list -keystore app/WebIDE.jks -storepass "$KEYSTORE_PASSWORD" > /dev/null 2>&1; then
-            echo "✓ Keystore 有效"
-          else
-            echo "⚠ Keystore 验证失败"
-            # 显示前几个字节用于调试
-            echo "文件前100字节:"
-            head -c 100 app/WebIDE.jks | hexdump -C
+          if [ $file_size -eq 0 ]; then
+            echo "错误: keystore 文件大小为 0!"
+            exit 1
           fi
           
-          echo "=== keystore 解码完成 ==="
+          # 尝试验证 keystore
+          echo "尝试验证 keystore..."
+          if keytool -list -keystore app/WebIDE.jks -storepass "$KEYSTORE_PASSWORD" > /dev/null 2>&1; then
+            echo "✓ Keystore 验证成功"
+            echo "Keystore 别名:"
+            keytool -list -keystore app/WebIDE.jks -storepass "$KEYSTORE_PASSWORD" | grep "别名"
+          else
+            echo "✗ Keystore 验证失败 - 密码错误或文件损坏"
+            echo "前 50 字节 (十六进制):"
+            head -c 50 app/WebIDE.jks | hexdump -C
+            exit 1
+          fi
+          
+          echo "=== keystore 设置完成 ==="
         env:
           KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -108,30 +121,52 @@ jobs:
           echo "=== 为 PR 构建未签名版本 ==="
           ./gradlew assembleRelease --warning-mode all --stacktrace
 
-      - name: Build for main (signed)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - name: Build signed Release
+        id: build-release
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         run: |
-          echo "=== 为主分支构建签名版本 ==="
-          echo "使用 keystore: WebIDE.jks"
+          echo "=== 构建签名版本 ==="
+          echo "Keystore 文件: WebIDE.jks"
           echo "存储密码: $KEYSTORE_PASSWORD"
           echo "密钥密码: $KEY_PASSWORD"
+          echo "密钥别名: key0"
           
-          # 检查文件是否存在
-          ls -la app/WebIDE.jks || echo "警告: keystore 文件不存在"
+          # 验证文件存在
+          if [ ! -f "app/WebIDE.jks" ]; then
+            echo "错误: keystore 文件不存在!"
+            ls -la app/
+            exit 1
+          fi
           
-          ./gradlew assembleRelease \
+          # 构建
+          ./gradlew clean assembleRelease \
             -PKEYSTORE_FILE=WebIDE.jks \
             -PKEYSTORE_PASSWORD="$KEYSTORE_PASSWORD" \
             -PKEY_ALIAS=key0 \
             -PKEY_PASSWORD="$KEY_PASSWORD" \
             --warning-mode all --stacktrace
+          
+          echo "构建完成!"
+          echo "APK 文件:"
+          find app/build/outputs -name "*.apk" -type f | while read file; do
+            echo "- $file ($(wc -c < "$file") bytes)"
+          done
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
-      - name: Upload artifacts
+      - name: Upload PR APK (unsigned)
+        if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ github.event_name == 'pull_request' && 'WebIDE-pr-apk' || 'WebIDE-release-apk' }}
+          name: WebIDE-pr-apk
           path: app/build/outputs/apk/release/**/*.apk
-          if-no-files-found: warn
+          if-no-files-found: error
+
+      - name: Upload Release APK (signed)
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: WebIDE-release-apk
+          path: app/build/outputs/apk/release/**/*.apk
+          if-no-files-found: error
