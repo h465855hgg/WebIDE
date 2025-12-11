@@ -47,13 +47,30 @@ jobs:
       - name: Grant execute permission
         run: chmod +x gradlew
 
-      - name: Decode keystore (push -> main)
+      - name: Decode and verify keystore (push -> main)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           mkdir -p app
+          # 清空可能存在的文件
+          rm -f app/WebIDE.jks
+          
+          # 解码 base64
           echo "$KEYSTORE_B64" | base64 -d > app/WebIDE.jks
+          
+          # 验证文件大小
+          echo "Keystore file size:"
+          ls -lh app/WebIDE.jks
+          
+          # 验证文件类型
+          echo "File type:"
+          file app/WebIDE.jks
+          
+          # 尝试列出 keystore 内容（不验证密码）
+          echo "Checking keystore structure:"
+          keytool -list -keystore app/WebIDE.jks -storepass "$KEYSTORE_PASSWORD" || echo "密码验证失败，继续尝试构建"
         env:
           KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         
       - name: Build unsigned Release for PR
         if: github.event_name == 'pull_request'
@@ -62,88 +79,16 @@ jobs:
       - name: Build signed Release for main
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
+          # 调试：显示环境变量长度
+          echo "Keystore password length: ${#KEYSTORE_PASSWORD}"
+          echo "Key password length: ${#KEY_PASSWORD}"
+          
           ./gradlew assembleRelease \
             -PKEYSTORE_FILE=WebIDE.jks \
-            -PKEYSTORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }} \
+            -PKEYSTORE_PASSWORD="$KEYSTORE_PASSWORD" \
             -PKEY_ALIAS=key0 \
-            -PKEY_PASSWORD=${{ secrets.KEY_PASSWORD }} \
+            -PKEY_PASSWORD="$KEY_PASSWORD" \
             --warning-mode all --stacktrace
-
-          
-      - name: Upload PR APK (unsigned)
-        if: github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v4
-        with:
-          name: WebIDE-pr-apk
-          path: app/build/outputs/apk/release/**/*.apk
-          if-no-files-found: error
-
-      - name: Upload Release APK (signed)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@v4
-        with:
-          name: WebIDE-release-apk
-          path: app/build/outputs/apk/release/**/*.apk
-          if-no-files-found: error
-
-  upload-telegram:
-    name: Upload to Telegram (仅 main push)
-    needs: build
-    runs-on: ubuntu-latest
-    if: ${{ success() && github.ref == 'refs/heads/main' && github.event_name == 'push' }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Download APK artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: WebIDE-release-apk
-          path: artifacts
-
-      - name: Find APK file
-        id: find_apk
-        shell: bash
-        run: |
-          shopt -s nullglob
-          files=(artifacts/**/*.apk artifacts/*.apk)
-          if [ ${#files[@]} -eq 0 ]; then
-            echo "No APK found!" >&2
-            exit 1
-          fi
-          # 取第一个（如果有多个，你也可以用循环逐个发）
-          echo "apk_path=${files[0]}" >> "$GITHUB_OUTPUT"
-
-      - name: Send APK via Telegram API
         env:
-          BOT_TOKEN:      ${{ secrets.TELEGRAM_TOKEN }}
-          CHAT_ID:        ${{ secrets.TELEGRAM_CHAT_ID }}
-          APK_PATH:       ${{ steps.find_apk.outputs.apk_path }}
-          SHA:            ${{ github.sha }}
-          COMMIT_MSG:     ${{ github.event.head_commit.message }}
-          COMMIT_AUTHOR:  ${{ github.event.head_commit.author.name }}
-          REPO:           ${{ github.repository }}
-        run: |
-          echo "Sending $APK_PATH"
-          
-          commit_msg="$COMMIT_MSG"
-          commit_author="$COMMIT_AUTHOR"
-          commit_url="https://github.com/${REPO}/commit/${SHA}"
-          
-          caption="🎉 *检测到新的 GitHub 推送！*
-          *Commit SHA:* \`${SHA}\`
-          
-          \`\`\`
-          ${commit_msg}
-          \`\`\`
-          
-          *提交者* \`${commit_author}\`
-          [查看详情](${commit_url})"
-          
-          curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendDocument" \
-            -F chat_id="${CHAT_ID}" \
-            -F document=@"${APK_PATH}" \
-            -F caption="${caption}" \
-            -F parse_mode=Markdown
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
