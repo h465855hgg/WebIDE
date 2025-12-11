@@ -1,60 +1,26 @@
-name: Android ci
+name: Android CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
   pull_request:
-    branches: [ main ]
-  workflow_dispatch:
-    inputs:
-      build_android:
-        description: 'Build for Android'
-        type: boolean
-        required: true
-        default: true
+    branches: [ "main" ]
 
 jobs:
-  # ====================================================
-  # Build for Android
-  # ====================================================
-  build-android:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.build_android == true }}
-    runs-on: ubuntu-24.04
-    env:
-      ANDROID_NDK_HOME: /opt/android/ndk/android-ndk-r28c
+  build:
+
+    runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Install dependencies
-        run: |
-          sudo dpkg --add-architecture i386
-          sudo apt-get update
-          sudo apt-get install -y build-essential gcc-multilib make unzip wget dos2unix
-      
-      - name: Setup NDK
-        id: cache-ndk
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.ANDROID_NDK_HOME }}
-          key: ${{ runner.os }}-ndk-r28c
-      
-      - name: Download NDK if not cached
-        if: steps.cache-ndk.outputs.cache-hit != 'true'
-        run: |
-          sudo mkdir -p /opt/android/ndk
-          cd /opt/android/ndk
-          wget -q https://dl.google.com/android/repository/android-ndk-r28c-linux.zip
-          sudo unzip -q android-ndk-r28c-linux.zip
-          sudo chmod -R 777 ${{ env.ANDROID_NDK_HOME }}
+    - uses: actions/checkout@v4
+    - name: set up JDK 11
+      uses: actions/setup-java@v4
+      with:
+        java-version: '11'
+        distribution: 'temurin'
+        cache: gradle
 
-      - name: Build
-        run: |
-          dos2unix build-android.sh
-          chmod +x build-android.sh
-          ./build-android.sh
-
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: luajit-android-build
-          path: luajit-build/
-
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+    - name: Build with Gradle
+      run: ./gradlew build
