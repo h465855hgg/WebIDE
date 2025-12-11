@@ -29,8 +29,16 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    if: ${{ !startsWith(github.event.head_commit.message, '[skip ci]') && (github.ref == 'refs/heads/main' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') }}
     steps:
+      - name: Debug environment
+        run: |
+          echo "=== 环境调试信息 ==="
+          echo "事件名称: ${{ github.event_name }}"
+          echo "引用: ${{ github.ref }}"
+          echo "分支: ${{ github.ref_name }}"
+          echo "是否为 main 分支构建: ${{ github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' }}"
+          echo "=== 结束 ==="
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -47,29 +55,106 @@ jobs:
       - name: Grant execute permission
         run: chmod +x gradlew
 
-      - name: Decode keystore (push -> main)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - name: Setup keystore for signed builds
+        id: setup-keystore
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         run: |
+          echo "=== 开始设置 keystore ==="
+          
+          # 检查 secrets
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "错误: KEYSTORE_B64 为空或未设置!"
+            echo "请检查 GitHub Secrets 配置"
+            exit 1
+          fi
+          
+          if [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "错误: KEYSTORE_PASSWORD 为空!"
+            exit 1
+          fi
+          
+          echo "Base64 长度: ${#KEYSTORE_B64}"
+          echo "密码长度: ${#KEYSTORE_PASSWORD}"
+          
+          # 创建目录
           mkdir -p app
+          
+          # 清理旧文件
+          rm -f app/WebIDE.jks
+          
+          # 解码 keystore
+          echo "正在解码 keystore..."
           echo "$KEYSTORE_B64" | base64 -d > app/WebIDE.jks
+          
+          # 验证文件
+          echo "文件信息:"
+          ls -la app/WebIDE.jks
+          file_size=$(wc -c < app/WebIDE.jks)
+          echo "文件大小: ${file_size} 字节"
+          
+          if [ $file_size -eq 0 ]; then
+            echo "错误: keystore 文件大小为 0!"
+            exit 1
+          fi
+          
+          # 尝试验证 keystore
+          echo "尝试验证 keystore..."
+          if keytool -list -keystore app/WebIDE.jks -storepass "$KEYSTORE_PASSWORD" > /dev/null 2>&1; then
+            echo "✓ Keystore 验证成功"
+            echo "Keystore 别名:"
+            keytool -list -keystore app/WebIDE.jks -storepass "$KEYSTORE_PASSWORD" | grep "别名"
+          else
+            echo "✗ Keystore 验证失败 - 密码错误或文件损坏"
+            echo "前 50 字节 (十六进制):"
+            head -c 50 app/WebIDE.jks | hexdump -C
+            exit 1
+          fi
+          
+          echo "=== keystore 设置完成 ==="
         env:
           KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
-        
-      - name: Build unsigned Release for PR
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+
+      - name: Build for PR (unsigned)
         if: github.event_name == 'pull_request'
-        run: ./gradlew assembleRelease --warning-mode all --stacktrace
-
-      - name: Build signed Release for main
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          ./gradlew assembleRelease \
-            -PKEYSTORE_FILE=WebIDE.jks \
-            -PKEYSTORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }} \
-            -PKEY_ALIAS=WebIDE \
-            -PKEY_PASSWORD=${{ secrets.KEY_PASSWORD }} \
-            --warning-mode all --stacktrace
+          echo "=== 为 PR 构建未签名版本 ==="
+          ./gradlew assembleRelease --warning-mode all --stacktrace
 
+      - name: Build signed Release
+        id: build-release
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+        run: |
+          echo "=== 构建签名版本 ==="
+          echo "Keystore 文件: WebIDE.jks"
+          echo "存储密码: $KEYSTORE_PASSWORD"
+          echo "密钥密码: $KEY_PASSWORD"
+          echo "密钥别名: key0"
           
+          # 验证文件存在
+          if [ ! -f "app/WebIDE.jks" ]; then
+            echo "错误: keystore 文件不存在!"
+            ls -la app/
+            exit 1
+          fi
+          
+          # 构建
+          ./gradlew clean assembleRelease \
+            -PKEYSTORE_FILE=WebIDE.jks \
+            -PKEYSTORE_PASSWORD="$KEYSTORE_PASSWORD" \
+            -PKEY_ALIAS=key0 \
+            -PKEY_PASSWORD="$KEY_PASSWORD" \
+            --warning-mode all --stacktrace
+          
+          echo "构建完成!"
+          echo "APK 文件:"
+          find app/build/outputs -name "*.apk" -type f | while read file; do
+            echo "- $file ($(wc -c < "$file") bytes)"
+          done
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
       - name: Upload PR APK (unsigned)
         if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4
@@ -79,71 +164,9 @@ jobs:
           if-no-files-found: error
 
       - name: Upload Release APK (signed)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: WebIDE-release-apk
           path: app/build/outputs/apk/release/**/*.apk
           if-no-files-found: error
-
-  upload-telegram:
-    name: Upload to Telegram (仅 main push)
-    needs: build
-    runs-on: ubuntu-latest
-    if: ${{ success() && github.ref == 'refs/heads/main' && github.event_name == 'push' }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Download APK artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: WebIDE-release-apk
-          path: artifacts
-
-      - name: Find APK file
-        id: find_apk
-        shell: bash
-        run: |
-          shopt -s nullglob
-          files=(artifacts/**/*.apk artifacts/*.apk)
-          if [ ${#files[@]} -eq 0 ]; then
-            echo "No APK found!" >&2
-            exit 1
-          fi
-          # 取第一个（如果有多个，你也可以用循环逐个发）
-          echo "apk_path=${files[0]}" >> "$GITHUB_OUTPUT"
-
-      - name: Send APK via Telegram API
-        env:
-          BOT_TOKEN:      ${{ secrets.TELEGRAM_TOKEN }}
-          CHAT_ID:        ${{ secrets.TELEGRAM_CHAT_ID }}
-          APK_PATH:       ${{ steps.find_apk.outputs.apk_path }}
-          SHA:            ${{ github.sha }}
-          COMMIT_MSG:     ${{ github.event.head_commit.message }}
-          COMMIT_AUTHOR:  ${{ github.event.head_commit.author.name }}
-          REPO:           ${{ github.repository }}
-        run: |
-          echo "Sending $APK_PATH"
-          
-          commit_msg="$COMMIT_MSG"
-          commit_author="$COMMIT_AUTHOR"
-          commit_url="https://github.com/${REPO}/commit/${SHA}"
-          
-          caption="🎉 *检测到新的 GitHub 推送！*
-          *Commit SHA:* \`${SHA}\`
-          
-          \`\`\`
-          ${commit_msg}
-          \`\`\`
-          
-          *提交者* \`${commit_author}\`
-          [查看详情](${commit_url})"
-          
-          curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendDocument" \
-            -F chat_id="${CHAT_ID}" \
-            -F document=@"${APK_PATH}" \
-            -F caption="${caption}" \
-            -F parse_mode=Markdown
