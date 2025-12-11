@@ -65,7 +65,7 @@ jobs:
           ./gradlew assembleRelease \
             -PKEYSTORE_FILE=WebIDE.jks \
             -PKEYSTORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }} \
-            -PKEY_ALIAS=WebIDE \
+            -PKEY_ALIAS=key0 \
             -PKEY_PASSWORD=${{ secrets.KEY_PASSWORD }} \
             --warning-mode all --stacktrace
 
