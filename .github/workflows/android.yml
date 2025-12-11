@@ -51,7 +51,7 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           mkdir -p app
-          echo "$KEYSTORE_B64" | base64 -d > app/ono.jks
+          echo "$KEYSTORE_B64" | base64 -d > app/WebIDE.jks
         env:
           KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
         
@@ -63,7 +63,7 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           ./gradlew assembleRelease \
-            -PKEYSTORE_FILE=ono.jks \
+            -PKEYSTORE_FILE=WebIDE.jks \
             -PKEYSTORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }} \
             -PKEY_ALIAS=key0 \
             -PKEY_PASSWORD=${{ secrets.KEY_PASSWORD }} \
@@ -74,7 +74,7 @@ jobs:
         if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4
         with:
-          name: ono-pr-apk
+          name: WebIDE-pr-apk
           path: app/build/outputs/apk/release/**/*.apk
           if-no-files-found: error
 
@@ -82,7 +82,7 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
-          name: ono-release-apk
+          name: WebIDE-release-apk
           path: app/build/outputs/apk/release/**/*.apk
           if-no-files-found: error
 
@@ -100,7 +100,7 @@ jobs:
       - name: Download APK artifact
         uses: actions/download-artifact@v4
         with:
-          name: ono-release-apk
+          name: WebIDE-release-apk
           path: artifacts
 
       - name: Find APK file
