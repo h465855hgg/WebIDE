@@ -1,81 +1,26 @@
-name: Android CI - Emergency Fix
+name: Android CI
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
 
 jobs:
   build:
+
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      
-      - name: Setup JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-      
-      - name: Debug - Show Keystore Info
-        run: |
-          echo "=== 调试信息 ==="
-          echo "KEYSTORE_B64 长度: ${#KEYSTORE_B64}"
-          echo "前 50 字符: ${KEYSTORE_B64:0:50}"
-          echo "=== 结束 ==="
-        env:
-          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
-      
-      - name: Create keystore with fallback
-        run: |
-          mkdir -p app
-          
-          # 尝试解码 secret
-          if echo "$KEYSTORE_B64" | base64 -d > app/WebIDE.jks 2>/dev/null; then
-            echo "✓ Keystore 从 secret 创建成功"
-            echo "文件大小: $(wc -c < app/WebIDE.jks) bytes"
-          else
-            echo "⚠ Secret 解码失败，生成临时 keystore"
-            # 生成临时 keystore 用于测试
-            keytool -genkeypair -v \
-              -alias webide \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -keystore app/WebIDE.jks \
-              -storepass WebIDE \
-              -keypass WebIDE \
-              -dname "CN=WebIDE"
-          fi
-          
-          # 验证 keystore
-          echo "验证 keystore..."
-          if keytool -list -keystore app/WebIDE.jks -storepass WebIDE > /dev/null 2>&1; then
-            echo "✓ Keystore 有效"
-          else
-            echo "✗ Keystore 无效"
-            exit 1
-          fi
-        env:
-          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
-      
-      - name: Build with debug
-        run: |
-          chmod +x gradlew
-          
-          echo "=== 构建配置 ==="
-          echo "KEYSTORE_FILE: WebIDE.jks"
-          echo "KEY_ALIAS: webide"
-          echo "=== 开始构建 ==="
-          
-          ./gradlew clean assembleRelease \
-            -PKEYSTORE_FILE=WebIDE.jks \
-            -PKEYSTORE_PASSWORD='WebIDE' \
-            -PKEY_ALIAS=webide \
-            -PKEY_PASSWORD='WebIDE' \
-            --stacktrace
-      
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: emergency-build
-          path: app/build/outputs/apk/release/*.apk
+    - uses: actions/checkout@v4
+    - name: set up JDK 23
+      uses: actions/setup-java@v4
+      with:
+        java-version: '23'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+    - name: Build with Gradle
+      run: ./gradlew build
