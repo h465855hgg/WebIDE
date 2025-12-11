@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,7 +24,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Close
-import com.web.webide.R
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.*
@@ -33,6 +33,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -45,14 +47,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.content.edit
+import androidx.core.net.toUri
 import androidx.navigation.NavController
+import com.web.webide.R
 import com.mikepenz.aboutlibraries.Libs
 import com.mikepenz.aboutlibraries.entity.Library
 import com.mikepenz.aboutlibraries.util.withContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import androidx.core.content.edit
-import androidx.core.net.toUri
 
 // 定义开发者数据模型
 data class Developer(
@@ -63,20 +67,47 @@ data class Developer(
     val url: String = ""
 )
 
+// 全局缓存，实现真正的“秒加载”，只要 App 不杀进程，第二次进来不需要解析 JSON
+private var cachedLibraries: List<Library>? = null
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AboutScreen(navController: NavController) {
     val context = LocalContext.current
-
-    // 1. 修改：使用 exitUntilCollapsedScrollBehavior 以获得更好的联动折叠效果
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val scope = rememberCoroutineScope()
 
-    val prefs = remember { context.getSharedPreferences("webide_settings", Context.MODE_PRIVATE) }
-    var showAuthorNote by remember { mutableStateOf(prefs.getBoolean("show_author_note", true)) }
+    val prefs = remember {
+        context.getSharedPreferences("webide_settings", Context.MODE_PRIVATE)
+    }
 
-    var libraries by remember { mutableStateOf<List<Library>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
+    var showAuthorNote by remember {
+        mutableStateOf(prefs.getBoolean("show_author_note", true))
+    }
+
+    // --- 数据加载优化 ---
+    // 使用 mutableStateOf 而不是 produceState，配合全局缓存
+    var libraries by remember { mutableStateOf(cachedLibraries ?: emptyList()) }
+    var isLoading by remember { mutableStateOf(cachedLibraries == null) }
     var selectedLib by remember { mutableStateOf<Library?>(null) }
+
+    LaunchedEffect(Unit) {
+        if (cachedLibraries == null) {
+            // 只有在没有缓存时才去 IO 线程加载
+            withContext(Dispatchers.IO) {
+                // 手动构建 Libs，比 produceLibraries 更可控
+                val loaded = Libs.Builder()
+                    .withContext(context)
+                    .build()
+                    .libraries
+                    .sortedBy { it.name.lowercase() } // 提前排好序
+
+                cachedLibraries = loaded // 存入缓存
+                libraries = loaded
+                isLoading = false
+            }
+        }
+    }
 
     val teamMembers = remember {
         listOf(
@@ -87,27 +118,11 @@ fun AboutScreen(navController: NavController) {
         )
     }
 
-    LaunchedEffect(Unit) {
-        withContext(Dispatchers.IO) {
-            val libs = Libs.Builder().withContext(context).build()
-
-            libraries = libs.libraries.sortedBy { it.name.lowercase() }
-        }
-        isLoading = false
-    }
-
     Scaffold(
-        // 2. 关键修改：添加 nestedScroll 才能让 TopAppBar 随内容滚动变化
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            // 3. 修改：使用 LargeTopAppBar (或者 MediumTopAppBar) 配合 ScrollBehavior 实现折叠大标题效果
             LargeTopAppBar(
-                title = {
-                    Text(
-                        "关于",
-                        fontWeight = FontWeight.SemiBold
-                    )
-                },
+                title = { Text("关于", fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
@@ -129,89 +144,40 @@ fun AboutScreen(navController: NavController) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // 1. App 头部
-            item {
-                AppHeaderSection()
-            }
+            item { AppHeaderSection() }
 
             // 2. 开发团队
             item {
                 SectionTitle("WebIDE Team")
-
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 24.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    items(teamMembers) { dev ->
-                        DeveloperChip(dev)
-                    }
+                    items(teamMembers) { dev -> DeveloperChip(dev) }
                 }
 
-                // 4. 优化：动画布局
-                // 这里的处理是：当显示的通告消失时，shrinkVertically 会自动把高度收起
                 AnimatedVisibility(
                     visible = showAuthorNote,
                     enter = expandVertically() + fadeIn(),
                     exit = shrinkVertically() + fadeOut()
                 ) {
-                    Column {
-                        // 这个 Spacer 放在动画内部，当隐藏时它也会一起消失，从而消除间隙
-                        Spacer(modifier = Modifier.height(20.dp))
-
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 24.dp),
-                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(12.dp),
-                                verticalAlignment = Alignment.Top
-                            ) {
-                                Icon(
-                                    Icons.Outlined.Info,
-                                    null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp).padding(top = 2.dp)
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-
-                                Text(
-                                    "本项目由人类开发者与 AI 协作开发，探索代码生成的无限可能。",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.weight(1f)
-                                )
-
-                                Spacer(modifier = Modifier.width(8.dp))
-
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Close",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier
-                                        .size(18.dp)
-                                        .clickable {
-                                            showAuthorNote = false
-                                            prefs.edit { putBoolean("show_author_note", false) }
-                                        }
-                                )
-                            }
+                    AuthorNoteCard(
+                        onClose = {
+                            showAuthorNote = false
+                            prefs.edit { putBoolean("show_author_note", false) }
                         }
-                    }
+                    )
                 }
             }
 
-            // 3. 开源协议列表
+            // 3. 开源协议标题
             item {
-                // 5. 布局优化：减少这里的固定间距
-                // 之前是 32.dp，如果上面隐藏了，32dp 加上卡片的 padding 显得太远。
-                // 改为 24.dp，视觉上更紧凑。如果上面的 Note 显示，Note 内部自带 20dp 上边距，整体平衡。
                 Spacer(modifier = Modifier.height(24.dp))
                 SectionTitle("Licenses")
             }
 
+            // 4. 库列表内容 - 核心优化点
             if (isLoading) {
                 item {
                     Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
@@ -220,32 +186,41 @@ fun AboutScreen(navController: NavController) {
                 }
             } else if (libraries.isEmpty()) {
                 item {
-                    Text(
-                        "暂无信息",
-                        modifier = Modifier.padding(16.dp),
-                        color = MaterialTheme.colorScheme.outline
-                    )
+                    Text("暂无信息", modifier = Modifier.padding(16.dp), color = MaterialTheme.colorScheme.outline)
                 }
             } else {
-                item {
-                    Card(
+                // 【关键优化】：直接使用 itemsIndexed，让 LazyColumn 进行视图复用
+                // 不要外层包 Card，而是把 Card 的样式应用到每一个 Item 上
+                itemsIndexed(
+                    items = libraries,
+                    key = { _, lib -> lib.uniqueId } // 加上 Key 优化性能
+                ) { index, lib ->
+                    // 动态计算圆角，模拟“一组大卡片”的效果
+                    val shape = when {
+                        libraries.size == 1 -> RoundedCornerShape(16.dp) // 只有一个
+                        index == 0 -> RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp) // 第一个
+                        index == libraries.lastIndex -> RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp) // 最后一个
+                        else -> RectangleShape // 中间的
+                    }
+
+                    // 模拟卡片背景
+                    Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 24.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-                        shape = RoundedCornerShape(16.dp)
+                            .padding(horizontal = 24.dp), // 保持左右间距
+                        color = MaterialTheme.colorScheme.surfaceContainer,
+                        shape = shape
                     ) {
                         Column {
-                            libraries.forEachIndexed { index, lib ->
-                                ImprovedLibraryListItem(lib = lib, onClick = { selectedLib = lib })
+                            ImprovedLibraryListItem(lib = lib, onClick = { selectedLib = lib })
 
-                                if (index < libraries.lastIndex) {
-                                    HorizontalDivider(
-                                        modifier = Modifier.padding(horizontal = 20.dp),
-                                        thickness = 0.5.dp,
-                                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
-                                    )
-                                }
+                            // 只有不是最后一个时，才显示分割线
+                            if (index < libraries.lastIndex) {
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(horizontal = 20.dp),
+                                    thickness = 0.5.dp,
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                                )
                             }
                         }
                     }
@@ -264,15 +239,41 @@ fun AboutScreen(navController: NavController) {
     }
 
     if (selectedLib != null) {
-        LibraryDetailDialog(
-            lib = selectedLib!!,
-            onDismiss = { selectedLib = null }
-        )
+        LibraryDetailDialog(lib = selectedLib!!, onDismiss = { selectedLib = null })
     }
 }
-
-// --- 组件定义 (保持不变) ---
-
+// --- 原有组件保持不变 ---
+@Composable
+private fun AuthorNoteCard(onClose: () -> Unit) {
+    Column {
+        Spacer(modifier = Modifier.height(20.dp))
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp),
+            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {
+                Icon(Icons.Outlined.Info, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp).padding(top = 2.dp))
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    "本项目由人类开发者与 AI 协作开发，探索代码生成的无限可能。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Close",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp).clickable { onClose() }
+                )
+            }
+        }
+    }
+}
 @Composable
 private fun AppHeaderSection() {
     Column(

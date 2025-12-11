@@ -113,20 +113,20 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 
 
 dependencies {
-    implementation("com.google.accompanist:accompanist-navigation-animation:0.36.0")
+    implementation(libs.accompanist.navigation.animation)
 
-    implementation("com.mikepenz:aboutlibraries-compose:13.1.0")
-    implementation("androidx.compose.material:material-icons-extended")
+    implementation(libs.aboutlibraries.compose)
+    implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.compose.animation)
     implementation(libs.androidx.compose.ui)
     val editorVersion = "0.24.0"
-    implementation("io.github.rosemoe:editor:$editorVersion")
-    implementation("io.github.rosemoe:language-textmate:$editorVersion")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
-    implementation("androidx.navigation:navigation-compose:2.9.6")
+    implementation(libs.editor)
+    implementation(libs.language.textmate)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.navigation.compose)
     // DataStore dependencies
-    implementation("androidx.datastore:datastore-preferences:1.2.0")
-    implementation("androidx.datastore:datastore-core:1.2.0")
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.datastore.core)
 
     implementation(files("libs/xml.jar"))
 
@@ -134,7 +134,7 @@ dependencies {
     implementation(project(":signer"))
 
 
-    implementation("com.github.iyxan23:zipalign-java:1.2.2")
+    implementation(libs.zipalign.java)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
