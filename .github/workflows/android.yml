@@ -37,7 +37,7 @@ jobs:
             echo "⚠ Secret 解码失败，生成临时 keystore"
             # 生成临时 keystore 用于测试
             keytool -genkeypair -v \
-              -alias webide \
+              -alias WebIDE \
               -keyalg RSA \
               -keysize 2048 \
               -validity 10000 \
