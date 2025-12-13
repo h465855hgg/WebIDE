@@ -45,12 +45,16 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.lang.reflect.Method;
+import java.net.HttpURLConnection;
 import java.net.NetworkInterface;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -80,6 +84,100 @@ public class WebAppInterface {
 
     // ========================== 基础功能 ==========================
 
+    // ========================== 网络请求 (绕过 CORS) ==========================
+
+    @JavascriptInterface
+    public void httpRequest(final String method, final String urlStr, final String headersJson, final String body, final String callbackId) {
+        // 在子线程执行网络请求，避免阻塞主线程
+        new Thread(() -> {
+            HttpURLConnection conn = null;
+            try {
+                URL url = new URL(urlStr);
+                conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod(method.toUpperCase());
+                conn.setConnectTimeout(15000); // 连接超时 15s
+                conn.setReadTimeout(15000);    // 读取超时 15s
+
+                // 1. 设置请求头 (Headers)
+                if (headersJson != null && !headersJson.isEmpty()) {
+                    try {
+                        JSONObject headers = new JSONObject(headersJson);
+                        Iterator<String> keys = headers.keys();
+                        while (keys.hasNext()) {
+                            String key = keys.next();
+                            conn.setRequestProperty(key, headers.getString(key));
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                // 2. 发送请求体 (Body) - 仅限 POST/PUT
+                if (body != null && !body.isEmpty() && ("POST".equalsIgnoreCase(method) || "PUT".equalsIgnoreCase(method))) {
+                    conn.setDoOutput(true);
+                    try (java.io.OutputStream os = conn.getOutputStream()) {
+                        os.write(body.getBytes(StandardCharsets.UTF_8));
+                        os.flush();
+                    }
+                }
+
+                // 3. 获取响应状态码
+                int code = conn.getResponseCode();
+
+                // 4. 读取响应内容 (成功读 InputStream，失败读 ErrorStream)
+                InputStream stream = (code < 400) ? conn.getInputStream() : conn.getErrorStream();
+                StringBuilder responseText = new StringBuilder();
+                if (stream != null) {
+                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            responseText.append(line).append("\n");
+                        }
+                    }
+                }
+
+                // 5. 构造返回数据
+                JSONObject resultJson = new JSONObject();
+                resultJson.put("status", code);
+                resultJson.put("body", responseText.toString());
+
+                // 获取响应头
+                JSONObject responseHeaders = new JSONObject();
+                Map<String, List<String>> headerFields = conn.getHeaderFields();
+                for (Map.Entry<String, List<String>> entry : headerFields.entrySet()) {
+                    if (entry.getKey() != null) {
+                        // 将 List<String> 转为逗号分隔的 String
+                        StringBuilder sb = new StringBuilder();
+                        for (String val : entry.getValue()) {
+                            if (sb.length() > 0) sb.append(",");
+                            sb.append(val);
+                        }
+                        responseHeaders.put(entry.getKey(), sb.toString());
+                    }
+                }
+                resultJson.put("headers", responseHeaders);
+
+                // 成功回调：将 JSON 字符串传回 JS
+                sendResultToJs(callbackId, true, resultJson.toString());
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                // 失败回调
+                try {
+                    JSONObject errorJson = new JSONObject();
+                    errorJson.put("status", 0);
+                    errorJson.put("error", e.getMessage() != null ? e.getMessage() : "Unknown Error");
+                    sendResultToJs(callbackId, false, errorJson.toString());
+                } catch (JSONException jsonException) {
+                    jsonException.printStackTrace();
+                }
+            } finally {
+                if (conn != null) {
+                    conn.disconnect();
+                }
+            }
+        }).start();
+    }
     @JavascriptInterface
     public void showToast(final String message) {
         mainHandler.post(() -> Toast.makeText(context, message, Toast.LENGTH_SHORT).show());

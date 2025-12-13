@@ -1036,14 +1036,14 @@
                     "name": "The Android Open Source Project"
                 }
             ],
-            "artifactVersion": "1.1.1",
+            "artifactVersion": "1.2.0",
             "description": "Android DataStore - contains the underlying store used by each serialization method along with components that require an Android dependency",
             "scm": {
                 "connection": "scm:git:https://android.googlesource.com/platform/frameworks/support",
                 "url": "https://cs.android.com/androidx/platform/frameworks/support"
             },
             "name": "DataStore",
-            "website": "https://developer.android.com/jetpack/androidx/releases/datastore#1.1.1",
+            "website": "https://developer.android.com/jetpack/androidx/releases/datastore#1.2.0",
             "licenses": [
                 "Apache-2.0"
             ],
@@ -1061,14 +1061,14 @@
                     "name": "The Android Open Source Project"
                 }
             ],
-            "artifactVersion": "1.1.1",
+            "artifactVersion": "1.2.0",
             "description": "Android DataStore Core - contains the underlying store used by each serialization method",
             "scm": {
                 "connection": "scm:git:https://android.googlesource.com/platform/frameworks/support",
                 "url": "https://cs.android.com/androidx/platform/frameworks/support"
             },
             "name": "DataStore Core",
-            "website": "https://developer.android.com/jetpack/androidx/releases/datastore#1.1.1",
+            "website": "https://developer.android.com/jetpack/androidx/releases/datastore#1.2.0",
             "licenses": [
                 "Apache-2.0"
             ],
@@ -1086,14 +1086,14 @@
                     "name": "The Android Open Source Project"
                 }
             ],
-            "artifactVersion": "1.1.1",
+            "artifactVersion": "1.2.0",
             "description": "Android DataStore Core Okio- contains APIs to use datastore-core in multiplatform via okio",
             "scm": {
                 "connection": "scm:git:https://android.googlesource.com/platform/frameworks/support",
                 "url": "https://cs.android.com/androidx/platform/frameworks/support"
             },
             "name": "DataStore Core Okio",
-            "website": "https://developer.android.com/jetpack/androidx/releases/datastore#1.1.1",
+            "website": "https://developer.android.com/jetpack/androidx/releases/datastore#1.2.0",
             "licenses": [
                 "Apache-2.0"
             ],
@@ -1111,14 +1111,14 @@
                     "name": "The Android Open Source Project"
                 }
             ],
-            "artifactVersion": "1.1.1",
+            "artifactVersion": "1.2.0",
             "description": "Android Preferences DataStore",
             "scm": {
                 "connection": "scm:git:https://android.googlesource.com/platform/frameworks/support",
                 "url": "https://cs.android.com/androidx/platform/frameworks/support"
             },
             "name": "Preferences DataStore",
-            "website": "https://developer.android.com/jetpack/androidx/releases/datastore#1.1.1",
+            "website": "https://developer.android.com/jetpack/androidx/releases/datastore#1.2.0",
             "licenses": [
                 "Apache-2.0"
             ],
@@ -1136,14 +1136,64 @@
                     "name": "The Android Open Source Project"
                 }
             ],
-            "artifactVersion": "1.1.1",
+            "artifactVersion": "1.2.0",
             "description": "Android Preferences DataStore without the Android Dependencies",
             "scm": {
                 "connection": "scm:git:https://android.googlesource.com/platform/frameworks/support",
                 "url": "https://cs.android.com/androidx/platform/frameworks/support"
             },
             "name": "Preferences DataStore Core",
-            "website": "https://developer.android.com/jetpack/androidx/releases/datastore#1.1.1",
+            "website": "https://developer.android.com/jetpack/androidx/releases/datastore#1.2.0",
+            "licenses": [
+                "Apache-2.0"
+            ],
+            "organization": {
+                "name": "The Android Open Source Project"
+            }
+        },
+        {
+            "uniqueId": "androidx.datastore:datastore-preferences-external-protobuf",
+            "funding": [
+                
+            ],
+            "developers": [
+                {
+                    "name": "The Android Open Source Project"
+                }
+            ],
+            "artifactVersion": "1.2.0",
+            "description": "Repackaged proto-lite dependency for use by datastore preferences",
+            "scm": {
+                "connection": "scm:git:https://android.googlesource.com/platform/frameworks/support",
+                "url": "https://cs.android.com/androidx/platform/frameworks/support"
+            },
+            "name": "Preferences External Protobuf",
+            "website": "https://developer.android.com/jetpack/androidx/releases/datastore#1.2.0",
+            "licenses": [
+                "BSD-3-Clause"
+            ],
+            "organization": {
+                "name": "The Android Open Source Project"
+            }
+        },
+        {
+            "uniqueId": "androidx.datastore:datastore-preferences-proto",
+            "funding": [
+                
+            ],
+            "developers": [
+                {
+                    "name": "The Android Open Source Project"
+                }
+            ],
+            "artifactVersion": "1.2.0",
+            "description": "Jarjar the generated proto for use by datastore-preferences.",
+            "scm": {
+                "connection": "scm:git:https://android.googlesource.com/platform/frameworks/support",
+                "url": "https://cs.android.com/androidx/platform/frameworks/support"
+            },
+            "name": "Preferences DataStore Proto",
+            "website": "https://developer.android.com/jetpack/androidx/releases/datastore#1.2.0",
             "licenses": [
                 "Apache-2.0"
             ],
@@ -1665,39 +1715,20 @@
                     "name": "The Android Open Source Project"
                 }
             ],
-            "artifactVersion": "2.7.7",
+            "artifactVersion": "2.9.6",
             "description": "Android Navigation-Common",
             "scm": {
                 "connection": "scm:git:https://android.googlesource.com/platform/frameworks/support",
                 "url": "https://cs.android.com/androidx/platform/frameworks/support"
             },
             "name": "Navigation Common",
-            "website": "https://developer.android.com/jetpack/androidx/releases/navigation#2.7.7",
+            "website": "https://developer.android.com/jetpack/androidx/releases/navigation#2.9.6",
             "licenses": [
                 "Apache-2.0"
-            ]
-        },
-        {
-            "uniqueId": "androidx.navigation:navigation-common-ktx",
-            "funding": [
-                
             ],
-            "developers": [
-                {
-                    "name": "The Android Open Source Project"
-                }
-            ],
-            "artifactVersion": "2.7.7",
-            "description": "Android Navigation-Common-Ktx",
-            "scm": {
-                "connection": "scm:git:https://android.googlesource.com/platform/frameworks/support",
-                "url": "https://cs.android.com/androidx/platform/frameworks/support"
-            },
-            "name": "Navigation Common Kotlin Extensions",
-            "website": "https://developer.android.com/jetpack/androidx/releases/navigation#2.7.7",
-            "licenses": [
-                "Apache-2.0"
-            ]
+            "organization": {
+                "name": "The Android Open Source Project"
+            }
         },
         {
             "uniqueId": "androidx.navigation:navigation-compose",
@@ -1709,17 +1740,20 @@
                     "name": "The Android Open Source Project"
                 }
             ],
-            "artifactVersion": "2.7.7",
+            "artifactVersion": "2.9.6",
             "description": "Compose integration with Navigation",
             "scm": {
                 "connection": "scm:git:https://android.googlesource.com/platform/frameworks/support",
                 "url": "https://cs.android.com/androidx/platform/frameworks/support"
             },
             "name": "Compose Navigation",
-            "website": "https://developer.android.com/jetpack/androidx/releases/navigation#2.7.7",
+            "website": "https://developer.android.com/jetpack/androidx/releases/navigation#2.9.6",
             "licenses": [
                 "Apache-2.0"
-            ]
+            ],
+            "organization": {
+                "name": "The Android Open Source Project"
+            }
         },
         {
             "uniqueId": "androidx.navigation:navigation-runtime",
@@ -1731,39 +1765,20 @@
                     "name": "The Android Open Source Project"
                 }
             ],
-            "artifactVersion": "2.7.7",
+            "artifactVersion": "2.9.6",
             "description": "Android Navigation-Runtime",
             "scm": {
                 "connection": "scm:git:https://android.googlesource.com/platform/frameworks/support",
                 "url": "https://cs.android.com/androidx/platform/frameworks/support"
             },
             "name": "Navigation Runtime",
-            "website": "https://developer.android.com/jetpack/androidx/releases/navigation#2.7.7",
+            "website": "https://developer.android.com/jetpack/androidx/releases/navigation#2.9.6",
             "licenses": [
                 "Apache-2.0"
-            ]
-        },
-        {
-            "uniqueId": "androidx.navigation:navigation-runtime-ktx",
-            "funding": [
-                
             ],
-            "developers": [
-                {
-                    "name": "The Android Open Source Project"
-                }
-            ],
-            "artifactVersion": "2.7.7",
-            "description": "Android Navigation-Runtime-Ktx",
-            "scm": {
-                "connection": "scm:git:https://android.googlesource.com/platform/frameworks/support",
-                "url": "https://cs.android.com/androidx/platform/frameworks/support"
-            },
-            "name": "Navigation Runtime Kotlin Extensions",
-            "website": "https://developer.android.com/jetpack/androidx/releases/navigation#2.7.7",
-            "licenses": [
-                "Apache-2.0"
-            ]
+            "organization": {
+                "name": "The Android Open Source Project"
+            }
         },
         {
             "uniqueId": "androidx.navigationevent:navigationevent",
@@ -2174,6 +2189,29 @@
             ]
         },
         {
+            "uniqueId": "com.google.accompanist:accompanist-navigation-animation",
+            "funding": [
+                
+            ],
+            "developers": [
+                {
+                    "name": "Google"
+                }
+            ],
+            "artifactVersion": "0.36.0",
+            "description": "Utilities for Jetpack Compose",
+            "scm": {
+                "connection": "scm:git:git://github.com/google/accompanist.git",
+                "url": "https://github.com/google/accompanist/",
+                "developerConnection": "scm:git:git://github.com/google/accompanist.git"
+            },
+            "name": "Accompanist Navigation Animation",
+            "website": "https://github.com/google/accompanist/",
+            "licenses": [
+                "Apache-2.0"
+            ]
+        },
+        {
             "uniqueId": "com.google.code.findbugs:jsr305",
             "funding": [
                 
@@ -2370,7 +2408,7 @@
                     "name": "Square, Inc."
                 }
             ],
-            "artifactVersion": "3.4.0",
+            "artifactVersion": "3.9.1",
             "description": "A modern I/O library for Android, Java, and Kotlin Multiplatform.",
             "scm": {
                 "connection": "scm:git:git://github.com/square/okio.git",
@@ -2393,7 +2431,7 @@
                     "name": "Rosemoe"
                 }
             ],
-            "artifactVersion": "0.24.0",
+            "artifactVersion": "0.24.2",
             "description": "An awesome code editor library on Android",
             "scm": {
                 "connection": "scm:git:github.com/Rosemoe/sora-editor.git",
@@ -2416,8 +2454,8 @@
                     "name": "Rosemoe"
                 }
             ],
-            "artifactVersion": "0.24.0",
-            "description": "An awesome code editor library on Android",
+            "artifactVersion": "0.24.2",
+            "description": "TextMate-based language support for sora-editor",
             "scm": {
                 "connection": "scm:git:github.com/Rosemoe/sora-editor.git",
                 "url": "https://github.com/Rosemoe/sora-editor/tree/master",
@@ -3156,54 +3194,6 @@
             ]
         },
         {
-            "uniqueId": "org.jetbrains.kotlin:kotlin-android-extensions-runtime",
-            "funding": [
-                
-            ],
-            "developers": [
-                {
-                    "organisationUrl": "https://www.jetbrains.com",
-                    "name": "Kotlin Team"
-                }
-            ],
-            "artifactVersion": "1.9.22",
-            "description": "Kotlin Android Extensions Runtime",
-            "scm": {
-                "connection": "scm:git:https://github.com/JetBrains/kotlin.git",
-                "url": "https://github.com/JetBrains/kotlin",
-                "developerConnection": "scm:git:https://github.com/JetBrains/kotlin.git"
-            },
-            "name": "Kotlin Android Extensions Runtime",
-            "website": "https://kotlinlang.org/",
-            "licenses": [
-                "Apache-2.0"
-            ]
-        },
-        {
-            "uniqueId": "org.jetbrains.kotlin:kotlin-parcelize-runtime",
-            "funding": [
-                
-            ],
-            "developers": [
-                {
-                    "organisationUrl": "https://www.jetbrains.com",
-                    "name": "Kotlin Team"
-                }
-            ],
-            "artifactVersion": "1.9.22",
-            "description": "Runtime library for the Parcelize compiler plugin",
-            "scm": {
-                "connection": "scm:git:https://github.com/JetBrains/kotlin.git",
-                "url": "https://github.com/JetBrains/kotlin",
-                "developerConnection": "scm:git:https://github.com/JetBrains/kotlin.git"
-            },
-            "name": "Parcelize Runtime",
-            "website": "https://kotlinlang.org/",
-            "licenses": [
-                "Apache-2.0"
-            ]
-        },
-        {
             "uniqueId": "org.jetbrains.kotlin:kotlin-stdlib",
             "funding": [
                 
@@ -3246,54 +3236,6 @@
                 "developerConnection": "scm:git:https://github.com/JetBrains/kotlin.git"
             },
             "name": "Kotlin Stdlib Common",
-            "website": "https://kotlinlang.org/",
-            "licenses": [
-                "Apache-2.0"
-            ]
-        },
-        {
-            "uniqueId": "org.jetbrains.kotlin:kotlin-stdlib-jdk7",
-            "funding": [
-                
-            ],
-            "developers": [
-                {
-                    "organisationUrl": "https://www.jetbrains.com",
-                    "name": "Kotlin Team"
-                }
-            ],
-            "artifactVersion": "1.8.0",
-            "description": "Kotlin Standard Library JDK 7 extension",
-            "scm": {
-                "connection": "scm:git:https://github.com/JetBrains/kotlin.git",
-                "url": "https://github.com/JetBrains/kotlin",
-                "developerConnection": "scm:git:https://github.com/JetBrains/kotlin.git"
-            },
-            "name": "Kotlin Stdlib Jdk7",
-            "website": "https://kotlinlang.org/",
-            "licenses": [
-                "Apache-2.0"
-            ]
-        },
-        {
-            "uniqueId": "org.jetbrains.kotlin:kotlin-stdlib-jdk8",
-            "funding": [
-                
-            ],
-            "developers": [
-                {
-                    "organisationUrl": "https://www.jetbrains.com",
-                    "name": "Kotlin Team"
-                }
-            ],
-            "artifactVersion": "1.8.0",
-            "description": "Kotlin Standard Library JDK 8 extension",
-            "scm": {
-                "connection": "scm:git:https://github.com/JetBrains/kotlin.git",
-                "url": "https://github.com/JetBrains/kotlin",
-                "developerConnection": "scm:git:https://github.com/JetBrains/kotlin.git"
-            },
-            "name": "Kotlin Stdlib Jdk8",
             "website": "https://kotlinlang.org/",
             "licenses": [
                 "Apache-2.0"
@@ -3618,7 +3560,7 @@
             "name": "Apache License 2.0"
         },
         "BSD-3-Clause": {
-            "content": "Copyright (c) <year> <owner>. \n\nRedistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:\n\n1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.\n\n2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.\n\n3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.\n\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS IS\" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.",
+            "content": "Copyright (c) <<var;name=copyright;original= <year> <owner>;match=.+>>. All rights reserved. \n\nRedistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:\n\n1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer. \n\n2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution. \n\n3. Neither the name of <<var;name=organizationClause3;original=the copyright holder;match=.+>> nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.\n\nTHIS SOFTWARE IS PROVIDED BY <<var;name=copyrightHolderAsIs;original=THE COPYRIGHT HOLDERS AND CONTRIBUTORS;match=.+>> \"AS IS\" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <<var;name=copyrightHolderLiability;original=THE COPYRIGHT HOLDER OR CONTRIBUTORS;match=.+>> BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. ",
             "hash": "BSD-3-Clause",
             "internalHash": "BSD-3-Clause",
             "url": "https://spdx.org/licenses/BSD-3-Clause.html",

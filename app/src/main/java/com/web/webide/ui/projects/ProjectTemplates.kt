@@ -36,28 +36,82 @@ document.getElementById('clickBtn').addEventListener('click', function() {
     """.trimIndent()
 
     val apiJs = """
+// 1. 核心通信层：处理 Android 回调
 window.requestCallbacks = {};
 window.onAndroidResponse = function(id, b64) {
     const cb = window.requestCallbacks[id];
     if(!cb) return;
     try {
-        const res = JSON.parse(decodeURIComponent(escape(window.atob(b64))));
+        const jsonStr = decodeURIComponent(escape(window.atob(b64)));
+        const res = JSON.parse(jsonStr);
         res.success ? cb.resolve(res.data) : cb.reject(res.data);
     } catch(e) { cb.reject(e.message); }
     delete window.requestCallbacks[id];
 };
-const call = (m, ...a) => new Promise((res, rej) => {
-    if(!window.Android || !window.Android[m]) return rej("Native API not found");
-    const id = 'cb_'+Math.random();
-    window.requestCallbacks[id] = {resolve: res, reject: rej};
-    window.Android[m](...a, id);
+
+// 2. 通用调用函数 (将 Native 方法转为 Promise)
+const call = (method, ...args) => new Promise((resolve, reject) => {
+    if(!window.Android || !window.Android[method]) return reject("Native API not found: " + method);
+    const id = 'cb_' + Math.random().toString(36).substr(2, 9);
+    window.requestCallbacks[id] = { resolve, reject };
+    // 自动补全 callbackId 参数
+    window.Android[method](...args, id);
 });
+
+// 3. 对外暴露的 API 对象
 window.NativeAPI = {
-    toast: (m) => window.Android?.showToast(m),
+    // --- UI 交互 ---
+    toast: (msg) => window.Android?.showToast(msg),
     vibrate: (ms=50) => window.Android?.vibrate(ms),
-    share: (t) => window.Android?.shareText(t),
-    openBrowser: (u) => window.Android?.openBrowser(u),
-    info: () => { try { return JSON.parse(window.Android.getDeviceInfo()); } catch(e){ return null; } }
+    
+    // --- 系统能力 ---
+    openBrowser: (url) => window.Android?.openBrowser(url),
+    share: (text) => window.Android?.shareText(text),
+    keepScreenOn: (enable) => window.Android?.keepScreenOn(enable),
+    
+    // --- 硬件信息 ---
+    info: async () => {
+        const res = await call('getDeviceInfo'); 
+        return JSON.parse(res); 
+    },
+    
+    // --- 剪贴板 ---
+    clipboard: {
+        copy: (text) => window.Android?.copyToClipboard(text),
+        read: () => call('getFromClipboard')
+    },
+    
+    // --- 本地存储 (SharedPreferences) ---
+    storage: {
+        save: (k, v) => window.Android?.saveStorage(k, v),
+        get: (k) => window.Android?.getStorage(k), // 同步方法可直接调用
+        remove: (k) => window.Android?.removeStorage(k),
+        clear: () => window.Android?.clearStorage()
+    },
+
+    // --- 文件系统 (读写文件) ---
+    file: {
+        read: (path) => call('readFile', path),
+        write: (path, content) => call('writeFile', path, content),
+        exists: (path) => window.Android?.fileExists(path),
+        list: async (dir) => JSON.parse(await call('listFiles', dir)),
+        delete: (path) => window.Android?.deleteFile(path)
+    },
+
+    // --- 网络请求 (绕过跨域) ---
+    http: {
+        request: async (method, url, headers = {}, body = "") => {
+            const res = await call('httpRequest', method, url, JSON.stringify(headers), typeof body === 'object' ? JSON.stringify(body) : body);
+            return JSON.parse(res); 
+        },
+        get: async (url, headers = {}) => {
+            return await window.NativeAPI.http.request('GET', url, headers, "");
+        },
+        post: async (url, data, headers = {}) => {
+            const h = { "Content-Type": "application/json", ...headers };
+            return await window.NativeAPI.http.request('POST', url, h, data);
+        }
+    }
 };
     """.trimIndent()
 

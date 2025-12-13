@@ -5,7 +5,6 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
-import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -65,6 +64,7 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
     val workspacePath = WorkspaceManager.getWorkspacePath(context)
     val projectPath = File(workspacePath, folderName).absolutePath
 
+    var snackbarHostState = remember { SnackbarHostState() }
     // 初始加载进度条状态
     var showInitialLoader by remember { mutableStateOf(!viewModel.hasShownInitialLoader) }
     // 构建过程中的进度条状态
@@ -106,6 +106,7 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
         }
     ) {
         Scaffold(
+            snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
                 TopAppBar(
                     title = {
@@ -138,8 +139,11 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                         }
                         IconButton(onClick = {
                             scope.launch {
-                                viewModel.saveAllModifiedFiles(context)
-                                navController.navigate("preview/$folderName")
+                                scope.launch {
+                                    // ✅ 传入 snackbarHostState
+                                    viewModel.saveAllModifiedFiles(context, snackbarHostState)
+                                    navController.navigate("preview/$folderName")
+                                }
                             }
                         }) {
                             Icon(Icons.Filled.PlayArrow, "运行")
@@ -155,7 +159,13 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                 DropdownMenuItem(
                                     text = { Text("全部保存") },
                                     onClick = {
-                                        scope.launch { viewModel.saveAllModifiedFiles(context) }
+                                        scope.launch {
+                                            // ✅ 传入 snackbarHostState
+                                            viewModel.saveAllModifiedFiles(
+                                                context,
+                                                snackbarHostState
+                                            )
+                                        }
                                         isMoreMenuExpanded = false
                                     }
                                 )
@@ -170,7 +180,16 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                             isMoreMenuExpanded = false
                                             scope.launch {
                                                 isBuilding = true
-                                                viewModel.saveAllModifiedFiles(context)
+                                                viewModel.saveAllModifiedFiles(
+                                                    context,
+                                                    snackbarHostState
+                                                )
+                                                val prefs = context.getSharedPreferences(
+                                                    "WebIDE_Project_Settings",
+                                                    Context.MODE_PRIVATE
+                                                )
+                                                val isDebug =
+                                                    prefs.getBoolean("debug_$folderName", false)
 
 
                                                 val configFile = File(projectPath, "webapp.json")
@@ -183,27 +202,37 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
 
                                                 if (configFile.exists()) {
                                                     try {
-                                                        val jsonStr = withContext(Dispatchers.IO) { configFile.readText() }
+                                                        val jsonStr =
+                                                            withContext(Dispatchers.IO) { configFile.readText() }
                                                         val json = JSONObject(jsonStr)
 
                                                         // 解析包名、版本
-                                                        pkg = json.optString("package", "com.example.webapp")
-                                                        verName = json.optString("versionName", "1.0")
+                                                        pkg = json.optString(
+                                                            "package",
+                                                            "com.example.webapp"
+                                                        )
+                                                        verName =
+                                                            json.optString("versionName", "1.0")
                                                         verCode = json.optString("versionCode", "1")
 
                                                         // 解析 Icon 路径
                                                         val iconName = json.optString("icon", "")
                                                         if (iconName.isNotEmpty()) {
-                                                            val iconFile = File(projectPath, iconName)
+                                                            val iconFile =
+                                                                File(projectPath, iconName)
                                                             if (iconFile.exists()) {
                                                                 iconPath = iconFile.absolutePath
                                                             } else {
-                                                                LogCatcher.w("Build", "未找到图标文件: ${iconFile.absolutePath}")
+                                                                LogCatcher.w(
+                                                                    "Build",
+                                                                    "未找到图标文件: ${iconFile.absolutePath}"
+                                                                )
                                                             }
                                                         }
 
                                                         // 解析权限列表
-                                                        val jsonPerms = json.optJSONArray("permissions")
+                                                        val jsonPerms =
+                                                            json.optJSONArray("permissions")
                                                         if (jsonPerms != null && jsonPerms.length() > 0) {
                                                             val list = ArrayList<String>()
                                                             for (i in 0 until jsonPerms.length()) {
@@ -213,14 +242,23 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                                         }
 
                                                         // 新增：解析状态栏配置
-                                                        val statusBarJson = json.optJSONObject("statusBar")
+                                                        val statusBarJson =
+                                                            json.optJSONObject("statusBar")
                                                         if (statusBarJson != null) {
-                                                            statusBarConfig = statusBarJson.toString()
-                                                            LogCatcher.d("Build", "状态栏配置: $statusBarConfig")
+                                                            statusBarConfig =
+                                                                statusBarJson.toString()
+                                                            LogCatcher.d(
+                                                                "Build",
+                                                                "状态栏配置: $statusBarConfig"
+                                                            )
                                                         }
 
                                                     } catch (e: Exception) {
-                                                        LogCatcher.e("Build", "解析 webapp.json 失败", e)
+                                                        LogCatcher.e(
+                                                            "Build",
+                                                            "解析 webapp.json 失败",
+                                                            e
+                                                        )
                                                     }
                                                 }
 
@@ -236,7 +274,8 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                                         verName,           // String ver
                                                         verCode,           // String code
                                                         iconPath,          // String amph
-                                                        permissions        // String[] ps
+                                                        permissions,        // String[] ps
+                                                        isDebug            // 🔥 boolean isDebug
                                                         // 注意：ApkBuilder.bin 方法的参数列表没有 statusBarConfig
                                                         // 但我们已在 mergeApk 方法中将 webapp.json 打包到 assets
                                                     )
@@ -303,7 +342,10 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                 Text("APK 已生成，是否立即安装？")
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text("输出路径:", style = MaterialTheme.typography.titleSmall)
-                                Text("${result.apkPath}", style = MaterialTheme.typography.bodySmall)
+                                Text(
+                                    "${result.apkPath}",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
                             } else {
                                 Text("错误信息：", color = MaterialTheme.colorScheme.error)
                                 Text(result.message)
@@ -313,7 +355,6 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                     confirmButton = {
                         if (isSuccess && result.apkPath != null) {
                             TextButton(onClick = {
-                                installApk(context, File(result.apkPath))
                                 buildResult = null
                             }) {
                                 Text("安装")
@@ -359,7 +400,11 @@ private suspend fun ensureKeystoreExists(context: Context, workspacePath: String
 }
 
 // 安装 APK
-private fun installApk(context: Context, apkFile: File) {
+private fun installApk(
+    context: Context, apkFile: File,
+    scope: kotlinx.coroutines.CoroutineScope, // 新增
+    snackbarHostState: SnackbarHostState
+) {
     if (!apkFile.exists()) {
         return
     }
@@ -367,7 +412,7 @@ private fun installApk(context: Context, apkFile: File) {
     // Android 8.0+ 权限
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         if (!context.packageManager.canRequestPackageInstalls()) {
-            Toast.makeText(context, "请开启安装权限", Toast.LENGTH_SHORT).show()
+            scope.launch { snackbarHostState.showSnackbar("请开启安装权限") }
             val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
                 data = Uri.parse("package:${context.packageName}")
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -390,7 +435,7 @@ private fun installApk(context: Context, apkFile: File) {
         context.startActivity(intent)
 
     } catch (e: Exception) {
-         LogCatcher.e("Install", "Error", e)
+        LogCatcher.e("Install", "Error", e)
     }
 }
 
@@ -417,11 +462,45 @@ private fun findBuiltApk(projectPath: String, appName: String): File? {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SymbolBar(viewModel: EditorViewModel) {
-    val symbols = listOf("Tab", "<", ">", "/", "=", "\"", "'", "!", "?", ",", ";", ":", "(", ")", "[", "]", "{", "}", "+", "-", "*", "_", "&", "|")
-    BottomAppBar(modifier = Modifier.imePadding().height(48.dp)) {
-        Row(modifier = Modifier.horizontalScroll(rememberScrollState()).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    val symbols = listOf(
+        "Tab",
+        "<",
+        ">",
+        "/",
+        "=",
+        "\"",
+        "'",
+        "!",
+        "?",
+        ",",
+        ";",
+        ":",
+        "(",
+        ")",
+        "[",
+        "]",
+        "{",
+        "}",
+        "+",
+        "-",
+        "*",
+        "_",
+        "&",
+        "|"
+    )
+    BottomAppBar(modifier = Modifier
+        .imePadding()
+        .height(48.dp)) {
+        Row(
+            modifier = Modifier
+                .horizontalScroll(rememberScrollState())
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             symbols.forEach { symbol ->
-                Box(modifier = Modifier.clickable { viewModel.insertSymbol(symbol) }.padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
+                Box(modifier = Modifier
+                    .clickable { viewModel.insertSymbol(symbol) }
+                    .padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
                     Text(text = symbol, style = MaterialTheme.typography.titleMedium)
                 }
             }
@@ -438,7 +517,9 @@ fun EditCode(modifier: Modifier = Modifier, viewModel: EditorViewModel) {
     var expandedTabIndex by remember { mutableStateOf<Int?>(null) }
     val currentFiles by rememberUpdatedState(openFiles)
     val currentIndex by rememberUpdatedState(activeFileIndex)
-    val pagerState = rememberPagerState(initialPage = activeFileIndex.coerceIn(0, maxOf(0, openFiles.size - 1)), pageCount = { currentFiles.size })
+    val pagerState = rememberPagerState(
+        initialPage = activeFileIndex.coerceIn(0, maxOf(0, openFiles.size - 1)),
+        pageCount = { currentFiles.size })
 
     LaunchedEffect(currentIndex, currentFiles.size) {
         if (currentFiles.isNotEmpty() && currentIndex >= 0 && currentIndex < currentFiles.size && pagerState.currentPage != currentIndex) {
@@ -455,27 +536,85 @@ fun EditCode(modifier: Modifier = Modifier, viewModel: EditorViewModel) {
 
     Column(modifier = modifier) {
         if (openFiles.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("未打开任何文件") }
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) { Text("未打开任何文件") }
         } else {
-            ScrollableTabRow(selectedTabIndex = pagerState.currentPage.coerceIn(0, openFiles.size - 1), edgePadding = 0.dp, divider = {}, indicator = { tabPositions -> if (tabPositions.isNotEmpty() && pagerState.currentPage < tabPositions.size) { Box(modifier = Modifier.tabIndicatorOffset(tabPositions[pagerState.currentPage]).height(3.dp).background(color = MaterialTheme.colorScheme.primary, shape = RoundedCornerShape(percent = 50))) } }) {
+            ScrollableTabRow(
+                selectedTabIndex = pagerState.currentPage.coerceIn(
+                    0,
+                    openFiles.size - 1
+                ),
+                edgePadding = 0.dp,
+                divider = {},
+                indicator = { tabPositions ->
+                    if (tabPositions.isNotEmpty() && pagerState.currentPage < tabPositions.size) {
+                        Box(
+                            modifier = Modifier
+                                .tabIndicatorOffset(tabPositions[pagerState.currentPage])
+                                .height(3.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.primary,
+                                    shape = RoundedCornerShape(percent = 50)
+                                )
+                        )
+                    }
+                }) {
                 openFiles.forEachIndexed { index, editorState ->
                     Box {
-                        val displayName = if (editorState.isModified) "*${editorState.file.name}" else editorState.file.name
-                        Tab(selected = pagerState.currentPage == index, onClick = { if (pagerState.currentPage == index) expandedTabIndex = index else scope.launch { pagerState.animateScrollToPage(index) } }, text = { Text(text = displayName, maxLines = 1, overflow = TextOverflow.Ellipsis) })
-                        DropdownMenu(expanded = expandedTabIndex == index, onDismissRequest = { expandedTabIndex = null }) {
-                            DropdownMenuItem(text = { Text("关闭") }, onClick = { expandedTabIndex = null; viewModel.closeFile(index) })
-                            DropdownMenuItem(text = { Text("关闭其他") }, onClick = { expandedTabIndex = null; viewModel.closeOtherFiles(index) })
-                            DropdownMenuItem(text = { Text("关闭全部") }, onClick = { expandedTabIndex = null; viewModel.closeAllFiles() })
+                        val displayName =
+                            if (editorState.isModified) "*${editorState.file.name}" else editorState.file.name
+                        Tab(
+                            selected = pagerState.currentPage == index,
+                            onClick = {
+                                if (pagerState.currentPage == index) expandedTabIndex =
+                                    index else scope.launch { pagerState.animateScrollToPage(index) }
+                            },
+                            text = {
+                                Text(
+                                    text = displayName,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            })
+                        DropdownMenu(
+                            expanded = expandedTabIndex == index,
+                            onDismissRequest = { expandedTabIndex = null }) {
+                            DropdownMenuItem(
+                                text = { Text("关闭") },
+                                onClick = { expandedTabIndex = null; viewModel.closeFile(index) })
+                            DropdownMenuItem(
+                                text = { Text("关闭其他") },
+                                onClick = {
+                                    expandedTabIndex = null; viewModel.closeOtherFiles(index)
+                                })
+                            DropdownMenuItem(
+                                text = { Text("关闭全部") },
+                                onClick = { expandedTabIndex = null; viewModel.closeAllFiles() })
                         }
                     }
                 }
             }
             HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant)
-            HorizontalPager(state = pagerState, modifier = Modifier.weight(1f).fillMaxWidth(), userScrollEnabled = false, key = { index -> if (index < openFiles.size) openFiles[index].file.absolutePath else "empty_$index" }) { page ->
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                userScrollEnabled = false,
+                key = { index -> if (index < openFiles.size) openFiles[index].file.absolutePath else "empty_$index" }) { page ->
                 if (page in openFiles.indices) {
-                    CodeEditorView(modifier = Modifier.fillMaxSize(), state = openFiles[page], viewModel = viewModel)
+                    CodeEditorView(
+                        modifier = Modifier.fillMaxSize(),
+                        state = openFiles[page],
+                        viewModel = viewModel
+                    )
                 } else {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) { CircularProgressIndicator() }
                 }
             }
         }
@@ -485,8 +624,16 @@ fun EditCode(modifier: Modifier = Modifier, viewModel: EditorViewModel) {
 @Composable
 fun FileManagerDrawer(projectPath: String, onFileClick: (File) -> Unit) {
     Column(modifier = Modifier.fillMaxSize()) {
-        Text("文件树", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(16.dp))
-        FileTree(rootPath = projectPath, modifier = Modifier.fillMaxSize(), onFileClick = onFileClick)
+        Text(
+            "文件树",
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.padding(16.dp)
+        )
+        FileTree(
+            rootPath = projectPath,
+            modifier = Modifier.fillMaxSize(),
+            onFileClick = onFileClick
+        )
     }
 }
 
@@ -519,7 +666,10 @@ fun AnimatedDrawerToggle(
             val arrowheadSize = width * 0.3f
 
             withTransform({
-                rotate(degrees = lerp(0f, 180f, progress), pivot = Offset(x = width / 2, y = height / 2))
+                rotate(
+                    degrees = lerp(0f, 180f, progress),
+                    pivot = Offset(x = width / 2, y = height / 2)
+                )
             }) {
                 drawLine(
                     color = color,

@@ -4,7 +4,6 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.*
-import android.content.pm.ActivityInfo
 import android.net.Uri
 import android.os.*
 import android.util.Base64
@@ -16,9 +15,14 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresPermission
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -29,17 +33,17 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import androidx.navigation.NavController
 import com.web.webide.core.utils.LogCatcher
 import com.web.webide.core.utils.WorkspaceManager
 import com.web.webide.ui.editor.viewmodel.EditorViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
 import java.nio.charset.StandardCharsets
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -49,13 +53,27 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
     val activity = context as? Activity
     val workspacePath = WorkspaceManager.getWorkspacePath(context)
     val projectDir = File(workspacePath, folderName)
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    // --- 0. 状态管理 ---
+    val prefs = remember { context.getSharedPreferences("WebIDE_Project_Settings", Context.MODE_PRIVATE) }
 
-    // --- 0. 🔥🔥🔥 关键修复：进入预览时，向 Android 系统申请硬件权限 ---
-    // 如果 WebIDE 自身没有相机权限，WebView 里的网页永远无法调用摄像头
+    // 调试开关状态
+    var isDebugEnabled by remember {
+        mutableStateOf(prefs.getBoolean("debug_$folderName", false))
+    }
+
+    // 切换调试模式
+    fun toggleDebugMode() {
+        isDebugEnabled = !isDebugEnabled
+        prefs.edit().putBoolean("debug_$folderName", isDebugEnabled).apply()
+        scope.launch { snackbarHostState.showSnackbar(if (isDebugEnabled) "调试模式已开启" else "调试模式已关闭") }
+    }
+
+    // --- 1. 权限申请 ---
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        // 权限回调，这里可以做日志，但我们主要目的是确保用户点了“允许”
         LogCatcher.d("WebPreview", "Permissions granted: $permissions")
     }
 
@@ -68,7 +86,7 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
         ))
     }
 
-    // --- 1. 读取配置 ---
+    // --- 2. 读取配置 ---
     val webAppConfig = produceState<JSONObject?>(initialValue = null, key1 = projectDir) {
         value = withContext(Dispatchers.IO) {
             val configFile = File(projectDir, "webapp.json")
@@ -79,51 +97,39 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
     }
     val config = webAppConfig.value
 
-    // --- 2. 应用状态栏配置 ---
+    // 🔥🔥🔥 新增：全屏模式状态（控制标题栏显示/隐藏） 🔥🔥🔥
+    // 默认值参考 config 中的设置，如果没有设置则为 false
+    var isFullScreenMode by remember(config) {
+        mutableStateOf(config?.optBoolean("fullscreen", false) == true)
+    }
+
+    // --- 3. 应用状态栏配置 ---
     DisposableEffect(config) {
         val statusBarConfig = config?.optJSONObject("statusBar")
         if (statusBarConfig != null && activity != null) {
             val window = activity.window
             val decorView = window.decorView
 
-            // 处理状态栏隐藏
             if (statusBarConfig.optBoolean("hidden", false)) {
-                // 隐藏状态栏
                 val flags = View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
                 decorView.systemUiVisibility = flags
             } else {
-                // 显示状态栏
                 decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
-
-                // 设置状态栏颜色
                 try {
                     val colorStr = statusBarConfig.optString("backgroundColor", "")
                     if (colorStr.isNotEmpty() && colorStr.startsWith("#")) {
                         val color = Color(android.graphics.Color.parseColor(colorStr))
                         window.statusBarColor = color.toArgb()
                     }
-                } catch (e: Exception) {
-                    LogCatcher.e("WebPreview", "设置状态栏颜色失败", e)
-                }
+                } catch (e: Exception) { }
 
-                // 设置状态栏文字颜色
                 val style = statusBarConfig.optString("style", "dark")
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     when (style) {
-                        "light" -> {
-                            // 浅色文字（深色背景）
-                            decorView.systemUiVisibility = decorView.systemUiVisibility or
-                                    View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
-                        }
-                        "dark" -> {
-                            // 深色文字（浅色背景）
-                            decorView.systemUiVisibility = decorView.systemUiVisibility and
-                                    View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv()
-                        }
+                        "light" -> decorView.systemUiVisibility = decorView.systemUiVisibility or View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+                        "dark" -> decorView.systemUiVisibility = decorView.systemUiVisibility and View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv()
                     }
                 }
-
-                // 设置透明状态栏
                 if (statusBarConfig.optBoolean("translucent", false)) {
                     window.addFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
                 } else {
@@ -131,15 +137,11 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
                 }
             }
         }
-
         onDispose {
-            // 恢复默认状态栏设置
             if (activity != null) {
                 val window = activity.window
-                val decorView = window.decorView
-                decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
+                window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
                 window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
-                // 恢复默认状态栏颜色
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                     window.statusBarColor = android.graphics.Color.TRANSPARENT
                 }
@@ -147,7 +149,7 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
         }
     }
 
-    // --- 3. URL 计算 (保持不变) ---
+    // --- 4. URL 计算 ---
     val targetUrl = remember(projectDir, config) {
         val rawUrl = config?.optString("targetUrl")?.takeIf { it.isNotEmpty() }
             ?: config?.optString("url")?.takeIf { it.isNotEmpty() }
@@ -158,16 +160,15 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
             rawUrl != null -> {
                 val f = File(projectDir, rawUrl)
                 val af = File(projectDir, "src/main/assets/$rawUrl")
-                if(f.exists()) "file://${f.absolutePath}" else "file://${af.absolutePath}"
+                if (f.exists()) "file://${f.absolutePath}" else "file://${af.absolutePath}"
             }
             else -> {
                 val af = File(projectDir, "src/main/assets/index.html")
-                if(af.exists()) "file://${af.absolutePath}" else "file://${File(projectDir, "index.html").absolutePath}"
+                if (af.exists()) "file://${af.absolutePath}" else "file://${File(projectDir, "index.html").absolutePath}"
             }
         }
     }
 
-    // --- 4. 文件/相机回调 ---
     var filePathCallback by remember { mutableStateOf<ValueCallback<Array<Uri>>?>(null) }
     val fileChooserLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -179,21 +180,47 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
     }
 
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
-    val refreshKey = remember(config) { System.currentTimeMillis() }
+    val refreshKey = remember(config, isDebugEnabled) { System.currentTimeMillis() }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            if (config?.optBoolean("fullscreen", false) != true) {
+            // 🔥🔥🔥 核心：如果不是全屏模式，才显示标题栏 🔥🔥🔥
+            if (!isFullScreenMode) {
                 TopAppBar(
-                    title = { Text(if(targetUrl.startsWith("http")) "网页预览" else "App 预览") },
-                    navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") } },
-                    actions = { IconButton(onClick = { webViewRef?.reload() }) { Icon(Icons.Default.Refresh, "刷新") } }
+                    title = { Text(if (targetUrl.startsWith("http")) "网页预览" else "App 预览") },
+                    navigationIcon = {
+                        IconButton(onClick = { navController.popBackStack() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                        }
+                    },
+                    actions = {
+                        // 1. 调试开关
+                        IconButton(onClick = { toggleDebugMode() }) {
+                            Icon(
+                                imageVector = Icons.Default.BugReport,
+                                contentDescription = "调试模式",
+                                tint = if (isDebugEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        // 2. 刷新按钮
+                        IconButton(onClick = { webViewRef?.reload() }) {
+                            Icon(Icons.Default.Refresh, "刷新")
+                        }
+                        // 3. 🔥新增：进入全屏按钮🔥
+                        IconButton(onClick = { isFullScreenMode = true }) {
+                            Icon(Icons.Default.Fullscreen, "全屏")
+                        }
+                    }
                 )
             }
         },
-        containerColor = if (config?.optBoolean("fullscreen", false) == true) Color.Black else MaterialTheme.colorScheme.background
+        // 如果全屏，背景设为黑色（防止闪烁），否则用默认色
+        containerColor = if (isFullScreenMode) Color.Black else MaterialTheme.colorScheme.background
     ) { innerPadding ->
-        val actualPadding = if (config?.optBoolean("fullscreen", false) == true) PaddingValues(0.dp) else innerPadding
+        // 如果全屏，Padding 设为 0，否则使用 Scaffold 给的 padding
+        val actualPadding = if (isFullScreenMode) PaddingValues(0.dp) else innerPadding
+
         Box(modifier = Modifier.padding(actualPadding).fillMaxSize()) {
             key(refreshKey) {
                 AndroidView(
@@ -219,18 +246,125 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
                             webViewRef = this
                         }
                     },
-                    update = { webView -> if (webView.url != targetUrl) webView.loadUrl(targetUrl) }
+                    update = { webView ->
+                        if (webView.url != null && webView.url == targetUrl) return@AndroidView
+
+                        if (targetUrl.startsWith("file://") && isDebugEnabled) {
+                            try {
+                                val filePath = targetUrl.replace("file://", "")
+                                val file = File(filePath)
+                                if (file.exists()) {
+                                    val rawHtml = file.readText()
+                                    // 注入 Eruda (传入 Context 读取 assets)
+                                    val injectedHtml = injectErudaIntoHtml(context, rawHtml)
+                                    webView.loadDataWithBaseURL(targetUrl, injectedHtml, "text/html", "UTF-8", targetUrl)
+                                } else {
+                                    webView.loadUrl(targetUrl)
+                                }
+                            } catch (e: Exception) {
+                                LogCatcher.e("WebPreview", "注入失败", e)
+                                webView.loadUrl(targetUrl)
+                            }
+                        } else {
+                            if (webView.url != targetUrl) webView.loadUrl(targetUrl)
+                        }
+                    }
                 )
             }
-            if (config?.optBoolean("fullscreen", false) == true) {
-                IconButton(onClick = { navController.popBackStack() }, modifier = Modifier.align(Alignment.TopStart).padding(16.dp)) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = Color.White.copy(alpha = 0.5f))
+
+            // 🔥🔥🔥 核心：全屏模式下的悬浮控件 🔥🔥🔥
+            // 只要进入全屏模式，就显示这些浮动按钮，方便用户操作
+            if (isFullScreenMode) {
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .statusBarsPadding()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // 1. 半透明返回按钮
+                    IconButton(
+                        onClick = { navController.popBackStack() },
+                        modifier = Modifier
+                            .background(Color.Black.copy(alpha = 0.3f), CircleShape)
+                            .size(36.dp)
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            "返回",
+                            tint = Color.White.copy(alpha = 0.8f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    // 2. 🔥新增：退出全屏按钮🔥
+                    IconButton(
+                        onClick = { isFullScreenMode = false }, // 点击恢复标题栏
+                        modifier = Modifier
+                            .background(Color.Black.copy(alpha = 0.3f), CircleShape)
+                            .size(36.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.FullscreenExit,
+                            "退出全屏",
+                            tint = Color.White.copy(alpha = 0.8f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    // 3. 调试开启指示器
+                    if (isDebugEnabled) {
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Icon(
+                            Icons.Default.BugReport,
+                            "Debug On",
+                            tint = Color.Green.copy(alpha = 0.6f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
         }
     }
 }
 
+// 离线 Eruda 注入 (请确保 assets/eruda.min.js 存在)
+private fun injectErudaIntoHtml(context: Context, htmlContent: String): String {
+    try {
+        val erudaCode = context.assets.open("eruda.min.js").bufferedReader().use { it.readText() }
+
+        val script = """
+            <script>
+            $erudaCode
+            (function() {
+                localStorage.removeItem('eruda-entry-btn');
+                eruda.init();
+                var entryBtn = eruda.get('entry');
+                if (entryBtn) {
+                    // 位置：居中靠右
+                    entryBtn.position({
+                        x: window.innerWidth - 50,
+                        y: window.innerHeight / 2
+                    });
+                }
+                console.log("Eruda injected");
+            })();
+            </script>
+        """
+        return if (htmlContent.contains("</body>", ignoreCase = true)) {
+            htmlContent.replace("</body>", "$script</body>", ignoreCase = true)
+        } else {
+            htmlContent + script
+        }
+    } catch (e: Exception) {
+        LogCatcher.e("WebPreview", "读取本地 eruda 失败", e)
+        return htmlContent
+    }
+}
+
+// ... configureFullWebView 和 FullWebAppInterface 保持不变 (引用之前的代码) ...
 @SuppressLint("SetJavaScriptEnabled")
 private fun configureFullWebView(
     webView: WebView,
@@ -242,14 +376,11 @@ private fun configureFullWebView(
     settings.javaScriptEnabled = true
     settings.domStorageEnabled = true
     settings.databaseEnabled = true
-
-    // 🔥🔥🔥 关键：允许文件访问和媒体播放
     settings.allowFileAccess = true
     settings.allowContentAccess = true
     settings.allowFileAccessFromFileURLs = true
     settings.allowUniversalAccessFromFileURLs = true
-    settings.mediaPlaybackRequiresUserGesture = false // 允许自动播放视频流
-
+    settings.mediaPlaybackRequiresUserGesture = false
     settings.useWideViewPort = true
     settings.loadWithOverviewMode = true
     settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
@@ -273,13 +404,9 @@ private fun configureFullWebView(
         override fun onShowFileChooser(webView: WebView?, filePathCallback: ValueCallback<Array<Uri>>?, fileChooserParams: FileChooserParams?): Boolean {
             return if (filePathCallback != null) onShowFileChooser(filePathCallback, fileChooserParams) else false
         }
-
-        // 🔥🔥🔥 关键：无脑允许所有权限请求 (相机/麦克风)
-        // 这一步对于 file:// 协议调用 getUserMedia 至关重要
         override fun onPermissionRequest(request: PermissionRequest?) {
             request?.grant(request.resources)
         }
-
         override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
             LogCatcher.d("WebPreview_JS", "[${consoleMessage?.messageLevel()}] ${consoleMessage?.message()}")
             return true
@@ -298,12 +425,79 @@ private fun configureFullWebView(
     WebView.setWebContentsDebuggingEnabled(true)
 }
 
-// FullWebAppInterface 和辅助方法保持不变 (与上一版一致)
 class FullWebAppInterface(private val context: Context, private val webView: WebView, private val packageName: String) {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val prefs = context.getSharedPreferences("WebIDE_Preview_${packageName}", Context.MODE_PRIVATE)
 
-    @JavascriptInterface fun showToast(msg: String) { Toast.makeText(context, msg, Toast.LENGTH_SHORT).show() }
+    @JavascriptInterface
+    fun httpRequest(method: String, urlStr: String, headersJson: String, body: String, callbackId: String) {
+        // 开启新线程避免阻塞 UI
+        Thread {
+            var conn: HttpURLConnection? = null
+            try {
+                val url = URL(urlStr)
+                conn = url.openConnection() as HttpURLConnection
+                conn.requestMethod = method.uppercase()
+                conn.connectTimeout = 15000 // 15秒超时
+                conn.readTimeout = 15000
+
+                // 1. 设置 Headers
+                if (headersJson.isNotEmpty()) {
+                    try {
+                        val headers = JSONObject(headersJson)
+                        val keys = headers.keys()
+                        while (keys.hasNext()) {
+                            val key = keys.next()
+                            conn.setRequestProperty(key, headers.getString(key))
+                        }
+                    } catch (e: Exception) { e.printStackTrace() }
+                }
+
+                // 2. 发送 Body (如果是 POST/PUT)
+                if (body.isNotEmpty() && (method.equals("POST", true) || method.equals("PUT", true))) {
+                    conn.doOutput = true
+                    conn.outputStream.use { os ->
+                        os.write(body.toByteArray(StandardCharsets.UTF_8))
+                    }
+                }
+
+                // 3. 获取响应状态
+                val code = conn.responseCode
+
+                // 4. 读取响应内容 (成功读 inputStream，失败读 errorStream)
+                val stream = if (code < 400) conn.inputStream else conn.errorStream
+                val responseText = stream?.bufferedReader()?.use { it.readText() } ?: ""
+
+                // 5. 构造返回给 JS 的数据
+                val resultJson = JSONObject()
+                resultJson.put("status", code)
+                resultJson.put("body", responseText)
+
+                // 可选：返回响应头
+                val responseHeaders = JSONObject()
+                for ((k, v) in conn.headerFields) {
+                    if (k != null) responseHeaders.put(k, v.joinToString(","))
+                }
+                resultJson.put("headers", responseHeaders)
+
+                // 成功回调
+                sendResultToJs(callbackId, true, resultJson.toString())
+
+            } catch (e: Exception) {
+                // 失败回调
+                e.printStackTrace()
+                val errorJson = JSONObject()
+                errorJson.put("status", 0)
+                errorJson.put("error", e.message)
+                sendResultToJs(callbackId, false, errorJson.toString())
+            } finally {
+                conn?.disconnect()
+            }
+        }.start()
+    }
+    @JavascriptInterface fun showToast(msg: String) {
+        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+    }
 
     @RequiresPermission(Manifest.permission.VIBRATE)
     @JavascriptInterface fun vibrate(ms: Long) {
@@ -313,7 +507,6 @@ class FullWebAppInterface(private val context: Context, private val webView: Web
             else @Suppress("DEPRECATION") v.vibrate(ms)
         } catch (e: Exception) {}
     }
-
     @JavascriptInterface fun keepScreenOn(enable: Boolean) {
         mainHandler.post {
             val win = (context as? Activity)?.window
@@ -321,14 +514,12 @@ class FullWebAppInterface(private val context: Context, private val webView: Web
             else win?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
     }
-
     @JavascriptInterface fun copyToClipboard(text: String) {
         mainHandler.post {
             (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("WebIDE", text))
             Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
         }
     }
-
     @JavascriptInterface fun getFromClipboard(callbackId: String) {
         mainHandler.post {
             try {
@@ -338,24 +529,20 @@ class FullWebAppInterface(private val context: Context, private val webView: Web
             } catch (e: Exception) { sendResultToJs(callbackId, false, "") }
         }
     }
-
     @JavascriptInterface fun openBrowser(url: String) {
         try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } catch (e: Exception) {}
     }
-
     @JavascriptInterface fun shareText(text: String) {
         try {
             val intent = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, text) }
             context.startActivity(Intent.createChooser(intent, "分享"))
         } catch (e: Exception) {}
     }
-
     @JavascriptInterface fun getDeviceInfo(): String {
         val json = JSONObject()
         json.put("model", Build.MODEL); json.put("android", Build.VERSION.RELEASE); json.put("package", packageName)
         return json.toString()
     }
-
     @JavascriptInterface fun saveStorage(k: String, v: String) = prefs.edit().putString(k, v).apply()
     @JavascriptInterface fun getStorage(k: String): String = prefs.getString(k, "") ?: ""
 
@@ -364,15 +551,4 @@ class FullWebAppInterface(private val context: Context, private val webView: Web
         val base64 = Base64.encodeToString(json.toByteArray(StandardCharsets.UTF_8), Base64.NO_WRAP)
         mainHandler.post { webView.evaluateJavascript("if(window.onAndroidResponse) window.onAndroidResponse('$callbackId', '$base64')", null) }
     }
-}
-
-private fun hideSystemUI(activity: Activity) {
-    WindowCompat.setDecorFitsSystemWindows(activity.window, false)
-    WindowInsetsControllerCompat(activity.window, activity.window.decorView).let {
-        it.hide(WindowInsetsCompat.Type.systemBars()); it.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-    }
-}
-private fun showSystemUI(activity: Activity) {
-    WindowCompat.setDecorFitsSystemWindows(activity.window, true)
-    WindowInsetsControllerCompat(activity.window, activity.window.decorView).show(WindowInsetsCompat.Type.systemBars())
 }

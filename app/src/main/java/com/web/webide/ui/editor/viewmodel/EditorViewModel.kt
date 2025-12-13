@@ -1,9 +1,9 @@
 package com.web.webide.ui.editor.viewmodel
 
 import android.content.Context
+import androidx.compose.material3.SnackbarHostState // 必须导入这个
 import com.web.webide.core.utils.LogCatcher
 import com.web.webide.core.utils.PermissionManager
-import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -48,25 +48,27 @@ class EditorViewModel : ViewModel() {
         private set
     var activeFileIndex by mutableStateOf(-1)
         private set
-var currentProjectPath by mutableStateOf<String?>(null)
+    var currentProjectPath by mutableStateOf<String?>(null)
         private set
     private val editorInstances = mutableMapOf<String, CodeEditor>()
     private val supportedLanguageScopes = setOf("text.html.basic", "source.css", "source.js")
-    
+
     // 权限检查
     private var hasPermissions = false
     private lateinit var appContext: Context
-    
+
     /**
      * 初始化权限状态
      */
     fun initializePermissions(context: Context) {
         appContext = context.applicationContext
         hasPermissions = PermissionManager.hasRequiredPermissions(appContext)
-        LogCatcher.permission("EditorViewModel", "初始化", 
-            if (hasPermissions) "已有权限" else "需要请求权限")
+        LogCatcher.permission(
+            "EditorViewModel", "初始化",
+            if (hasPermissions) "已有权限" else "需要请求权限"
+        )
     }
-    
+
     /**
      * 检查权限，如果没有权限则记录日志
      */
@@ -112,13 +114,32 @@ var currentProjectPath by mutableStateOf<String?>(null)
             }
             text.addContentListener(object : ContentListener {
                 override fun beforeReplace(content: Content) {}
-                override fun afterInsert(content: Content, startLine: Int, startColumn: Int, endLine: Int, endColumn: Int, inserted: CharSequence) {
+                override fun afterInsert(
+                    content: Content,
+                    startLine: Int,
+                    startColumn: Int,
+                    endLine: Int,
+                    endColumn: Int,
+                    inserted: CharSequence
+                ) {
                     val newText = content.toString()
-                    if (state.content != newText) { state.content = newText }
+                    if (state.content != newText) {
+                        state.content = newText
+                    }
                 }
-                override fun afterDelete(content: Content, startLine: Int, startColumn: Int, endLine: Int, endColumn: Int, deleted: CharSequence) {
+
+                override fun afterDelete(
+                    content: Content,
+                    startLine: Int,
+                    startColumn: Int,
+                    endLine: Int,
+                    endColumn: Int,
+                    deleted: CharSequence
+                ) {
                     val newText = content.toString()
-                    if (state.content != newText) { state.content = newText }
+                    if (state.content != newText) {
+                        state.content = newText
+                    }
                 }
             })
         }
@@ -146,33 +167,47 @@ var currentProjectPath by mutableStateOf<String?>(null)
             LogCatcher.d("EditorViewModel", "尝试加载初始文件: ${indexFile.absolutePath}")
             if (indexFile.exists() && indexFile.isFile && indexFile.canRead()) {
                 if (checkPermissions("加载初始文件")) {
-                    LogCatcher.fileOperation("EditorViewModel", "加载初始文件", indexFile.absolutePath, "开始")
+                    LogCatcher.fileOperation(
+                        "EditorViewModel",
+                        "加载初始文件",
+                        indexFile.absolutePath,
+                        "开始"
+                    )
                     openFile(indexFile)
                 } else {
-                    LogCatcher.fileOperation("EditorViewModel", "加载初始文件", indexFile.absolutePath, "权限不足")
+                    LogCatcher.fileOperation(
+                        "EditorViewModel",
+                        "加载初始文件",
+                        indexFile.absolutePath,
+                        "权限不足"
+                    )
                 }
             }
         }
     }
 
-    suspend fun saveAllModifiedFiles(context: Context) {
+    suspend fun saveAllModifiedFiles(context: Context, snackbarHostState: SnackbarHostState) {
         withContext(Dispatchers.IO) {
             val modifiedFiles = openFiles.filter { it.isModified }
             if (modifiedFiles.isEmpty()) {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "没有需要保存的文件", Toast.LENGTH_SHORT).show()
+                    viewModelScope.launch {
+                        snackbarHostState.showSnackbar("没有需要保存的文件")
+                    }
                 }
                 return@withContext
             }
-            
+
             // 权限检查
             if (!checkPermissions("保存文件")) {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "需要存储权限才能保存文件", Toast.LENGTH_LONG).show()
+                    viewModelScope.launch {
+                        snackbarHostState.showSnackbar("需要存储权限才能保存文件")
+                    }
                 }
                 return@withContext
             }
-            
+
             var successCount = 0
             modifiedFiles.forEach { state ->
                 try {
@@ -187,15 +222,27 @@ var currentProjectPath by mutableStateOf<String?>(null)
                     }
                     state.onContentSaved()
                     successCount++
-                    LogCatcher.fileOperation("EditorViewModel", "保存文件", state.file.absolutePath, "成功")
+                    LogCatcher.fileOperation(
+                        "EditorViewModel",
+                        "保存文件",
+                        state.file.absolutePath,
+                        "成功"
+                    )
                 } catch (e: Exception) {
                     LogCatcher.e("EditorViewModel", "保存失败", e)
-                    LogCatcher.fileOperation("EditorViewModel", "保存文件", state.file.absolutePath, "失败: ${e.message}")
+                    LogCatcher.fileOperation(
+                        "EditorViewModel",
+                        "保存文件",
+                        state.file.absolutePath,
+                        "失败: ${e.message}"
+                    )
                 }
             }
             withContext(Dispatchers.Main) {
                 if (successCount > 0) {
-                    Toast.makeText(context, "已保存 $successCount 个文件", Toast.LENGTH_SHORT).show()
+                    viewModelScope.launch {
+                        snackbarHostState.showSnackbar("已保存 $successCount 个文件")
+                    }
                 }
             }
         }
@@ -215,6 +262,7 @@ var currentProjectPath by mutableStateOf<String?>(null)
                     ""
                 }
             }
+
             val htmlContent = if (htmlFile.exists()) safeReadFile(htmlFile) else "<h1>错误</h1>"
             val cssContent = safeReadFile(cssFile)
             val jsContent = safeReadFile(jsFile)
@@ -236,7 +284,8 @@ var currentProjectPath by mutableStateOf<String?>(null)
                 if (file.exists()) return file
             }
         }
-        return projectDir.listFiles { _, name -> extensions.any { name.endsWith(".$it") } }?.firstOrNull()
+        return projectDir.listFiles { _, name -> extensions.any { name.endsWith(".$it") } }
+            ?.firstOrNull()
     }
 
     fun openFile(file: File) {
@@ -269,7 +318,7 @@ var currentProjectPath by mutableStateOf<String?>(null)
             }
         }
     }
-    
+
     /**
      * 权限检查版本的打开文件方法
      */
@@ -278,7 +327,7 @@ var currentProjectPath by mutableStateOf<String?>(null)
             LogCatcher.fileOperation("EditorViewModel", "打开文件", file.absolutePath, "权限不足")
             return
         }
-        
+
         LogCatcher.fileOperation("EditorViewModel", "打开文件", file.absolutePath, "开始")
         openFile(file)
     }
@@ -301,10 +350,10 @@ var currentProjectPath by mutableStateOf<String?>(null)
                 val startLine = editor.cursor.leftLine
                 val startColumn = editor.cursor.leftColumn
                 val processedSymbol = if (symbol == "Tab") "\t" else symbol
-                
+
                 // 插入符号
                 editor.text.insert(startLine, startColumn, processedSymbol)
-                
+
                 // 计算新的光标位置（考虑换行符）
                 val newLineCount = processedSymbol.count { it == '\n' }
                 if (newLineCount > 0) {

@@ -48,7 +48,9 @@ public class ApkBuilder {
             String ver,
             String code,
             String amph, // 图标路径 (CodeEditScreen 传入的 absolutePath)
-            String[] ps) {
+            String[] ps,
+            boolean isDebug // 🔥 改动1：新增 isDebug 参数
+    ) {
 
         File bf = new File(projectPath, "build");
         if (!bf.exists()) bf.mkdirs();
@@ -58,7 +60,7 @@ public class ApkBuilder {
         File alignedZipFile = new File(bf, "temp_aligned.apk");
         File finalApkFile = new File(bf, aname + "_release.apk");
 
-        LogCatcher.i("ApkBuilder", "========== 开始构建 WebApp ==========");
+        LogCatcher.i("ApkBuilder", "========== 开始构建 WebApp (Debug: " + isDebug + ") ==========");
 
         try {
             // 0. 清理旧文件
@@ -89,7 +91,8 @@ public class ApkBuilder {
 
             // 3. 合并逻辑 (包含图标替换)
             LogCatcher.i("ApkBuilder", ">> 正在合并资源...");
-            mergeApk(templateApk, rawZipFile, projectPath, config);
+            // 🔥 改动2：传入 context 和 isDebug
+            mergeApk(context, templateApk, rawZipFile, projectPath, config, isDebug);
 
             if (rawZipFile.length() < 1000) {
                 return "error: 构建失败，生成的包体过小";
@@ -136,7 +139,8 @@ public class ApkBuilder {
         }
     }
 
-    private static void mergeApk(File templateFile, File outputFile, String projectPath, AppConfig config) throws Exception {
+    // 🔥 改动3：增加 context 和 isDebug 参数
+    private static void mergeApk(Context context, File templateFile, File outputFile, String projectPath, AppConfig config, boolean isDebug) throws Exception {
         ZipFile zipFile = new ZipFile(templateFile);
         ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(outputFile));
         zos.setLevel(5);
@@ -184,10 +188,27 @@ public class ApkBuilder {
                 zos.closeEntry();
             }
 
+            // 🔥 改动4：在注入用户 assets 之前，先注入 eruda.min.js (如果 isDebug 为 true)
+            if (isDebug) {
+                try {
+                    // 从 IDE 自身的 assets 中读取
+                    InputStream erudaIn = context.getAssets().open("eruda.min.js");
+                    ZipEntry erudaEntry = new ZipEntry("assets/eruda.min.js");
+                    zos.putNextEntry(erudaEntry);
+                    copyStream(erudaIn, zos);
+                    erudaIn.close();
+                    zos.closeEntry();
+                    LogCatcher.d("ApkBuilder", "注入成功: assets/eruda.min.js");
+                } catch (Exception e) {
+                    LogCatcher.w("ApkBuilder", "注入 eruda 失败 (可能 IDE assets 中缺少文件): " + e.getMessage());
+                }
+            }
+
             // B. 注入用户 assets
             File userAssetsDir = new File(projectPath, "src/main/assets");
             if (userAssetsDir.exists() && userAssetsDir.isDirectory()) {
-                addProjectFilesRecursively(zos, userAssetsDir, "assets");
+                // 🔥 改动5：传递 isDebug 参数
+                addProjectFilesRecursively(zos, userAssetsDir, "assets", isDebug);
             }
 
             // C. 将 webapp.json 配置文件打包到 assets 目录
@@ -210,9 +231,6 @@ public class ApkBuilder {
         }
     }
 
-    /**
-     * Manifest 处理逻辑：包名修改、版本修改、权限修改
-     */
     /**
      * Manifest 处理逻辑：包名修改、版本修改、权限修改
      */
@@ -264,9 +282,8 @@ public class ApkBuilder {
 
             // 5. 【新增】处理 Provider 授权冲突
             LogCatcher.i("ApkBuilder", "正在处理 Provider 授权冲突...");
+            // 注意：因为我没有 ProviderAuthReplacer 的源码，这里保留你原有的调用，如果报错请根据实际情况调整
             ProviderAuthReplacer.replaceProviderAuthorities(tempManifest, OLD_PACKAGE_NAME, config.appPackage);
-
-            // 可选：快速检查修复
             ProviderAuthReplacer.fixProviderConflicts(tempManifest, config.appPackage);
 
             // 写入 Zip
@@ -284,9 +301,6 @@ public class ApkBuilder {
 
     /**
      * 使用 PermissionEditor 修改权限
-     * @param path Manifest 文件路径
-     * @param permission 权限字符串 (如 android.permission.INTERNET)
-     * @param remove true=删除, false=添加
      */
     public static void setPermission(String path, String permission, boolean remove) {
         try {
@@ -311,29 +325,65 @@ public class ApkBuilder {
         }
     }
 
-    // --- 以下保持原有的辅助方法 ---
+    // --- 🔥 改动6：修改递归方法以支持 HTML 注入，其他文件保持原样 ---
 
-    private static void addProjectFilesRecursively(ZipOutputStream zos, File file, String zipPath) {
+    private static void addProjectFilesRecursively(ZipOutputStream zos, File file, String zipPath, boolean isDebug) {
         if (file.isDirectory()) {
             File[] children = file.listFiles();
             if (children != null) {
                 for (File child : children) {
-                    addProjectFilesRecursively(zos, child, zipPath + "/" + child.getName());
+                    addProjectFilesRecursively(zos, child, zipPath + "/" + child.getName(), isDebug);
                 }
             }
         } else {
             try {
                 ZipEntry newEntry = new ZipEntry(zipPath);
                 zos.putNextEntry(newEntry);
-                try (FileInputStream fis = new FileInputStream(file)) {
-                    copyStream(fis, zos);
+
+                // 🔥 只有在 (Debug模式) 且 (是HTML文件) 时，才拦截修改内容
+                if (isDebug && (file.getName().endsWith(".html") || file.getName().endsWith(".htm"))) {
+                    // 读取原文件 -> 插入代码 -> 写入Zip
+                    injectScriptToHtml(file, zos);
+                } else {
+                    // ⚠️ 这是你原本的逻辑，绝对保留，保证 css/js/img 不会丢失
+                    try (FileInputStream fis = new FileInputStream(file)) {
+                        copyStream(fis, zos);
+                    }
                 }
+
                 zos.closeEntry();
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
     }
+
+    // 🔥 改动7：新增 HTML 注入辅助方法
+    private static void injectScriptToHtml(File htmlFile, ZipOutputStream zos) throws IOException {
+        // 读取文件内容
+        byte[] bytes = new byte[(int) htmlFile.length()];
+        try (FileInputStream fis = new FileInputStream(htmlFile)) {
+            fis.read(bytes);
+        }
+        String html = new String(bytes, StandardCharsets.UTF_8);
+
+        // 注入脚本 (引用 assets/eruda.min.js)
+        String injection = "<script src=\"eruda.min.js\"></script><script>eruda.init();</script>";
+
+        // 查找 </body> 插入，没有则追加
+        if (html.contains("</body>")) {
+            html = html.replace("</body>", injection + "\n</body>");
+        } else if (html.contains("</BODY>")) {
+            html = html.replace("</BODY>", injection + "\n</BODY>");
+        } else {
+            html += injection;
+        }
+
+        // 写入 Zip
+        zos.write(html.getBytes(StandardCharsets.UTF_8));
+    }
+
+    // --- 以下全是原有的辅助方法，未动 ---
 
     private static void copyAsStored(ZipFile zipFile, ZipEntry entry, ZipOutputStream zos) throws IOException {
         ByteArrayOutputStream bos = new ByteArrayOutputStream();

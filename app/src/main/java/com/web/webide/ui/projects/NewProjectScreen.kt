@@ -51,7 +51,18 @@ fun NewProjectScreen(navController: NavController) {
     val scrollState = rememberScrollState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    var packageError by remember { mutableStateOf<String?>(null) }
+    fun validatePackageName(name: String): String? {
+        if (name.isBlank()) return "包名不能为空"
+        if (name.any { it.isDigit() }) return "包名不能包含数字" // 禁止数字
+        if (name.any { it.code > 127 }) return "包名不能包含中文" // 禁止中文
 
+        // 正则严格校验结构
+        val regex = Regex("^[a-zA-Z_]+(\\.[a-zA-Z_]+)+$")
+        if (!name.matches(regex)) return "格式不完整 (例: com.test.app)"
+
+        return null
+    }
     // 获取当前工作空间路径
     val workspacePath = WorkspaceManager.getWorkspacePath(context)
 
@@ -141,8 +152,14 @@ fun NewProjectScreen(navController: NavController) {
                 onValueChange = {
                     projectName = it
                     if (selectedType != ProjectType.NORMAL) {
-                        val cleanName = it.filter { c -> c.isLetterOrDigit() }.lowercase(Locale.ROOT)
-                        if (cleanName.isNotEmpty()) packageName = "com.example.$cleanName"
+                        // 🔥🔥🔥 [修改 2/4] 修改：过滤掉数字，只保留字母
+                        // 原代码是: it.filter { c -> c.isLetterOrDigit() }
+                        val cleanName = it.filter { c -> c.isLetter() }.lowercase(Locale.ROOT)
+
+                        if (cleanName.isNotEmpty()) {
+                            packageName = "com.example.$cleanName"
+                            packageError = null // 自动生成时清除错误
+                        }
                     }
                 },
                 label = { Text("项目名称") },
@@ -155,13 +172,26 @@ fun NewProjectScreen(navController: NavController) {
                     Spacer(modifier = Modifier.height(16.dp))
                     OutlinedTextField(
                         value = packageName,
-                        onValueChange = { packageName = it },
+                        onValueChange = { packageName = it
+
+                            // 🔥🔥🔥 [修改 3/4] 新增：实时校验
+                            packageError = validatePackageName(it)
+                        },
                         label = { Text("包名 (Package Name)") },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+
+                        // 🔥🔥🔥 [修改 3/4] 新增：绑定错误状态和提示文字
+                        isError = packageError != null,
+                        supportingText = {
+                            if (packageError != null) {
+                                Text(packageError!!, color = MaterialTheme.colorScheme.error)
+                            }
+                        }
                     )
                 }
-            }
+                }
+
 
             AnimatedVisibility(visible = selectedType == ProjectType.WEBSITE) {
                 Column {
@@ -178,9 +208,9 @@ fun NewProjectScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // --- 3. 提交按钮 ---
             Button(
                 onClick = {
+                    // 1. 基础非空检查
                     if (projectName.isBlank()) {
                         scope.launch { snackbarHostState.showSnackbar("请输入项目名称") }
                         return@Button
@@ -189,23 +219,33 @@ fun NewProjectScreen(navController: NavController) {
                         scope.launch { snackbarHostState.showSnackbar("项目名称不能包含特殊字符") }
                         return@Button
                     }
-                    if (selectedType != ProjectType.NORMAL && packageName.isBlank()) {
-                        scope.launch { snackbarHostState.showSnackbar("请输入包名") }
-                        return@Button
-                    }
+
+                    // 2. 网址检查
                     if (selectedType == ProjectType.WEBSITE && targetUrl.isBlank()) {
                         scope.launch { snackbarHostState.showSnackbar("请输入目标网址") }
                         return@Button
                     }
 
-                    // 权限检查：只有在非私有目录时才检查权限
-                    // isSystemPermissionRequiredForPath 返回 false 表示是私有目录，不需要检查
+                    // 🔥🔥🔥 [修改 4/4] 必须放在这里！在创建项目之前！🔥🔥🔥
+                    // 包名严格校验（禁止中文、禁止数字、必须完整）
+                    if (selectedType != ProjectType.NORMAL) {
+                        // 注意：这里需要你上面定义的 validatePackageName 函数
+                        val error = validatePackageName(packageName)
+                        if (error != null) {
+                            packageError = error // 让输入框变红
+                            scope.launch { snackbarHostState.showSnackbar("包名错误: $error") }
+                            return@Button // ❌ 拦截成功，不再往下执行
+                        }
+                    }
+
+                    // 3. 权限检查
                     if (PermissionManager.isSystemPermissionRequiredForPath(context, workspacePath) &&
                         !PermissionManager.hasRequiredPermissions(context)) {
                         permissionState.requestPermissions()
                         return@Button
                     }
 
+                    // 4. 一切检查通过，才开始创建
                     isLoading = true
                     createNewProject(
                         context, projectName, packageName, targetUrl, selectedType,
