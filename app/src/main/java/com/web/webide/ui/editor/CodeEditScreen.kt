@@ -77,6 +77,18 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
     val hasWebAppConfig = remember(projectPath) {
         File(projectPath, "webapp.json").exists()
     }
+// 🔥🔥🔥 新增修复：进入项目时清理不属于当前项目的文件 🔥🔥🔥
+    LaunchedEffect(folderName) {
+        // 如果当前有打开的文件，且第一个文件的路径不包含当前项目路径，说明是上一个项目的缓存
+        // 或者你可以简单粗暴地每次进入项目都清空： viewModel.closeAllFiles()
+        if (viewModel.openFiles.isNotEmpty()) {
+            val firstFile = viewModel.openFiles.first().file
+            if (!firstFile.absolutePath.startsWith(projectPath)) {
+                // 清理旧项目的文件状态
+                viewModel.closeAllFiles()
+            }
+        }
+    }
 
     LaunchedEffect(projectPath) {
         viewModel.loadInitialFile(projectPath)
@@ -193,46 +205,54 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
 
 
                                                 val configFile = File(projectPath, "webapp.json")
-                                                var pkg: String? = null
-                                                var verName: String? = null
-                                                var verCode: String? = null
+                                                // 1. 【核心修改】变量初始化时直接给默认值，不要给 null
+                                                var pkg: String = "com.example.webapp"  // 默认包名
+                                                var verName: String = "1.0"
+                                                var verCode: String = "1"
                                                 var iconPath: String = ""
                                                 var permissions: Array<String>? = null
-                                                var statusBarConfig: String? = null // 新增：状态栏配置
+                                                var statusBarConfig: String? = null
 
                                                 if (configFile.exists()) {
                                                     try {
-                                                        val jsonStr =
-                                                            withContext(Dispatchers.IO) { configFile.readText() }
-                                                        val json = JSONObject(jsonStr)
+                                                        var jsonStr = withContext(Dispatchers.IO) { configFile.readText() }
 
-                                                        // 解析包名、版本
-                                                        pkg = json.optString(
-                                                            "package",
-                                                            "com.example.webapp"
-                                                        )
-                                                        verName =
-                                                            json.optString("versionName", "1.0")
-                                                        verCode = json.optString("versionCode", "1")
-
-                                                        // 解析 Icon 路径
-                                                        val iconName = json.optString("icon", "")
-                                                        if (iconName.isNotEmpty()) {
-                                                            val iconFile =
-                                                                File(projectPath, iconName)
-                                                            if (iconFile.exists()) {
-                                                                iconPath = iconFile.absolutePath
+                                                        // 2. 【核心修改】更强的注释清理逻辑
+                                                        // 这一步是为了防止用户写了 // 注释导致解析失败
+                                                        // 简单的正则可能会误伤 http:// 里的 //，所以我们按行处理
+                                                        val cleanLines = jsonStr.lines().map { line ->
+                                                            val index = line.indexOf("//")
+                                                            if (index != -1) {
+                                                                // 检查 // 前面是不是 http: 或 https:，如果是 URL 就不删
+                                                                // 这只是个简单的判断，防止误删网址
+                                                                if (index > 0 && (line[index - 1] == ':' || line.substring(0, index).contains("http"))) {
+                                                                    line
+                                                                } else {
+                                                                    line.substring(0, index)
+                                                                }
                                                             } else {
-                                                                LogCatcher.w(
-                                                                    "Build",
-                                                                    "未找到图标文件: ${iconFile.absolutePath}"
-                                                                )
+                                                                line
                                                             }
                                                         }
+                                                        // 重新组合成字符串
+                                                        jsonStr = cleanLines.joinToString("\n")
 
-                                                        // 解析权限列表
-                                                        val jsonPerms =
-                                                            json.optJSONArray("permissions")
+                                                        // 3. 开始解析
+                                                        val json = JSONObject(jsonStr)
+
+                                                        // 使用 optString 读取，这样即使 key 不存在也不会报错
+                                                        pkg = json.optString("package", "com.example.webapp")
+                                                        verName = json.optString("versionName", "1.0")
+                                                        verCode = json.optString("versionCode", "1")
+
+                                                        // ... 解析 icon, permissions 等 ...
+                                                        val iconName = json.optString("icon", "")
+                                                        if (iconName.isNotEmpty()) {
+                                                            val iconFile = File(projectPath, iconName)
+                                                            if (iconFile.exists()) iconPath = iconFile.absolutePath
+                                                        }
+
+                                                        val jsonPerms = json.optJSONArray("permissions")
                                                         if (jsonPerms != null && jsonPerms.length() > 0) {
                                                             val list = ArrayList<String>()
                                                             for (i in 0 until jsonPerms.length()) {
@@ -241,30 +261,27 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                                             permissions = list.toTypedArray()
                                                         }
 
-                                                        // 新增：解析状态栏配置
-                                                        val statusBarJson =
-                                                            json.optJSONObject("statusBar")
+                                                        val statusBarJson = json.optJSONObject("statusBar")
                                                         if (statusBarJson != null) {
-                                                            statusBarConfig =
-                                                                statusBarJson.toString()
-                                                            LogCatcher.d(
-                                                                "Build",
-                                                                "状态栏配置: $statusBarConfig"
-                                                            )
+                                                            statusBarConfig = statusBarJson.toString()
                                                         }
 
                                                     } catch (e: Exception) {
-                                                        LogCatcher.e(
-                                                            "Build",
-                                                            "解析 webapp.json 失败",
-                                                            e
-                                                        )
+                                                        // 4. 【关键】如果解析失败，只打印日志，不崩溃
+                                                        // 因为我们在第1步已经给了默认值，所以 pkg 不会是 null
+                                                        LogCatcher.e("Build", "webapp.json 格式错误，将使用默认配置构建", e)
+
+                                                        // 强烈建议：弹个窗告诉用户 JSON 写错了
+                                                        scope.launch {
+                                                            snackbarHostState.showSnackbar("配置文件格式错误，请检查是否漏了 // 或标点")
+                                                        }
                                                     }
                                                 }
 
 
                                                 val result = withContext(Dispatchers.IO) {
                                                     // 2. 将解析出来的数据显式传递给 ApkBuilder
+
                                                     com.web.webide.build.ApkBuilder.bin(
                                                         context,           // Context context
                                                         workspacePath,     // String mRootDir
@@ -645,7 +662,7 @@ fun AnimatedDrawerToggle(
 ) {
     val progress by animateFloatAsState(
         targetValue = if (isOpen) 1f else 0f,
-        animationSpec = tween(durationMillis = 400),
+        animationSpec = tween(durationMillis = 200),
         label = "DrawerToggleProgress"
     )
 

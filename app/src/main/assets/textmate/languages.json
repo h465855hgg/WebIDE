@@ -4,13 +4,22 @@
       "grammar": "textmate/html/syntaxes/html.tmLanguage.json",
       "name": "html",
       "scopeName": "text.html.basic",
-      "languageConfiguration": "textmate/html/language-configuration.json"
+      "languageConfiguration": "textmate/html/language-configuration.json",
+      "embeddedLanguages": {
+        "source.js": "javascript"
+      }
     },
     {
       "grammar": "textmate/javascript/syntaxes/JavaScript.tmLanguage.json",
       "name": "javascript",
       "scopeName": "source.js",
       "languageConfiguration": "textmate/javascript/language-configuration.json"
+    },
+    {
+      "grammar": "textmate/json/syntaxes/JSON.tmLanguage.json",
+      "name": "json",
+      "scopeName": "source.json",
+      "languageConfiguration": "textmate/json/language-configuration.json"
     },
     {
      "grammar": "textmate/css/syntaxes/css.tmLanguage.json",

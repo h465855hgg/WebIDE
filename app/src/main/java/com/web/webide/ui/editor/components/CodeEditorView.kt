@@ -37,13 +37,13 @@ fun CodeEditorView(
 ) {
     val context = LocalContext.current
     var isEditorReady by remember { mutableStateOf(false) }
-    
+
     // ✅ 获取主题 ViewModel
     val themeViewModel: ThemeViewModel = viewModel(
         factory = ThemeViewModelFactory(context)
     )
     val themeState by themeViewModel.themeState.collectAsState()
-    
+
     // ✅ 确定最终的暗色模式状态
     val systemDark = isSystemInDarkTheme()
     val isDark = when (themeState.selectedModeIndex) {
@@ -52,14 +52,14 @@ fun CodeEditorView(
         2 -> true        // 强制深色
         else -> systemDark
     }
-    
+
     // ✅ 确定主题色
     val seedColor = if (themeState.isCustomTheme) {
         themeState.customColor
     } else {
         MaterialTheme.colorScheme.primary
     }
-    
+
     // ✅ 当主题色或明暗模式变化时，更新编辑器配色
     LaunchedEffect(seedColor, isDark, isEditorReady) {
         if (isEditorReady) {
@@ -141,7 +141,7 @@ object TextMateInitializer {
     private var isInitialized = false
     private var isInitializing = false
     private val callbacks = mutableListOf<() -> Unit>()
-    
+
     @Synchronized
     fun initialize(context: Context, onComplete: (() -> Unit)? = null) {
         if (isInitialized) {
@@ -154,17 +154,17 @@ object TextMateInitializer {
         }
         isInitializing = true
         onComplete?.let { callbacks.add(it) }
-        
+
         kotlinx.coroutines.GlobalScope.launch {
             try {
                 val appContext = context.applicationContext
                 val assetsFileResolver = AssetsFileResolver(appContext.assets)
                 FileProviderRegistry.getInstance().addFileProvider(assetsFileResolver)
-                
+
                 val themeRegistry = ThemeRegistry.getInstance()
                 val themeName = "quietlight"
                 val themePath = "textmate/$themeName.json"
-                
+
                 FileProviderRegistry.getInstance().tryGetInputStream(themePath)?.use { inputStream ->
                     themeRegistry.loadTheme(
                         ThemeModel(
@@ -174,9 +174,9 @@ object TextMateInitializer {
                     )
                     themeRegistry.setTheme(themeName)
                 }
-                
+
                 GrammarRegistry.getInstance().loadGrammars("textmate/languages.json")
-                
+
                 synchronized(this) {
                     isInitialized = true
                     isInitializing = false
@@ -192,9 +192,9 @@ object TextMateInitializer {
             }
         }
     }
-    
+
     fun isReady() = isInitialized
-    
+
     fun preloadCommonLanguages(context: Context) {
         if (!isInitialized && !isInitializing) {
             initialize(context)

@@ -58,7 +58,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.UUID;
 
 public class WebAppInterface {
     private Context context;
@@ -82,23 +81,19 @@ public class WebAppInterface {
         this.sensorManager = (SensorManager) context.getSystemService(Context.SENSOR_SERVICE);
     }
 
-    // ========================== 基础功能 ==========================
-
     // ========================== 网络请求 (绕过 CORS) ==========================
 
     @JavascriptInterface
     public void httpRequest(final String method, final String urlStr, final String headersJson, final String body, final String callbackId) {
-        // 在子线程执行网络请求，避免阻塞主线程
         new Thread(() -> {
             HttpURLConnection conn = null;
             try {
                 URL url = new URL(urlStr);
                 conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod(method.toUpperCase());
-                conn.setConnectTimeout(15000); // 连接超时 15s
-                conn.setReadTimeout(15000);    // 读取超时 15s
+                conn.setConnectTimeout(15000);
+                conn.setReadTimeout(15000);
 
-                // 1. 设置请求头 (Headers)
                 if (headersJson != null && !headersJson.isEmpty()) {
                     try {
                         JSONObject headers = new JSONObject(headersJson);
@@ -112,7 +107,6 @@ public class WebAppInterface {
                     }
                 }
 
-                // 2. 发送请求体 (Body) - 仅限 POST/PUT
                 if (body != null && !body.isEmpty() && ("POST".equalsIgnoreCase(method) || "PUT".equalsIgnoreCase(method))) {
                     conn.setDoOutput(true);
                     try (java.io.OutputStream os = conn.getOutputStream()) {
@@ -121,10 +115,7 @@ public class WebAppInterface {
                     }
                 }
 
-                // 3. 获取响应状态码
                 int code = conn.getResponseCode();
-
-                // 4. 读取响应内容 (成功读 InputStream，失败读 ErrorStream)
                 InputStream stream = (code < 400) ? conn.getInputStream() : conn.getErrorStream();
                 StringBuilder responseText = new StringBuilder();
                 if (stream != null) {
@@ -136,17 +127,14 @@ public class WebAppInterface {
                     }
                 }
 
-                // 5. 构造返回数据
                 JSONObject resultJson = new JSONObject();
                 resultJson.put("status", code);
                 resultJson.put("body", responseText.toString());
 
-                // 获取响应头
                 JSONObject responseHeaders = new JSONObject();
                 Map<String, List<String>> headerFields = conn.getHeaderFields();
                 for (Map.Entry<String, List<String>> entry : headerFields.entrySet()) {
                     if (entry.getKey() != null) {
-                        // 将 List<String> 转为逗号分隔的 String
                         StringBuilder sb = new StringBuilder();
                         for (String val : entry.getValue()) {
                             if (sb.length() > 0) sb.append(",");
@@ -157,12 +145,10 @@ public class WebAppInterface {
                 }
                 resultJson.put("headers", responseHeaders);
 
-                // 成功回调：将 JSON 字符串传回 JS
                 sendResultToJs(callbackId, true, resultJson.toString());
 
             } catch (Exception e) {
                 e.printStackTrace();
-                // 失败回调
                 try {
                     JSONObject errorJson = new JSONObject();
                     errorJson.put("status", 0);
@@ -172,12 +158,11 @@ public class WebAppInterface {
                     jsonException.printStackTrace();
                 }
             } finally {
-                if (conn != null) {
-                    conn.disconnect();
-                }
+                if (conn != null) conn.disconnect();
             }
         }).start();
     }
+
     @JavascriptInterface
     public void showToast(final String message) {
         mainHandler.post(() -> Toast.makeText(context, message, Toast.LENGTH_SHORT).show());
@@ -201,52 +186,27 @@ public class WebAppInterface {
         try {
             info.put("model", Build.MODEL);
             info.put("manufacturer", Build.MANUFACTURER);
-            info.put("brand", Build.BRAND);
-            info.put("device", Build.DEVICE);
-            info.put("product", Build.PRODUCT);
             info.put("androidVersion", Build.VERSION.RELEASE);
             info.put("sdkInt", Build.VERSION.SDK_INT);
             info.put("screenWidth", context.getResources().getDisplayMetrics().widthPixels);
             info.put("screenHeight", context.getResources().getDisplayMetrics().heightPixels);
-            info.put("density", context.getResources().getDisplayMetrics().density);
-            info.put("locale", Locale.getDefault().toString());
-            info.put("timezone", java.util.TimeZone.getDefault().getID());
 
-            // 获取更多设备信息
             if (ActivityCompat.checkSelfPermission(context, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED) {
                 TelephonyManager tm = (TelephonyManager) context.getSystemService(Context.TELEPHONY_SERVICE);
-                info.put("phoneNumber", tm.getLine1Number() != null ? tm.getLine1Number() : "");
-                info.put("simOperator", tm.getSimOperatorName());
-                info.put("networkOperator", tm.getNetworkOperatorName());
+                if (tm != null) {
+                    info.put("simOperator", tm.getSimOperatorName());
+                    info.put("networkOperator", tm.getNetworkOperatorName());
+                }
             }
 
-            // 获取 WIFI 信息
             WifiManager wifiManager = (WifiManager) context.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
             if (wifiManager != null && wifiManager.isWifiEnabled()) {
                 WifiInfo wifiInfo = wifiManager.getConnectionInfo();
                 info.put("wifiSSID", wifiInfo.getSSID().replace("\"", ""));
-                info.put("wifiBSSID", wifiInfo.getBSSID());
                 info.put("wifiRSSI", wifiInfo.getRssi());
             }
 
-            // 获取 MAC 地址
             info.put("macAddress", getMacAddress());
-
-            // 获取存储信息
-            File internalStorage = Environment.getDataDirectory();
-            long internalFree = internalStorage.getFreeSpace();
-            long internalTotal = internalStorage.getTotalSpace();
-            info.put("internalStorageFree", internalFree);
-            info.put("internalStorageTotal", internalTotal);
-
-            // 外部存储
-            if (Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)) {
-                File externalStorage = Environment.getExternalStorageDirectory();
-                long externalFree = externalStorage.getFreeSpace();
-                long externalTotal = externalStorage.getTotalSpace();
-                info.put("externalStorageFree", externalFree);
-                info.put("externalStorageTotal", externalTotal);
-            }
 
         } catch (JSONException e) {
             e.printStackTrace();
@@ -265,9 +225,7 @@ public class WebAppInterface {
                 for (byte b : macBytes) {
                     res1.append(String.format("%02X:", b));
                 }
-                if (res1.length() > 0) {
-                    res1.deleteCharAt(res1.length() - 1);
-                }
+                if (res1.length() > 0) res1.deleteCharAt(res1.length() - 1);
                 return res1.toString();
             }
         } catch (Exception e) {
@@ -276,7 +234,7 @@ public class WebAppInterface {
         return "";
     }
 
-    // ========================== 剪贴板功能 ==========================
+    // ========================== 剪贴板 ==========================
 
     @JavascriptInterface
     public void copyToClipboard(final String text) {
@@ -298,9 +256,7 @@ public class WebAppInterface {
                     ClipData clipData = clipboard.getPrimaryClip();
                     if (clipData != null && clipData.getItemCount() > 0) {
                         CharSequence content = clipData.getItemAt(0).getText();
-                        if (content != null) {
-                            text = content.toString();
-                        }
+                        if (content != null) text = content.toString();
                     }
                 }
                 sendResultToJs(callbackId, true, text);
@@ -352,7 +308,6 @@ public class WebAppInterface {
     public String readFile(final String path) {
         try {
             if (path.startsWith("assets/")) {
-                // 读取 assets 文件
                 String assetPath = path.substring(7);
                 InputStream is = context.getAssets().open(assetPath);
                 BufferedReader reader = new BufferedReader(new InputStreamReader(is));
@@ -364,14 +319,13 @@ public class WebAppInterface {
                 reader.close();
                 return sb.toString();
             } else {
-                // 读取外部文件
                 File file = new File(path);
                 if (file.exists() && file.canRead()) {
                     FileInputStream fis = new FileInputStream(file);
                     byte[] data = new byte[(int) file.length()];
                     fis.read(data);
                     fis.close();
-                    return new String(data, "UTF-8");
+                    return new String(data, StandardCharsets.UTF_8);
                 }
             }
         } catch (IOException e) {
@@ -384,15 +338,10 @@ public class WebAppInterface {
     public boolean writeFile(final String path, final String content) {
         try {
             File file = new File(path);
-
-            // 确保父目录存在
             File parent = file.getParentFile();
-            if (parent != null && !parent.exists()) {
-                parent.mkdirs();
-            }
-
+            if (parent != null && !parent.exists()) parent.mkdirs();
             FileOutputStream fos = new FileOutputStream(file);
-            fos.write(content.getBytes("UTF-8"));
+            fos.write(content.getBytes(StandardCharsets.UTF_8));
             fos.close();
             return true;
         } catch (IOException e) {
@@ -408,28 +357,26 @@ public class WebAppInterface {
 
     @JavascriptInterface
     public boolean deleteFile(final String path) {
-        File file = new File(path);
-        return file.delete();
+        return new File(path).delete();
     }
 
     @JavascriptInterface
     public String listFiles(final String directory) {
         try {
             File dir = new File(directory);
-            if (!dir.exists() || !dir.isDirectory()) {
-                return "[]";
-            }
-
+            if (!dir.exists() || !dir.isDirectory()) return "[]";
             File[] files = dir.listFiles();
             JSONArray result = new JSONArray();
-            for (File file : files) {
-                JSONObject fileInfo = new JSONObject();
-                fileInfo.put("name", file.getName());
-                fileInfo.put("path", file.getAbsolutePath());
-                fileInfo.put("isDirectory", file.isDirectory());
-                fileInfo.put("size", file.length());
-                fileInfo.put("lastModified", file.lastModified());
-                result.put(fileInfo);
+            if (files != null) {
+                for (File file : files) {
+                    JSONObject fileInfo = new JSONObject();
+                    fileInfo.put("name", file.getName());
+                    fileInfo.put("path", file.getAbsolutePath());
+                    fileInfo.put("isDirectory", file.isDirectory());
+                    fileInfo.put("size", file.length());
+                    fileInfo.put("lastModified", file.lastModified());
+                    result.put(fileInfo);
+                }
             }
             return result.toString();
         } catch (JSONException e) {
@@ -538,7 +485,7 @@ public class WebAppInterface {
         mainHandler.post(() -> {
             Window window = activity.getWindow();
             WindowManager.LayoutParams layoutParams = window.getAttributes();
-            layoutParams.screenBrightness = brightness; // 0.0 - 1.0
+            layoutParams.screenBrightness = brightness;
             window.setAttributes(layoutParams);
         });
     }
@@ -552,11 +499,10 @@ public class WebAppInterface {
 
     @JavascriptInterface
     public void setVolume(final int volume) {
-        // 需要权限：android.permission.MODIFY_AUDIO_SETTINGS
         try {
             Class<?> audioSystemClass = Class.forName("android.media.AudioSystem");
             Method setStreamVolume = audioSystemClass.getMethod("setStreamVolume", int.class, int.class, int.class);
-            setStreamVolume.invoke(null, 3, volume, 0); // 3 = STREAM_MUSIC
+            setStreamVolume.invoke(null, 3, volume, 0);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -569,21 +515,11 @@ public class WebAppInterface {
         mainHandler.post(() -> {
             int sensorConstant;
             switch (sensorType.toLowerCase()) {
-                case "accelerometer":
-                    sensorConstant = Sensor.TYPE_ACCELEROMETER;
-                    break;
-                case "gyroscope":
-                    sensorConstant = Sensor.TYPE_GYROSCOPE;
-                    break;
-                case "magnetometer":
-                    sensorConstant = Sensor.TYPE_MAGNETIC_FIELD;
-                    break;
-                case "light":
-                    sensorConstant = Sensor.TYPE_LIGHT;
-                    break;
-                case "proximity":
-                    sensorConstant = Sensor.TYPE_PROXIMITY;
-                    break;
+                case "accelerometer": sensorConstant = Sensor.TYPE_ACCELEROMETER; break;
+                case "gyroscope": sensorConstant = Sensor.TYPE_GYROSCOPE; break;
+                case "magnetometer": sensorConstant = Sensor.TYPE_MAGNETIC_FIELD; break;
+                case "light": sensorConstant = Sensor.TYPE_LIGHT; break;
+                case "proximity": sensorConstant = Sensor.TYPE_PROXIMITY; break;
                 default:
                     sendResultToJs(callbackId, false, "Unsupported sensor type");
                     return;
@@ -612,12 +548,9 @@ public class WebAppInterface {
                     }
                     sendResultToJs(callbackId + "_data", true, values.toString());
                 }
-
                 @Override
-                public void onAccuracyChanged(Sensor sensor, int accuracy) {
-                }
+                public void onAccuracyChanged(Sensor sensor, int accuracy) {}
             };
-
             sensorManager.registerListener(sensorListener, sensor, SensorManager.SENSOR_DELAY_NORMAL);
             sendResultToJs(callbackId, true, "Sensor started");
         });
@@ -638,13 +571,10 @@ public class WebAppInterface {
     @JavascriptInterface
     public void requestPermission(final String permission, final String callbackId) {
         mainHandler.post(() -> {
-            // 检查是否已有权限
             if (ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED) {
                 sendResultToJs(callbackId, true, "Permission already granted");
                 return;
             }
-
-            // 保存回调
             if (!permissionCallbacks.containsKey(permission)) {
                 permissionCallbacks.put(permission, new ArrayList<>());
             }
@@ -652,8 +582,6 @@ public class WebAppInterface {
                 boolean granted = ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED;
                 sendResultToJs(callbackId, granted, granted ? "Permission granted" : "Permission denied");
             });
-
-            // 请求权限
             ActivityCompat.requestPermissions(activity, new String[]{permission}, PERMISSION_REQUEST_CODE);
         });
     }
@@ -678,14 +606,11 @@ public class WebAppInterface {
     @JavascriptInterface
     public String getAppConfig() {
         try {
-            // 从 assets 读取 webapp.json
             InputStream is = context.getAssets().open("webapp.json");
             BufferedReader reader = new BufferedReader(new InputStreamReader(is));
             StringBuilder sb = new StringBuilder();
             String line;
-            while ((line = reader.readLine()) != null) {
-                sb.append(line);
-            }
+            while ((line = reader.readLine()) != null) sb.append(line);
             reader.close();
             return sb.toString();
         } catch (IOException e) {
@@ -696,9 +621,7 @@ public class WebAppInterface {
 
     @JavascriptInterface
     public void reloadApp() {
-        mainHandler.post(() -> {
-            activity.recreate();
-        });
+        mainHandler.post(() -> activity.recreate());
     }
 
     @JavascriptInterface
@@ -732,7 +655,7 @@ public class WebAppInterface {
                 result.put("data", data);
 
                 String jsonResult = result.toString();
-                String base64Result = Base64.encodeToString(jsonResult.getBytes("UTF-8"), Base64.NO_WRAP);
+                String base64Result = Base64.encodeToString(jsonResult.getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP);
 
                 String jsCode = String.format("if(window.onAndroidResponse) window.onAndroidResponse('%s', '%s')",
                         callbackId, base64Result);
@@ -743,7 +666,6 @@ public class WebAppInterface {
         });
     }
 
-    // 权限请求结果处理（需要在 Activity 中调用）
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         if (requestCode == PERMISSION_REQUEST_CODE) {
             for (int i = 0; i < permissions.length; i++) {
@@ -760,7 +682,6 @@ public class WebAppInterface {
 
     @Override
     protected void finalize() throws Throwable {
-        // 清理传感器监听器
         if (sensorListener != null) {
             sensorManager.unregisterListener(sensorListener);
         }

@@ -30,10 +30,6 @@
 -keep interface kotlin.Cloneable { *; }
 -keep class kotlin.Cloneable$DefaultImpls { *; }
 
-# 3. Rosemoe Editor / TextMate / tm4e --------------------------------------
--keep class io.github.rosemoe.sora.** { *; }
--keep class org.eclipse.tm4e.core.** { *; }
--keep class org.eclipse.tm4e.languageconfiguration.** { *; }
 
 # 4. Gson 反射需要 ---------------------------------------------------------
 -keepattributes Signature,InnerClasses,EnclosingMethod
@@ -42,10 +38,6 @@
     <init>();
     <fields>;
 }
-
-# 5. Ensure tm4e grammar/theme implementations are kept
--keep class * implements org.eclipse.tm4e.core.grammar.IGrammar { *; }
--keepclassmembers class * implements org.eclipse.tm4e.core.theme.IThemeSource { *; }
 
 # -------------------------------------------------------------------------
 # R8 error seen during release build:
@@ -63,20 +55,13 @@
 #    The -dontwarn lines below silence the missing-class error for the package(s) in question.
 #    If you prefer stricter shrinking, add only the -dontwarn for the specific class referenced.
 #
--dontwarn io.github.rosemoe.oniguruma.**
--dontwarn org.eclipse.tm4e.core.internal.oniguruma.impl.onig.**
 
-# Optionally keep the NativeOnigConfig if runtime reflection/availability checks must remain:
--keep class org.eclipse.tm4e.core.internal.oniguruma.impl.onig.NativeOnigConfig { *; }
 
 # If R8 still generates missing_rules.txt in
 # app/build/outputs/mapping/release/missing_rules.txt
 # inspect that file and copy the suggested keep rules into this file.
 #
 # -------------------------------------------------------------------------
-# Additional miscellaneous keeps you had at the bottom of the original file:
--keep class * implements org.eclipse.tm4e.core.grammar.IGrammar { *; }
--keepclassmembers class * implements org.eclipse.tm4e.core.theme.IThemeSource { *; }
 
 
 # =========================================================================

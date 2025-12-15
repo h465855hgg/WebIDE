@@ -28,9 +28,11 @@ import androidx.core.content.ContextCompat;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -42,9 +44,6 @@ public class MainActivity extends Activity {
 
     // 权限请求码
     private static final int PERMISSION_REQUEST_CODE = 100;
-
-    // 文件选择器请求码
-    private static final int FILE_CHOOSER_REQUEST_CODE = 1;
 
     // WebApp 接口实例
     private WebAppInterface webAppInterface;
@@ -165,58 +164,37 @@ public class MainActivity extends Activity {
             permissionsToRequest.add(Manifest.permission.RECORD_AUDIO);
         }
 
-        // 存储权限（Android 11+ 需要不同处理）
+        // 存储权限（Android 11+ 需要不同处理，这里保留基础逻辑）
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
                 permissionsToRequest.add(Manifest.permission.READ_EXTERNAL_STORAGE);
             }
-
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
                 permissionsToRequest.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
             }
         }
 
-        // 位置权限（如果需要）
+        // 位置权限
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION);
         }
 
-        // 电话权限（如果需要）
+        // 电话权限
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
             permissionsToRequest.add(Manifest.permission.READ_PHONE_STATE);
         }
 
-        // 如果有权限需要请求
         if (!permissionsToRequest.isEmpty()) {
             ActivityCompat.requestPermissions(this, permissionsToRequest.toArray(new String[0]), PERMISSION_REQUEST_CODE);
         }
     }
 
-    /**
-     * 处理权限请求结果
-     */
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-
         if (requestCode == PERMISSION_REQUEST_CODE) {
-            // 将权限结果传递给 WebAppInterface
             if (webAppInterface != null) {
                 webAppInterface.onRequestPermissionsResult(requestCode, permissions, grantResults);
-            }
-
-            // 检查是否所有权限都被授予
-            boolean allGranted = true;
-            for (int grantResult : grantResults) {
-                if (grantResult != PackageManager.PERMISSION_GRANTED) {
-                    allGranted = false;
-                    break;
-                }
-            }
-
-            if (!allGranted) {
-                // 有些权限被拒绝，可以在这里提示用户
-                // 例如：显示一个对话框解释为什么需要这些权限
             }
         }
     }
@@ -290,7 +268,7 @@ public class MainActivity extends Activity {
                             window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
                             window.setStatusBarColor(color);
                         } catch (Exception e) {
-                            // 颜色解析失败，使用默认
+                            // 颜色解析失败
                         }
                     }
 
@@ -300,10 +278,8 @@ public class MainActivity extends Activity {
                         View decorView = window.getDecorView();
                         int systemUiVisibility = decorView.getSystemUiVisibility();
                         if ("light".equals(style)) {
-                            // 浅色文字（深色背景）
                             systemUiVisibility |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
                         } else {
-                            // 深色文字（浅色背景）
                             systemUiVisibility &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
                         }
                         decorView.setSystemUiVisibility(systemUiVisibility);
@@ -351,7 +327,7 @@ public class MainActivity extends Activity {
         webChromeClient.setActivity(this);
         webView.setWebChromeClient(webChromeClient);
 
-        // 开启调试（仅调试模式）
+        // 开启调试
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             WebView.setWebContentsDebuggingEnabled(true);
         }
@@ -364,23 +340,19 @@ public class MainActivity extends Activity {
         try {
             JSONObject webviewConfig = appConfig.optJSONObject("webview");
             if (webviewConfig != null) {
-                // 缩放
                 boolean zoomEnabled = webviewConfig.optBoolean("zoomEnabled", false);
                 settings.setSupportZoom(zoomEnabled);
                 settings.setBuiltInZoomControls(zoomEnabled);
                 settings.setDisplayZoomControls(false);
 
-                // 文本缩放
                 int textZoom = webviewConfig.optInt("textZoom", 100);
                 settings.setTextZoom(textZoom);
 
-                // 用户代理
                 String userAgent = webviewConfig.optString("userAgent", "");
                 if (!userAgent.isEmpty()) {
                     settings.setUserAgentString(userAgent);
                 }
 
-                // 其他布尔设置
                 settings.setJavaScriptEnabled(webviewConfig.optBoolean("javascriptEnabled", true));
                 settings.setDomStorageEnabled(webviewConfig.optBoolean("domStorageEnabled", true));
                 settings.setAllowFileAccess(webviewConfig.optBoolean("allowFileAccess", true));
@@ -395,12 +367,10 @@ public class MainActivity extends Activity {
      */
     private void loadWebContent() {
         try {
-            // 获取入口 URL
             String targetUrl = getTargetUrl();
             webView.loadUrl(targetUrl);
         } catch (Exception e) {
             e.printStackTrace();
-            // 加载本地默认页面
             webView.loadUrl("http://localhost/index.html");
         }
     }
@@ -410,58 +380,62 @@ public class MainActivity extends Activity {
      */
     private String getTargetUrl() {
         try {
-            // 优先级：targetUrl > url > entry > 默认 index.html
             String targetUrl = appConfig.optString("targetUrl", "");
-            if (targetUrl.isEmpty()) {
-                targetUrl = appConfig.optString("url", "");
-            }
-            if (targetUrl.isEmpty()) {
-                targetUrl = appConfig.optString("entry", "");
-            }
+            if (targetUrl.isEmpty()) targetUrl = appConfig.optString("url", "");
+            if (targetUrl.isEmpty()) targetUrl = appConfig.optString("entry", "");
 
             if (!targetUrl.isEmpty()) {
-                // 如果是 http/https 链接，直接使用
                 if (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) {
                     return targetUrl;
                 }
-                // 本地文件路径
+                // 处理 ./ 或 / 开头的情况
+                if (targetUrl.startsWith("./")) targetUrl = targetUrl.substring(2);
+                if (targetUrl.startsWith("/")) targetUrl = targetUrl.substring(1);
+
                 return "http://localhost/" + targetUrl;
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
-
-        // 默认入口
         return "http://localhost/index.html";
     }
 
     /**
-     * 本地内容 WebViewClient
+     * 本地内容 WebViewClient (修复版)
      */
     private class LocalContentWebViewClient extends WebViewClient {
         @Override
         public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
             Uri url = request.getUrl();
+            // 拦截 http://localhost 请求
             if (url != null && "localhost".equalsIgnoreCase(url.getHost())) {
-                try {
-                    String path = url.getPath();
-                    if (path == null || path.equals("/") || path.equals("")) {
-                        path = "index.html";
-                    }
-                    if (path.startsWith("/")) {
-                        path = path.substring(1);
-                    }
+                String path = url.getPath();
+                if (path == null || path.equals("/") || path.equals("")) {
+                    path = "index.html";
+                }
+                if (path.startsWith("/")) {
+                    path = path.substring(1);
+                }
 
+                try {
                     // 尝试从 assets 读取文件
                     InputStream stream = getAssets().open(path);
-
-                    // 根据文件扩展名设置 MIME 类型
                     String mimeType = getMimeType(path);
-
                     return new WebResourceResponse(mimeType, "UTF-8", stream);
+
                 } catch (IOException e) {
-                    // 文件不存在，返回 404
-                    return null;
+                    // 🔥🔥🔥 核心修复 🔥🔥🔥
+                    // 文件不存在时，返回 404 HTML，而不是 null。
+                    // 返回 null 会导致 WebView 尝试连接真实网络端口 (ERR_CONNECTION_REFUSED)
+                    String errorHtml = "<html><head><meta charset='utf-8'></head><body>" +
+                            "<h1>404 Not Found</h1>" +
+                            "<p>Cannot find file in assets: <b>" + path + "</b></p>" +
+                            "<p>请检查 webapp.json 配置或文件名大小写。</p>" +
+                            "</body></html>";
+                    InputStream errorStream = new ByteArrayInputStream(errorHtml.getBytes(StandardCharsets.UTF_8));
+
+                    // 返回一个 404 状态的 WebResourceResponse
+                    return new WebResourceResponse("text/html", "UTF-8", 404, "Not Found", null, errorStream);
                 }
             }
             return super.shouldInterceptRequest(view, request);
@@ -469,7 +443,6 @@ public class MainActivity extends Activity {
 
         @Override
         public boolean shouldOverrideUrlLoading(WebView view, String url) {
-            // 处理特殊协议
             if (url.startsWith("tel:") || url.startsWith("mailto:") ||
                     url.startsWith("sms:") || url.startsWith("geo:")) {
                 try {
@@ -480,15 +453,12 @@ public class MainActivity extends Activity {
                     return false;
                 }
             }
-
-            // 允许 WebView 加载其他 URL
             return false;
         }
 
         @Override
         public void onPageFinished(WebView view, String url) {
             super.onPageFinished(view, url);
-            // 页面加载完成后，可以注入一些初始化脚本
         }
     }
 
@@ -496,31 +466,29 @@ public class MainActivity extends Activity {
      * 获取 MIME 类型
      */
     private String getMimeType(String path) {
-        if (path.endsWith(".html") || path.endsWith(".htm")) return "text/html";
-        if (path.endsWith(".css")) return "text/css";
-        if (path.endsWith(".js")) return "application/javascript";
-        if (path.endsWith(".json")) return "application/json";
-        if (path.endsWith(".png")) return "image/png";
-        if (path.endsWith(".jpg") || path.endsWith(".jpeg")) return "image/jpeg";
-        if (path.endsWith(".gif")) return "image/gif";
-        if (path.endsWith(".svg")) return "image/svg+xml";
-        if (path.endsWith(".webp")) return "image/webp";
-        if (path.endsWith(".mp3")) return "audio/mpeg";
-        if (path.endsWith(".mp4")) return "video/mp4";
-        if (path.endsWith(".woff")) return "font/woff";
-        if (path.endsWith(".woff2")) return "font/woff2";
-        if (path.endsWith(".ttf")) return "font/ttf";
-        if (path.endsWith(".xml")) return "text/xml";
-        return "text/plain";
+        String lowerPath = path.toLowerCase();
+        if (lowerPath.endsWith(".html") || lowerPath.endsWith(".htm")) return "text/html";
+        if (lowerPath.endsWith(".css")) return "text/css";
+        if (lowerPath.endsWith(".js")) return "application/javascript";
+        if (lowerPath.endsWith(".json")) return "application/json";
+        if (lowerPath.endsWith(".png")) return "image/png";
+        if (lowerPath.endsWith(".jpg") || lowerPath.endsWith(".jpeg")) return "image/jpeg";
+        if (lowerPath.endsWith(".gif")) return "image/gif";
+        if (lowerPath.endsWith(".svg")) return "image/svg+xml";
+        if (lowerPath.endsWith(".webp")) return "image/webp";
+        if (lowerPath.endsWith(".mp3")) return "audio/mpeg";
+        if (lowerPath.endsWith(".mp4")) return "video/mp4";
+        if (lowerPath.endsWith(".woff")) return "font/woff";
+        if (lowerPath.endsWith(".woff2")) return "font/woff2";
+        if (lowerPath.endsWith(".ttf")) return "font/ttf";
+        if (lowerPath.endsWith(".xml")) return "text/xml";
+        return "text/plain"; // 默认 fallback
     }
 
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
-        // 配置变化时重新应用状态栏设置
-        new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            applyStatusBarConfig();
-        }, 100);
+        new Handler(Looper.getMainLooper()).postDelayed(this::applyStatusBarConfig, 100);
     }
 
     @Override
@@ -537,9 +505,7 @@ public class MainActivity extends Activity {
         if (webView != null) {
             webView.destroy();
         }
-
         if (webAppInterface != null) {
-            // 清理 WebAppInterface 资源
             try {
                 webAppInterface.finalize();
             } catch (Throwable e) {
@@ -547,6 +513,4 @@ public class MainActivity extends Activity {
             }
         }
     }
-
-
 }

@@ -268,7 +268,7 @@ public class ApkBuilder {
             }
 
             // 3. 移除 testOnly 标志
-            removeTestOnly(tempManifest);
+            //removeTestOnly(tempManifest);
 
             // 4. AXML 字符串池修正 (解决包名变更导致的 Provider/Class 问题)
             if (!config.appPackage.equals(OLD_PACKAGE_NAME)) {
@@ -276,6 +276,10 @@ public class ApkBuilder {
                 replacements.put(OLD_PACKAGE_NAME + ".androidx-startup", config.appPackage + ".androidx-startup");
                 replacements.put(OLD_PACKAGE_NAME + ".fileprovider", config.appPackage + ".fileprovider");
                 replacements.put(".MainActivity", OLD_PACKAGE_NAME + ".MainActivity");
+// 解决 INSTALL_FAILED_DUPLICATE_PERMISSION 错误
+                // 将 com.web.webapp.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION 替换为 新包名.DYNAMIC...
+                replacements.put(OLD_PACKAGE_NAME + ".DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
+                        config.appPackage + ".DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION");
 
                 ManifestStringReplacer.batchReplaceStringInAXML(tempManifest, replacements);
             }

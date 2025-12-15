@@ -63,6 +63,9 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
         mutableStateOf(prefs.getBoolean("debug_$folderName", false))
     }
 
+    // 刷新配置的触发器
+    var configRefreshTrigger by remember { mutableLongStateOf(0L) }
+
     // 切换调试模式
     fun toggleDebugMode() {
         isDebugEnabled = !isDebugEnabled
@@ -86,19 +89,38 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
         ))
     }
 
-    // --- 2. 读取配置 ---
-    val webAppConfig = produceState<JSONObject?>(initialValue = null, key1 = projectDir) {
+    // --- 2. 读取配置 (增强版：支持注释 + 错误提示) ---
+    val webAppConfig = produceState<JSONObject?>(initialValue = null, key1 = projectDir, key2 = configRefreshTrigger) {
         value = withContext(Dispatchers.IO) {
             val configFile = File(projectDir, "webapp.json")
             if (configFile.exists()) {
-                try { JSONObject(configFile.readText()) } catch (e: Exception) { null }
+                try {
+                    val rawJson = configFile.readText()
+                    // 去除注释逻辑
+                    val cleanJson = rawJson.lines().map { line ->
+                        val index = line.indexOf("//")
+                        if (index != -1) {
+                            if (index > 0 && (line[index - 1] == ':' || line.substring(0, index).contains("http"))) line
+                            else line.substring(0, index)
+                        } else line
+                    }.joinToString("\n")
+                    JSONObject(cleanJson)
+                } catch (e: Exception) {
+                    LogCatcher.e("WebPreview", "配置解析失败", e)
+                    // 🔥 重点：解析失败弹窗提示 🔥
+                    launch(Dispatchers.Main) {
+                        scope.launch { snackbarHostState.showSnackbar("webapp.json 格式错误: ${e.message}") }
+                    }
+                    null
+                }
             } else null
         }
     }
     val config = webAppConfig.value
 
-    // 🔥🔥🔥 新增：全屏模式状态（控制标题栏显示/隐藏） 🔥🔥🔥
-    // 默认值参考 config 中的设置，如果没有设置则为 false
+
+    // 全屏模式状态（控制标题栏显示/隐藏）
+    // 使用 remember(config) 确保配置加载后能自动应用默认值
     var isFullScreenMode by remember(config) {
         mutableStateOf(config?.optBoolean("fullscreen", false) == true)
     }
@@ -143,28 +165,43 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
                 window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
                 window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    window.statusBarColor = android.graphics.Color.TRANSPARENT
+                    window.statusBarColor = android.graphics.Color.TRANSPARENT // 或者恢复为你应用的主题色
                 }
             }
         }
     }
 
-    // --- 4. URL 计算 ---
+    // --- 4. 智能路径查找 (核心修改) ---
     val targetUrl = remember(projectDir, config) {
+        // 1. 获取配置的入口
         val rawUrl = config?.optString("targetUrl")?.takeIf { it.isNotEmpty() }
             ?: config?.optString("url")?.takeIf { it.isNotEmpty() }
             ?: config?.optString("entry")?.takeIf { it.isNotEmpty() }
+            ?: "index.html" // 默认值
 
-        when {
-            rawUrl != null && (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) -> rawUrl
-            rawUrl != null -> {
-                val f = File(projectDir, rawUrl)
-                val af = File(projectDir, "src/main/assets/$rawUrl")
-                if (f.exists()) "file://${f.absolutePath}" else "file://${af.absolutePath}"
-            }
-            else -> {
-                val af = File(projectDir, "src/main/assets/index.html")
-                if (af.exists()) "file://${af.absolutePath}" else "file://${File(projectDir, "index.html").absolutePath}"
+        // 2. 如果是网络链接，直接返回
+        if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) {
+            rawUrl
+        } else {
+            // 3. 本地文件查找逻辑
+            // 清理路径前缀
+            val cleanPath = rawUrl.removePrefix("./").removePrefix("/")
+
+            // 可能性 A: 在根目录
+            val rootFile = File(projectDir, cleanPath)
+            // 可能性 B: 在 src/main/assets 目录 (标准 WebApp 结构)
+            val assetFile = File(projectDir, "src/main/assets/$cleanPath")
+            // 可能性 C: 默认 fallback (如果是配置解析失败的情况)
+            val defaultAssetIndex = File(projectDir, "src/main/assets/index.html")
+            val defaultRootIndex = File(projectDir, "index.html")
+
+            when {
+                rootFile.exists() -> "file://${rootFile.absolutePath}"
+                assetFile.exists() -> "file://${assetFile.absolutePath}"
+                // 如果指定的文件找不到，尝试找默认的 index.html
+                defaultAssetIndex.exists() -> "file://${defaultAssetIndex.absolutePath}"
+                defaultRootIndex.exists() -> "file://${defaultRootIndex.absolutePath}"
+                else -> "file://${rootFile.absolutePath}" // 实在找不到，就硬着头皮加载配置的那个路径
             }
         }
     }
@@ -180,12 +217,12 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
     }
 
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
+    // 当 config 改变或 debug 改变时，重新创建/加载 WebView
     val refreshKey = remember(config, isDebugEnabled) { System.currentTimeMillis() }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            // 🔥🔥🔥 核心：如果不是全屏模式，才显示标题栏 🔥🔥🔥
             if (!isFullScreenMode) {
                 TopAppBar(
                     title = { Text(if (targetUrl.startsWith("http")) "网页预览" else "App 预览") },
@@ -203,11 +240,14 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
                                 tint = if (isDebugEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        // 2. 刷新按钮
-                        IconButton(onClick = { webViewRef?.reload() }) {
+                        // 2. 刷新按钮 (同时重新读取配置)
+                        IconButton(onClick = {
+                            webViewRef?.reload()
+                            configRefreshTrigger = System.currentTimeMillis() // 触发重读配置
+                        }) {
                             Icon(Icons.Default.Refresh, "刷新")
                         }
-                        // 3. 🔥新增：进入全屏按钮🔥
+                        // 3. 进入全屏按钮
                         IconButton(onClick = { isFullScreenMode = true }) {
                             Icon(Icons.Default.Fullscreen, "全屏")
                         }
@@ -215,10 +255,8 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
                 )
             }
         },
-        // 如果全屏，背景设为黑色（防止闪烁），否则用默认色
         containerColor = if (isFullScreenMode) Color.Black else MaterialTheme.colorScheme.background
     ) { innerPadding ->
-        // 如果全屏，Padding 设为 0，否则使用 Scaffold 给的 padding
         val actualPadding = if (isFullScreenMode) PaddingValues(0.dp) else innerPadding
 
         Box(modifier = Modifier.padding(actualPadding).fillMaxSize()) {
@@ -255,7 +293,6 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
                                 val file = File(filePath)
                                 if (file.exists()) {
                                     val rawHtml = file.readText()
-                                    // 注入 Eruda (传入 Context 读取 assets)
                                     val injectedHtml = injectErudaIntoHtml(context, rawHtml)
                                     webView.loadDataWithBaseURL(targetUrl, injectedHtml, "text/html", "UTF-8", targetUrl)
                                 } else {
@@ -272,8 +309,7 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
                 )
             }
 
-            // 🔥🔥🔥 核心：全屏模式下的悬浮控件 🔥🔥🔥
-            // 只要进入全屏模式，就显示这些浮动按钮，方便用户操作
+            // 全屏模式下的悬浮控件
             if (isFullScreenMode) {
                 Row(
                     modifier = Modifier
@@ -282,7 +318,7 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
                         .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // 1. 半透明返回按钮
+                    // 半透明返回按钮
                     IconButton(
                         onClick = { navController.popBackStack() },
                         modifier = Modifier
@@ -299,9 +335,9 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
 
                     Spacer(modifier = Modifier.width(12.dp))
 
-                    // 2. 🔥新增：退出全屏按钮🔥
+                    // 退出全屏按钮
                     IconButton(
-                        onClick = { isFullScreenMode = false }, // 点击恢复标题栏
+                        onClick = { isFullScreenMode = false },
                         modifier = Modifier
                             .background(Color.Black.copy(alpha = 0.3f), CircleShape)
                             .size(36.dp)
@@ -314,7 +350,6 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
                         )
                     }
 
-                    // 3. 调试开启指示器
                     if (isDebugEnabled) {
                         Spacer(modifier = Modifier.width(12.dp))
                         Icon(
@@ -343,7 +378,6 @@ private fun injectErudaIntoHtml(context: Context, htmlContent: String): String {
                 eruda.init();
                 var entryBtn = eruda.get('entry');
                 if (entryBtn) {
-                    // 位置：居中靠右
                     entryBtn.position({
                         x: window.innerWidth - 50,
                         y: window.innerHeight / 2
@@ -364,7 +398,6 @@ private fun injectErudaIntoHtml(context: Context, htmlContent: String): String {
     }
 }
 
-// ... configureFullWebView 和 FullWebAppInterface 保持不变 (引用之前的代码) ...
 @SuppressLint("SetJavaScriptEnabled")
 private fun configureFullWebView(
     webView: WebView,
@@ -431,17 +464,15 @@ class FullWebAppInterface(private val context: Context, private val webView: Web
 
     @JavascriptInterface
     fun httpRequest(method: String, urlStr: String, headersJson: String, body: String, callbackId: String) {
-        // 开启新线程避免阻塞 UI
         Thread {
             var conn: HttpURLConnection? = null
             try {
                 val url = URL(urlStr)
                 conn = url.openConnection() as HttpURLConnection
                 conn.requestMethod = method.uppercase()
-                conn.connectTimeout = 15000 // 15秒超时
+                conn.connectTimeout = 15000
                 conn.readTimeout = 15000
 
-                // 1. 设置 Headers
                 if (headersJson.isNotEmpty()) {
                     try {
                         val headers = JSONObject(headersJson)
@@ -453,7 +484,6 @@ class FullWebAppInterface(private val context: Context, private val webView: Web
                     } catch (e: Exception) { e.printStackTrace() }
                 }
 
-                // 2. 发送 Body (如果是 POST/PUT)
                 if (body.isNotEmpty() && (method.equals("POST", true) || method.equals("PUT", true))) {
                     conn.doOutput = true
                     conn.outputStream.use { os ->
@@ -461,30 +491,23 @@ class FullWebAppInterface(private val context: Context, private val webView: Web
                     }
                 }
 
-                // 3. 获取响应状态
                 val code = conn.responseCode
-
-                // 4. 读取响应内容 (成功读 inputStream，失败读 errorStream)
                 val stream = if (code < 400) conn.inputStream else conn.errorStream
                 val responseText = stream?.bufferedReader()?.use { it.readText() } ?: ""
 
-                // 5. 构造返回给 JS 的数据
                 val resultJson = JSONObject()
                 resultJson.put("status", code)
                 resultJson.put("body", responseText)
 
-                // 可选：返回响应头
                 val responseHeaders = JSONObject()
                 for ((k, v) in conn.headerFields) {
                     if (k != null) responseHeaders.put(k, v.joinToString(","))
                 }
                 resultJson.put("headers", responseHeaders)
 
-                // 成功回调
                 sendResultToJs(callbackId, true, resultJson.toString())
 
             } catch (e: Exception) {
-                // 失败回调
                 e.printStackTrace()
                 val errorJson = JSONObject()
                 errorJson.put("status", 0)

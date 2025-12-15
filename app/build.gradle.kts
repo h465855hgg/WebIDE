@@ -31,8 +31,8 @@ android {
         applicationId = "com.web.webide"
         minSdk = 29
         targetSdk = 36
-        versionCode = 12
-        versionName = "0.1.2"
+        versionCode = 13
+        versionName = "0.1.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
@@ -70,6 +70,9 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = "17"
     }
     buildFeatures {
         compose = true

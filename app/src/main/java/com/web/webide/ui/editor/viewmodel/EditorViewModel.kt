@@ -1,17 +1,18 @@
 package com.web.webide.ui.editor.viewmodel
 
 import android.content.Context
-import androidx.compose.material3.SnackbarHostState // 必须导入这个
-import com.web.webide.core.utils.LogCatcher
-import com.web.webide.core.utils.PermissionManager
+import android.view.ViewGroup
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.web.webide.ui.editor.components.TextMateInitializer
+import com.web.webide.core.utils.LogCatcher
+import com.web.webide.core.utils.PermissionManager
 import com.web.webide.ui.editor.EditorColorSchemeManager
+import com.web.webide.ui.editor.components.TextMateInitializer
 import io.github.rosemoe.sora.langs.textmate.TextMateColorScheme
 import io.github.rosemoe.sora.langs.textmate.TextMateLanguage
 import io.github.rosemoe.sora.langs.textmate.registry.ThemeRegistry
@@ -57,24 +58,13 @@ class EditorViewModel : ViewModel() {
     private var hasPermissions = false
     private lateinit var appContext: Context
 
-    /**
-     * 初始化权限状态
-     */
     fun initializePermissions(context: Context) {
         appContext = context.applicationContext
         hasPermissions = PermissionManager.hasRequiredPermissions(appContext)
-        LogCatcher.permission(
-            "EditorViewModel", "初始化",
-            if (hasPermissions) "已有权限" else "需要请求权限"
-        )
     }
 
-    /**
-     * 检查权限，如果没有权限则记录日志
-     */
     private fun checkPermissions(operation: String): Boolean {
         if (!hasPermissions) {
-            LogCatcher.w("EditorViewModel", "权限不足 - 操作: $operation")
             return false
         }
         return true
@@ -84,65 +74,90 @@ class EditorViewModel : ViewModel() {
         hasShownInitialLoader = true
     }
 
+    // 🔥 修复 1：更新主题时强制重绘，防止第一个文件光标因颜色加载滞后而不显示
     fun updateEditorTheme(seedColor: Color, isDark: Boolean) {
         editorInstances.values.forEach { editor ->
             val currentScheme = editor.colorScheme
             EditorColorSchemeManager.applyThemeColors(currentScheme, seedColor, isDark)
+            editor.invalidate() // 强制重绘
         }
     }
 
     @Synchronized
     fun getOrCreateEditor(context: Context, state: CodeEditorState): CodeEditor {
         val filePath = state.file.absolutePath
+
+
+
+        // 检查缓存
         editorInstances[filePath]?.let { existingEditor ->
-            (existingEditor.parent as? android.view.ViewGroup)?.removeView(existingEditor)
-            return existingEditor
+            // 🔥 必须检查：如果 Context 变了（比如屏幕旋转、退出了页面重进），必须销毁重建！
+            // 否则 View 会持有旧 Activity 的引用，导致键盘弹不出来
+            if (existingEditor.context != context) {
+                try {
+                    (existingEditor.parent as? ViewGroup)?.removeView(existingEditor)
+                    existingEditor.release()
+                } catch (e: Exception) { e.printStackTrace() }
+                editorInstances.remove(filePath)
+                // 让代码继续往下走，创建新的实例
+            } else {
+                (existingEditor.parent as? ViewGroup)?.removeView(existingEditor)
+                return existingEditor
+            }
         }
+
+        // 2. 确保 TextMate 初始化
         if (!TextMateInitializer.isReady()) {
             TextMateInitializer.initialize(context)
         }
+
+        // 3. 创建新实例
         val editor = CodeEditor(context).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+
+
+
+            isFocusable = true
+            isFocusableInTouchMode = true
+            isEnabled = true
+
             setText(state.content)
+
+            // 初始化配色
             colorScheme = TextMateColorScheme.create(ThemeRegistry.getInstance())
+
+            // 初始化语言
             if (state.languageScopeName in supportedLanguageScopes) {
                 try {
                     val language = TextMateLanguage.create(state.languageScopeName, true)
                     setEditorLanguage(language)
                 } catch (e: Exception) {
-                    LogCatcher.e("EditorViewModel", "设置语言失败: ${state.languageScopeName}", e)
+                    LogCatcher.e("EditorViewModel", "设置语言失败", e)
                 }
             }
+
+            // 初始化光标
+            setSelection(0, 0)
+            ensureSelectionVisible()
+
+            // 监听内容变化
             text.addContentListener(object : ContentListener {
                 override fun beforeReplace(content: Content) {}
-                override fun afterInsert(
-                    content: Content,
-                    startLine: Int,
-                    startColumn: Int,
-                    endLine: Int,
-                    endColumn: Int,
-                    inserted: CharSequence
-                ) {
+                override fun afterInsert(content: Content, startLine: Int, startColumn: Int, endLine: Int, endColumn: Int, inserted: CharSequence) {
                     val newText = content.toString()
-                    if (state.content != newText) {
-                        state.content = newText
-                    }
+                    if (state.content != newText) state.content = newText
                 }
-
-                override fun afterDelete(
-                    content: Content,
-                    startLine: Int,
-                    startColumn: Int,
-                    endLine: Int,
-                    endColumn: Int,
-                    deleted: CharSequence
-                ) {
+                override fun afterDelete(content: Content, startLine: Int, startColumn: Int, endLine: Int, endColumn: Int, deleted: CharSequence) {
                     val newText = content.toString()
-                    if (state.content != newText) {
-                        state.content = newText
-                    }
+                    if (state.content != newText) state.content = newText
                 }
             })
         }
+
+        // 存入缓存
         editorInstances[filePath] = editor
         return editor
     }
@@ -150,11 +165,7 @@ class EditorViewModel : ViewModel() {
     override fun onCleared() {
         super.onCleared()
         editorInstances.values.forEach {
-            try {
-                it.release()
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+            try { it.release() } catch (e: Exception) { e.printStackTrace() }
         }
         editorInstances.clear()
     }
@@ -164,24 +175,8 @@ class EditorViewModel : ViewModel() {
             closeAllFiles()
             currentProjectPath = projectPath
             val indexFile = File(projectPath, "index.html")
-            LogCatcher.d("EditorViewModel", "尝试加载初始文件: ${indexFile.absolutePath}")
             if (indexFile.exists() && indexFile.isFile && indexFile.canRead()) {
-                if (checkPermissions("加载初始文件")) {
-                    LogCatcher.fileOperation(
-                        "EditorViewModel",
-                        "加载初始文件",
-                        indexFile.absolutePath,
-                        "开始"
-                    )
-                    openFile(indexFile)
-                } else {
-                    LogCatcher.fileOperation(
-                        "EditorViewModel",
-                        "加载初始文件",
-                        indexFile.absolutePath,
-                        "权限不足"
-                    )
-                }
+                openFile(indexFile)
             }
         }
     }
@@ -189,21 +184,11 @@ class EditorViewModel : ViewModel() {
     suspend fun saveAllModifiedFiles(context: Context, snackbarHostState: SnackbarHostState) {
         withContext(Dispatchers.IO) {
             val modifiedFiles = openFiles.filter { it.isModified }
-            if (modifiedFiles.isEmpty()) {
-                withContext(Dispatchers.Main) {
-                    viewModelScope.launch {
-                        snackbarHostState.showSnackbar("没有需要保存的文件")
-                    }
-                }
-                return@withContext
-            }
+            if (modifiedFiles.isEmpty()) return@withContext
 
-            // 权限检查
             if (!checkPermissions("保存文件")) {
                 withContext(Dispatchers.Main) {
-                    viewModelScope.launch {
-                        snackbarHostState.showSnackbar("需要存储权限才能保存文件")
-                    }
+                    viewModelScope.launch { snackbarHostState.showSnackbar("需要存储权限才能保存文件") }
                 }
                 return@withContext
             }
@@ -211,10 +196,6 @@ class EditorViewModel : ViewModel() {
             var successCount = 0
             modifiedFiles.forEach { state ->
                 try {
-                    if (!state.file.canWrite()) {
-                        LogCatcher.e("EditorViewModel", "文件不可写: ${state.file.absolutePath}")
-                        return@forEach
-                    }
                     state.file.outputStream().use { output ->
                         output.bufferedWriter(Charsets.UTF_8).use { writer ->
                             writer.write(state.content)
@@ -222,70 +203,16 @@ class EditorViewModel : ViewModel() {
                     }
                     state.onContentSaved()
                     successCount++
-                    LogCatcher.fileOperation(
-                        "EditorViewModel",
-                        "保存文件",
-                        state.file.absolutePath,
-                        "成功"
-                    )
                 } catch (e: Exception) {
-                    LogCatcher.e("EditorViewModel", "保存失败", e)
-                    LogCatcher.fileOperation(
-                        "EditorViewModel",
-                        "保存文件",
-                        state.file.absolutePath,
-                        "失败: ${e.message}"
-                    )
+                    e.printStackTrace()
                 }
             }
             withContext(Dispatchers.Main) {
                 if (successCount > 0) {
-                    viewModelScope.launch {
-                        snackbarHostState.showSnackbar("已保存 $successCount 个文件")
-                    }
+                    viewModelScope.launch { snackbarHostState.showSnackbar("已保存 $successCount 个文件") }
                 }
             }
         }
-    }
-
-    suspend fun buildHtmlContentFromProject(projectPath: String): String {
-        return withContext(Dispatchers.IO) {
-            val htmlFile = File(projectPath, "index.html")
-            val cssFile = findFileByExtensions(projectPath, listOf("css"))
-            val jsFile = findFileByExtensions(projectPath, listOf("js"))
-            fun safeReadFile(file: File?): String {
-                if (file == null || !file.exists() || !file.canRead()) return ""
-                return try {
-                    file.readText(Charsets.UTF_8)
-                } catch (e: Exception) {
-                    LogCatcher.e("EditorViewModel", "读取文件失败", e)
-                    ""
-                }
-            }
-
-            val htmlContent = if (htmlFile.exists()) safeReadFile(htmlFile) else "<h1>错误</h1>"
-            val cssContent = safeReadFile(cssFile)
-            val jsContent = safeReadFile(jsFile)
-            """<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>$cssContent</style></head><body>$htmlContent<script>$jsContent</script></body></html>""".trimIndent()
-        }
-    }
-
-    private fun findFileByExtensions(projectPath: String, extensions: List<String>): File? {
-        val projectDir = File(projectPath)
-        for (ext in extensions) {
-            val commonNames = when (ext) {
-                "html", "htm" -> listOf("index.$ext")
-                "css" -> listOf("style.$ext", "styles.$ext")
-                "js" -> listOf("script.$ext", "main.$ext", "index.$ext")
-                else -> emptyList()
-            }
-            for (name in commonNames) {
-                val file = File(projectDir, name)
-                if (file.exists()) return file
-            }
-        }
-        return projectDir.listFiles { _, name -> extensions.any { name.endsWith(".$it") } }
-            ?.firstOrNull()
     }
 
     fun openFile(file: File) {
@@ -294,19 +221,12 @@ class EditorViewModel : ViewModel() {
             val existingIndex = openFiles.indexOfFirst { it.file.absolutePath == file.absolutePath }
             if (existingIndex != -1) {
                 activeFileIndex = existingIndex
-                LogCatcher.fileOperation("EditorViewModel", "切换文件", file.absolutePath, "已存在")
             } else {
                 val content = withContext(Dispatchers.IO) {
                     try {
-                        if (file.length() > 1024 * 1024) {
-                            LogCatcher.w("EditorViewModel", "文件过大: ${file.absolutePath}")
-                            "文件过大"
-                        } else {
-                            file.readText(Charsets.UTF_8)
-                        }
+                        file.readText(Charsets.UTF_8)
                     } catch (e: Exception) {
-                        LogCatcher.e("EditorViewModel", "读取文件失败", e)
-                        "无法读取文件: ${e.message}"
+                        ""
                     }
                 }
                 val language = getLanguageScope(file.extension)
@@ -314,22 +234,8 @@ class EditorViewModel : ViewModel() {
                 newState.onContentLoaded(content)
                 openFiles = openFiles + newState
                 activeFileIndex = openFiles.lastIndex
-                LogCatcher.fileOperation("EditorViewModel", "打开文件", file.absolutePath, "成功")
             }
         }
-    }
-
-    /**
-     * 权限检查版本的打开文件方法
-     */
-    fun openFileWithPermissionCheck(file: File, context: Context) {
-        if (!checkPermissions("打开文件")) {
-            LogCatcher.fileOperation("EditorViewModel", "打开文件", file.absolutePath, "权限不足")
-            return
-        }
-
-        LogCatcher.fileOperation("EditorViewModel", "打开文件", file.absolutePath, "开始")
-        openFile(file)
     }
 
     fun undo() {
@@ -350,20 +256,8 @@ class EditorViewModel : ViewModel() {
                 val startLine = editor.cursor.leftLine
                 val startColumn = editor.cursor.leftColumn
                 val processedSymbol = if (symbol == "Tab") "\t" else symbol
-
-                // 插入符号
                 editor.text.insert(startLine, startColumn, processedSymbol)
-
-                // 计算新的光标位置（考虑换行符）
-                val newLineCount = processedSymbol.count { it == '\n' }
-                if (newLineCount > 0) {
-                    // 如果包含换行符，光标移到最后一行的末尾
-                    val lastLineText = processedSymbol.substringAfterLast('\n')
-                    editor.setSelection(startLine + newLineCount, lastLineText.length)
-                } else {
-                    // 没有换行符，光标移到插入文本后
-                    editor.setSelection(startLine, startColumn + processedSymbol.length)
-                }
+                editor.setSelection(startLine, startColumn + processedSymbol.length)
             }
         }
     }
@@ -400,10 +294,12 @@ class EditorViewModel : ViewModel() {
         }
     }
 
+
     private fun getLanguageScope(extension: String): String = when (extension.lowercase()) {
-        "html", "htm" -> "text.html.basic"
+        "html", "htm" -> "text.html.basic"  //text.html.basic
         "css" -> "source.css"
         "js" -> "source.js"
+        "json" , "JSON" -> "source.js"
         else -> "text.plain"
     }
 }
