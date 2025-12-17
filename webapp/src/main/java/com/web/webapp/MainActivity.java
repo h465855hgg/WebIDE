@@ -35,6 +35,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import rrzt.web.web_bridge.SharedWebInterface; // 引入基类
 
 public class MainActivity extends Activity {
     private WebView webView;
@@ -45,7 +46,7 @@ public class MainActivity extends Activity {
     // 权限请求码
     private static final int PERMISSION_REQUEST_CODE = 100;
 
-    // WebApp 接口实例
+    // ✅ 修改：使用专门的 WebAppInterface
     private WebAppInterface webAppInterface;
 
     // 配置缓存键
@@ -317,7 +318,7 @@ public class MainActivity extends Activity {
         // 应用 webview 配置
         applyWebViewConfig(settings);
 
-        // 创建并注入 JavaScript 接口
+        // ✅ 创建并注入 JavaScript 接口 (使用新类)
         webAppInterface = new WebAppInterface(this, webView);
         webView.addJavascriptInterface(webAppInterface, "Android");
 
@@ -507,7 +508,8 @@ public class MainActivity extends Activity {
         }
         if (webAppInterface != null) {
             try {
-                webAppInterface.finalize();
+                // webAppInterface.finalize(); // 这个方法在 Java 中通常是 protected 的，不建议手动调用
+                webAppInterface.onDestroy(); // ✅ 调用自定义的销毁方法
             } catch (Throwable e) {
                 e.printStackTrace();
             }

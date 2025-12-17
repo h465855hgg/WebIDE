@@ -3,15 +3,15 @@
     <!-- 对应 Context.getFilesDir() -->
     <files-path name="my_files" path="." />
 
-    <!-- 对应 Context.getCacheDir() -->
-    <cache-path name="my_cache" path="." />
-
     <!-- 对应 Context.getExternalFilesDir() -->
     <external-files-path name="external_files" path="." />
 
     <!-- 对应 Environment.getExternalStorageDirectory() -->
     <external-path name="external_storage" path="." />
 
-    <!-- 对应项目根目录 (涵盖大部分情况) -->
+    <!-- 对应 Context.getCacheDir() -->
+    <cache-path name="cache" path="." />
+
+    <!-- 【关键】这个 root-path 可以映射手机里的任何文件，兼容性最强 -->
     <root-path name="root" path="." />
 </paths>

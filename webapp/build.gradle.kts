@@ -41,7 +41,7 @@ android {
 }
 
 dependencies {
-
+    implementation(project(":web-bridge"))
         // 添加 OkHttp 用于原生网络请求
         implementation(libs.okhttp)
         // 添加 Gson 用于 JSON 序列化（可选，但强烈建议，用于处理复杂数据）

@@ -5,23 +5,6 @@ plugins {
     alias(libs.plugins.aboutlibraries)
 }
 
-val copyWebAppApk = tasks.register<Copy>("copyWebAppApk") {
-    // 显式依赖 webapp 的构建任务
-    dependsOn(":webapp:assembleRelease")
-
-    // 设置输入源：webapp 的输出目录
-    // 注意：这里使用 provider 机制，确保路径在执行时才解析
-    from(project(":webapp").layout.buildDirectory.dir("outputs/apk/release")) {
-        include("*.apk")
-        // 如果你需要确定具体名字，可以用 rename
-        // rename { "webapp.apk" }
-        // 或者保留原名，或者像你之前那样重命名
-        rename { _ -> "webapp.apk" }
-    }
-
-    // 设置输出目标：app 模块的 build 目录 (不要污染 src 目录)
-    into(layout.buildDirectory.dir("generated/assets/webapp"))
-}
 
 android {
     namespace = "com.web.webide"
@@ -31,9 +14,12 @@ android {
         applicationId = "com.web.webide"
         minSdk = 29
         targetSdk = 36
-        versionCode = 14
-        versionName = "0.1.4"
+        versionCode = 15
+        versionName = "0.1.5"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
     signingConfigs {
         create("release") {
@@ -41,6 +27,8 @@ android {
             keyAlias = "WebIDE"
             storePassword = "WebIDE"
             keyPassword = "WebIDE"
+            enableV1Signing = true
+            enableV2Signing = true
         }
     }
     buildTypes {
@@ -78,13 +66,6 @@ android {
         compose = true
     }
 
-    sourceSets {
-        getByName("main") {
-            // 关键点：将 copyWebAppApk 任务作为目录源添加进去
-            // Gradle 会自动识别：在打包 Assets 之前，必须先运行 copyWebAppApk 任务
-            assets.srcDir(copyWebAppApk)
-        }
-    }
 }
 
 android.applicationVariants.configureEach {
@@ -99,6 +80,9 @@ android.applicationVariants.configureEach {
 }
 
 aboutLibraries() {
+    collect {
+        fetchRemoteLicense = true
+    }
     export {
         prettyPrint = true
         outputFile = file("src/main/res/raw/aboutlibraries.json")
@@ -112,10 +96,9 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 }
 
 
-
-
-
 dependencies {
+    implementation(libs.coil.compose)
+    implementation(project(":web-bridge"))
     implementation(libs.accompanist.navigation.animation)
 
     implementation(libs.aboutlibraries.compose)
@@ -146,6 +129,7 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation(libs.volley)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

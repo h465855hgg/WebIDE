@@ -1,290 +1,439 @@
 <!DOCTYPE html>
-<html lang="">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Android JS Bridge Pro</title>
-    <link rel="stylesheet" href="css/style.css">
+    <title>RRZT Web Bridge 测试</title>
     <style>
-        .card { background: white; padding: 15px; margin-bottom: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .btn { background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; margin: 5px; cursor: pointer; }
-        .btn:active { background: #0056b3; }
-        code { background: #eee; padding: 2px 5px; border-radius: 3px; }
-        #video-container { width: 100%; max-width: 400px; height: 300px; background: #000; margin: 10px auto; display: none; }
-        video { width: 100%; height: 100%; object-fit: cover; }
-        #photo-preview { max-width: 100%; margin-top: 10px; }
+        body { font-family: sans-serif; background: #f0f2f5; padding: 10px; padding-bottom: 200px; }
+        h3 { border-bottom: 2px solid #007bff; padding-bottom: 5px; margin-top: 20px; color: #333; }
+        .card { background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 10px; }
+        .btn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+        button {
+            background: #007bff; color: white; border: none; padding: 10px;
+            border-radius: 4px; font-size: 13px; cursor: pointer; text-align: center;
+        }
+        button:active { background: #0056b3; }
+        button.secondary { background: #6c757d; }
+        button.danger { background: #dc3545; }
+
+        /* 日志控制台样式 */
+        #console-container {
+            position: fixed; bottom: 0; left: 0; right: 0; height: 180px;
+            background: #212529; color: #00ff00; font-family: monospace;
+            padding: 10px; overflow-y: auto; z-index: 1000; border-top: 2px solid #444;
+            font-size: 12px;
+        }
+        .log-entry { margin-bottom: 4px; border-bottom: 1px solid #333; padding-bottom: 2px; }
+        .log-success { color: #00ff00; }
+        .log-error { color: #ff4444; }
+        .log-info { color: #00d4ff; }
+
+        input[type="text"] { padding: 5px; width: 60%; border: 1px solid #ddd; border-radius: 4px; }
     </style>
 </head>
 <body>
-<h2>📱 跨平台 WebApp 测试</h2>
 
-<!-- 环境检测 -->
 <div class="card">
-    <h3>🌍 运行环境</h3>
-    <div id="environment-info">检测中...</div>
-</div>
-
-<!-- 摄像头测试 -->
-<div class="card">
-    <h3>📷 摄像头兼容性测试</h3>
-    <p>测试浏览器和 WebView 中的摄像头兼容性</p>
-
-    <!-- 方案1: 标准摄像头 -->
-    <button class="btn" onclick="startCamera()">启动摄像头 (标准API)</button>
-    <button class="btn" onclick="stopCamera()">停止摄像头</button>
-
-    <div id="video-container">
-        <video id="camera-video" autoplay playsinline></video>
+    <div><strong>当前注入对象名:</strong> <span id="bridgeNameDisplay">Android</span></div>
+    <div style="margin-top:5px;">
+        <input type="text" id="customBridgeName" placeholder="如果不是Android，请输入">
+        <button onclick="setBridgeName()" class="secondary" style="padding: 5px 10px;">设置</button>
     </div>
-
-    <button class="btn" onclick="takePhoto()">拍照</button>
-    <img id="photo-preview" alt="拍照预览">
-
-    <!-- 方案2: 文件输入备用 -->
-    <hr>
-    <p>如果上方摄像头失败，使用备用方案：</p>
-    <button class="btn" onclick="takePhotoWithInput()">拍照/选择图片 (备用方案)</button>
 </div>
 
-<!-- 设备信息 -->
-<div class="card">
-    <h3>📱 设备信息</h3>
-    <div id="device-info">加载中...</div>
+<h3>1. 设备与系统信息</h3>
+<div class="card btn-grid">
+    <button onclick="testDeviceInfo()">获取设备信息</button>
+    <button onclick="testAppConfig()">获取App配置(Abstract)</button>
+    <button onclick="testPermissions()">检查/请求 存储权限</button>
+    <button onclick="testTime()">获取当前时间</button>
+    <button onclick="testFormatDate()">格式化时间</button>
 </div>
 
-<!-- 交互功能 -->
-<div class="card">
-    <h3>🔔 交互反馈</h3>
-    <button class="btn" onclick="showToast()">Toast 提示</button>
-    <button class="btn" onclick="vibrateDevice()">震动 100ms</button>
+<h3>2. UI 交互与反馈</h3>
+<div class="card btn-grid">
+    <button onclick="testToast()">显示 Toast</button>
+    <button onclick="testDialog()">显示 Dialog (回调)</button>
+    <button onclick="testNotification()">发送通知</button>
+    <button onclick="testVibrate()">震动 500ms</button>
 </div>
 
-<!-- 剪贴板 -->
-<div class="card">
-    <h3>📋 剪贴板</h3>
-    <input type="text" id="copy-input" value="Hello WebApp" style="padding:5px; width:200px;">
-    <button class="btn" onclick="copyToClipboard()">复制文本</button>
-    <button class="btn" onclick="readFromClipboard()">读取剪贴板</button>
-    <div id="clip-result" style="margin-top:5px; color:green;"></div>
+<h3>3. 存储 (SharedPrefs)</h3>
+<div class="card btn-grid">
+    <button onclick="testSaveStorage()">写入存储 (TestKey)</button>
+    <button onclick="testGetStorage()">读取存储 (TestKey)</button>
+    <button onclick="testGetAllStorage()">读取所有存储</button>
+    <button onclick="testRemoveStorage()">删除存储 (TestKey)</button>
+    <button onclick="testClearStorage()" class="danger">清空存储</button>
 </div>
 
-<!-- 文件系统 -->
-<div class="card">
-    <h3>💾 文件系统</h3>
-    <button class="btn" onclick="readSampleFile()">读取示例文件</button>
-    <button class="btn" onclick="writeSampleFile()">写入示例文件</button>
-    <div id="file-result" style="font-size:12px; max-height:100px; overflow:auto;"></div>
+<h3>4. 文件与下载</h3>
+<div class="card btn-grid">
+    <button onclick="testSaveToDownloads()">保存文本到下载</button>
+    <button onclick="testReadFile()">读取文件 (Abstract)</button>
+    <button onclick="testWriteFile()">写入文件 (Abstract)</button>
+    <button onclick="testListFiles()">列出文件 (Abstract)</button>
 </div>
 
-<!-- 权限管理 -->
-<div class="card">
-    <h3>🔐 权限管理</h3>
-    <button class="btn" onclick="requestCameraPermission()">请求摄像头权限</button>
-    <button class="btn" onclick="checkCameraPermission()">检查摄像头权限</button>
-    <div id="permission-result" style="margin-top:5px;"></div>
+<h3>5. 网络请求</h3>
+<div class="card btn-grid">
+    <button onclick="testHttpRequest()">GET 请求 (httpbin)</button>
 </div>
 
-<script src="js/api.js"></script>
+<h3>6. 传感器 (加速度计)</h3>
+<div class="card btn-grid">
+    <button onclick="testStartSensor()">开启传感器</button>
+    <button onclick="testStopSensor()" class="danger">停止传感器</button>
+</div>
+
+<h3>7. 剪贴板</h3>
+<div class="card btn-grid">
+    <button onclick="testCopyToClip()">复制 "Hello Bridge"</button>
+    <button onclick="testGetFromClip()">获取剪贴板内容</button>
+</div>
+
+<h3>8. 系统 Intents</h3>
+<div class="card btn-grid">
+    <button onclick="testOpenBrowser()">打开浏览器</button>
+    <button onclick="testShare()">分享文本</button>
+    <button onclick="testCall()">拨打电话 (10086)</button>
+    <button onclick="testSMS()">发送短信</button>
+    <button onclick="testEmail()">发送邮件</button>
+    <button onclick="testMap()">打开地图 (北京)</button>
+    <button onclick="testSettings()">打开应用设置</button>
+</div>
+
+<h3>9. 屏幕与控制</h3>
+<div class="card btn-grid">
+    <button onclick="testKeepScreen(true)">屏幕常亮: 开</button>
+    <button onclick="testKeepScreen(false)">屏幕常亮: 关</button>
+    <button onclick="testBrightness()">设置亮度 (50%)</button>
+    <button onclick="testGetBrightness()">获取亮度</button>
+    <button onclick="testVolume()">设置音量 (Max)</button>
+    <button onclick="testReload()" class="secondary">重载 App</button>
+    <button onclick="testExit()" class="danger">退出 App</button>
+</div>
+
+<div id="console-container">
+    <div class="log-entry">Waiting for interaction...</div>
+</div>
+
 <script>
-    // 环境检测
-    function detectEnvironment() {
-        const envInfo = document.getElementById('environment-info');
-        if (window.isWebView()) {
-            envInfo.innerHTML = `
-                <span style="color: green;">✅ 运行在 WebView 中</span><br>
-                支持原生 API: ${Object.keys(window.Android || {}).length} 个
-            `;
-        } else {
-            envInfo.innerHTML = `
-                <span style="color: blue;">🌐 运行在浏览器中</span><br>
-                用户代理: ${navigator.userAgent.substring(0, 50)}...
-            `;
+    // ==========================================
+    // 核心桥接逻辑
+    // ==========================================
+    let BRIDGE_NAME = "Android"; // 默认注入名
+    const callbacks = {};
+
+    function getBridge() {
+        return window[BRIDGE_NAME];
+    }
+
+    function setBridgeName() {
+        const val = document.getElementById('customBridgeName').value;
+        if(val) {
+            BRIDGE_NAME = val;
+            document.getElementById('bridgeNameDisplay').innerText = val;
+            log(`注入对象名已更新为: ${BRIDGE_NAME}`, "info");
         }
     }
 
-    // 显示设备信息
-    async function showDeviceInfo() {
-        const deviceInfo = await window.NativeAPI.getDeviceInfo();
-        const infoDiv = document.getElementById('device-info');
-
-        if (deviceInfo) {
-            infoDiv.innerHTML = `
-                设备型号: ${deviceInfo.model}<br>
-                制造商: ${deviceInfo.manufacturer}<br>
-                系统: ${deviceInfo.androidVersion || 'Browser'}<br>
-                屏幕: ${deviceInfo.screenWidth} × ${deviceInfo.screenHeight}<br>
-                语言: ${deviceInfo.locale}<br>
-                时区: ${deviceInfo.timezone}
-            `;
-        } else {
-            infoDiv.innerHTML = '无法获取设备信息';
-        }
-    }
-
-    // 摄像头相关变量
-    let cameraStream = null;
-
-    // 启动摄像头
-    async function startCamera() {
+    // 处理 Android 发回的 Base64 响应
+    window.onAndroidResponse = function(callbackId, base64Data) {
         try {
-            const constraints = {
-                video: {
-                    facingMode: 'environment',
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 }
-                },
-                audio: false
-            };
+            // 解决 Base64 中文乱码问题
+            const jsonStr = decodeURIComponent(escape(window.atob(base64Data)));
+            const result = JSON.parse(jsonStr);
 
-            // 使用兼容的摄像头 API
-            cameraStream = await window.CameraAPI.getMediaStream(constraints);
+            // 传感器特殊逻辑：callbackId + "_data" 是持续回调
+            if (callbackId.endsWith("_data")) {
+                const realId = callbackId.replace("_data", "");
+                // 仅在 Console 打印，防止刷屏
+                console.log(`[Sensor Data] ${realId}:`, result.data);
+                const logDiv = document.getElementById("console-container");
+                // 只是闪烁一下状态，不追加 DOM
+                return;
+            }
 
-            const video = document.getElementById('camera-video');
-            video.srcObject = cameraStream;
+            log(`Callback [${callbackId}] Success: ${result.success}`, result.success ? "success" : "error");
+            log(`Data: ${typeof result.data === 'object' ? JSON.stringify(result.data) : result.data}`);
 
-            const container = document.getElementById('video-container');
-            container.style.display = 'block';
-
-            window.NativeAPI.toast('摄像头启动成功');
-        } catch (error) {
-            console.error('摄像头启动失败:', error);
-            window.NativeAPI.toast(`摄像头启动失败: ${error.message}`);
+            if (callbacks[callbackId]) {
+                callbacks[callbackId](result.success, result.data);
+                // 注意：一般一次性回调调用后删除，如果是持续监听（如传感器初始）则保留
+                if (!callbackId.includes("sensor")) {
+                    delete callbacks[callbackId];
+                }
+            }
+        } catch (e) {
+            log(`Error parsing response: ${e.message}`, "error");
         }
+    };
+
+    // 辅助：生成回调 ID
+    function createCallback(fn) {
+        const id = 'cb_' + Math.random().toString(36).substr(2, 9);
+        callbacks[id] = fn;
+        return id;
     }
 
-    // 停止摄像头
-    function stopCamera() {
-        if (cameraStream) {
-            cameraStream.getTracks().forEach(track => track.stop());
-            cameraStream = null;
-
-            const video = document.getElementById('camera-video');
-            video.srcObject = null;
-
-            document.getElementById('video-container').style.display = 'none';
-            window.NativeAPI.toast('摄像头已停止');
-        }
+    // 日志函数
+    function log(msg, type="info") {
+        const container = document.getElementById("console-container");
+        const div = document.createElement("div");
+        div.className = `log-entry log-${type}`;
+        const time = new Date().toLocaleTimeString();
+        div.innerText = `[${time}] ${msg}`;
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+        console.log(msg);
     }
 
-    // 拍照
-    async function takePhoto() {
+    // ==========================================
+    // 测试函数实现
+    // ==========================================
+
+    function checkBridge() {
+        if (!getBridge()) {
+            log(`Error: window.${BRIDGE_NAME} 未找到。请检查注入名。`, "error");
+            return false;
+        }
+        return true;
+    }
+
+    // 1. 设备信息
+    function testDeviceInfo() {
+        if(!checkBridge()) return;
         try {
-            // 使用兼容的拍照 API
-            const photoData = await window.CameraAPI.takePhoto({
-                facingMode: 'environment',
-                quality: 0.8,
-                fallbackToFileInput: true
-            });
-
-            const preview = document.getElementById('photo-preview');
-            preview.src = photoData;
-            preview.style.display = 'block';
-
-            window.NativeAPI.toast('拍照成功');
-        } catch (error) {
-            console.error('拍照失败:', error);
-            window.NativeAPI.toast(`拍照失败: ${error.message}`);
-        }
+            const info = getBridge().getDeviceInfo();
+            log("Device Info: " + info);
+        } catch(e) { log(e.message, "error"); }
     }
 
-    // 使用文件输入拍照
-    async function takePhotoWithInput() {
-        try {
-            const photoData = await window.CameraAPI._takePhotoWithFileInput();
-
-            const preview = document.getElementById('photo-preview');
-            preview.src = photoData;
-            preview.style.display = 'block';
-
-            window.NativeAPI.toast('图片获取成功');
-        } catch (error) {
-            console.error('文件输入失败:', error);
-            window.NativeAPI.toast(`获取图片失败: ${error.message}`);
-        }
+    function testAppConfig() {
+        if(!checkBridge()) return;
+        log("App Config: " + getBridge().getAppConfig());
     }
 
-    // Toast 提示
-    function showToast() {
-        window.NativeAPI.toast('这是跨平台的 Toast 消息！');
+    function testPermissions() {
+        if(!checkBridge()) return;
+        // 检查
+        const perm = "android.permission.WRITE_EXTERNAL_STORAGE";
+        const has = getBridge().hasPermission(perm);
+        log(`Has Write Permission: ${has}`);
+
+        // 请求
+        const cbId = createCallback((success, data) => {
+            log(`Request Permission Result: ${data}`, success ? "success" : "error");
+        });
+        getBridge().requestPermission(perm, cbId);
     }
 
-    // 震动
-    function vibrateDevice() {
-        window.NativeAPI.vibrate(100);
+    function testTime() {
+        if(!checkBridge()) return;
+        log("Timestamp: " + getBridge().getCurrentTimeMillis());
     }
 
-    // 复制到剪贴板
-    async function copyToClipboard() {
-        const text = document.getElementById('copy-input').value;
-        const success = await window.NativeAPI.copyToClipboard(text);
-        window.NativeAPI.toast(success ? '已复制到剪贴板' : '复制失败');
+    function testFormatDate() {
+        if(!checkBridge()) return;
+        log("Formatted: " + getBridge().formatDate(new Date().getTime(), "yyyy-MM-dd HH:mm:ss"));
     }
 
-    // 从剪贴板读取
-    async function readFromClipboard() {
-        try {
-            const text = await window.NativeAPI.getClipboard();
-            document.getElementById('clip-result').innerText = `剪贴板内容: ${text}`;
-            window.NativeAPI.toast('读取成功');
-        } catch (error) {
-            document.getElementById('clip-result').innerText = '读取失败: ' + error.message;
-        }
+    // 2. UI
+    function testToast() {
+        if(!checkBridge()) return;
+        getBridge().showToast("来自 Web 的 Toast!");
     }
 
-    // 读取文件
-    async function readSampleFile() {
-        try {
-            // 尝试读取当前目录下的文件
-            const content = await window.FileSystemAPI.readFile('./js/api.js');
-            const resultDiv = document.getElementById('file-result');
-            resultDiv.innerHTML = `<pre>${content.substring(0, 500)}...</pre>`;
-            window.NativeAPI.toast('文件读取成功');
-        } catch (error) {
-            console.error('读取文件失败:', error);
-            window.NativeAPI.toast('文件读取失败');
-        }
+    function testDialog() {
+        if(!checkBridge()) return;
+        const cbId = createCallback((success, data) => {
+            log(`Dialog clicked: ${data}`); // positive or negative
+        });
+        getBridge().showDialog("测试标题", "这是一个来自 Web 的弹窗测试", "确定", "取消", cbId);
     }
 
-    // 写入文件
-    async function writeSampleFile() {
-        try {
-            const content = `这是测试文件内容，创建于 ${new Date().toLocaleString()}`;
-            const success = await window.FileSystemAPI.writeFile('test.txt', content);
-            window.NativeAPI.toast(success ? '文件已保存' : '文件保存失败');
-        } catch (error) {
-            console.error('写入文件失败:', error);
-            window.NativeAPI.toast('文件写入失败');
-        }
+    function testNotification() {
+        if(!checkBridge()) return;
+        getBridge().showNotification(1001, "Web 通知", "点击查看详情 (测试)");
+        log("Notification sent (check status bar)");
     }
 
-    // 请求摄像头权限
-    async function requestCameraPermission() {
-        const hasPermission = await window.NativeAPI.requestPermission('android.permission.CAMERA');
-        const resultDiv = document.getElementById('permission-result');
-        resultDiv.innerHTML = hasPermission ?
-            '<span style="color: green;">✅ 摄像头权限已授予</span>' :
-            '<span style="color: red;">❌ 摄像头权限被拒绝</span>';
+    function testVibrate() {
+        if(!checkBridge()) return;
+        getBridge().vibrate(500);
     }
 
-    // 检查摄像头权限
-    async function checkCameraPermission() {
-        const hasPermission = await window.NativeAPI.hasPermission('android.permission.CAMERA');
-        const resultDiv = document.getElementById('permission-result');
-        resultDiv.innerHTML = hasPermission ?
-            '<span style="color: green;">✅ 已有摄像头权限</span>' :
-            '<span style="color: orange;">⚠️ 无摄像头权限</span>';
+    // 3. 存储
+    function testSaveStorage() {
+        if(!checkBridge()) return;
+        getBridge().saveStorage("web_test_key", "Hello from JS " + new Date().getTime());
+        log("Saved to storage.");
     }
 
-    // 页面加载完成后的初始化
-    document.addEventListener('DOMContentLoaded', async function() {
-        detectEnvironment();
-        await showDeviceInfo();
+    function testGetStorage() {
+        if(!checkBridge()) return;
+        const val = getBridge().getStorage("web_test_key");
+        log(`Read Storage: ${val}`);
+    }
 
-        // 自动检查摄像头权限
-        if (window.isWebView()) {
-            await checkCameraPermission();
-        }
-    });
+    function testGetAllStorage() {
+        if(!checkBridge()) return;
+        const all = getBridge().getAllStorage();
+        log(`All Storage: ${all}`);
+    }
+
+    function testRemoveStorage() {
+        if(!checkBridge()) return;
+        getBridge().removeStorage("web_test_key");
+        log("Removed key.");
+    }
+
+    function testClearStorage() {
+        if(!checkBridge()) return;
+        getBridge().clearStorage();
+        log("Storage cleared.");
+    }
+
+    // 4. 文件
+    function testSaveToDownloads() {
+        if(!checkBridge()) return;
+        const content = "This is a test file content created at " + new Date();
+        const success = getBridge().saveToDownloads("web_test.txt", content, "text/plain");
+        log(`Save to Downloads: ${success}`);
+    }
+
+    function testReadFile() {
+        if(!checkBridge()) return;
+        log("ReadFile (Abstract): " + getBridge().readFile("/sdcard/test.txt"));
+    }
+
+    function testWriteFile() {
+        if(!checkBridge()) return;
+        log("WriteFile (Abstract): " + getBridge().writeFile("/sdcard/test.txt", "content"));
+    }
+
+    function testListFiles() {
+        if(!checkBridge()) return;
+        log("ListFiles (Abstract): " + getBridge().listFiles("/sdcard/"));
+    }
+
+    // 5. 网络
+    function testHttpRequest() {
+        if(!checkBridge()) return;
+        const cbId = createCallback((success, data) => {
+            // data is JSON string
+            log("Http Result: " + data);
+        });
+        // 使用 httpbin.org 测试 GET
+        getBridge().httpRequest("GET", "https://httpbin.org/get", "{}", "", cbId);
+        log("Http Request sent...");
+    }
+
+    // 6. 传感器
+    let sensorCbId = null;
+    function testStartSensor() {
+        if(!checkBridge()) return;
+        sensorCbId = createCallback((success, data) => {
+            log(`Sensor Start Status: ${data}`);
+        });
+        // 你的代码支持: accelerometer, gyroscope, magnetometer, light, proximity
+        getBridge().startSensor("accelerometer", sensorCbId);
+        log("Starting Accelerometer (Look at adb logcat or console logs for data stream)...");
+    }
+
+    function testStopSensor() {
+        if(!checkBridge()) return;
+        getBridge().stopSensor();
+        log("Sensor Stopped");
+        if(sensorCbId) delete callbacks[sensorCbId];
+    }
+
+    // 7. 剪贴板
+    function testCopyToClip() {
+        if(!checkBridge()) return;
+        getBridge().copyToClipboard("Hello Bridge Content");
+    }
+
+    function testGetFromClip() {
+        if(!checkBridge()) return;
+        const cbId = createCallback((success, data) => {
+            log(`Clipboard Content: ${data}`);
+        });
+        getBridge().getFromClipboard(cbId);
+    }
+
+    // 8. Intent
+    function testOpenBrowser() {
+        if(!checkBridge()) return;
+        getBridge().openBrowser("https://www.google.com");
+    }
+
+    function testShare() {
+        if(!checkBridge()) return;
+        getBridge().shareText("分享这段文字给朋友");
+    }
+
+    function testCall() {
+        if(!checkBridge()) return;
+        getBridge().callPhone("10086");
+    }
+
+    function testSMS() {
+        if(!checkBridge()) return;
+        getBridge().sendSMS("10086", "CXLL");
+    }
+
+    function testEmail() {
+        if(!checkBridge()) return;
+        getBridge().sendEmail("test@example.com", "Subject", "Body content");
+    }
+
+    function testMap() {
+        if(!checkBridge()) return;
+        getBridge().openMap(39.9042, 116.4074, "Beijing");
+    }
+
+    function testSettings() {
+        if(!checkBridge()) return;
+        getBridge().openAppSettings();
+    }
+
+    // 9. Screen
+    function testKeepScreen(on) {
+        if(!checkBridge()) return;
+        getBridge().keepScreenOn(on);
+        log(`Keep Screen On: ${on}`);
+    }
+
+    function testBrightness() {
+        if(!checkBridge()) return;
+        getBridge().setScreenBrightness(0.5); // 0.0 - 1.0
+        log("Set brightness to 50%");
+    }
+
+    function testGetBrightness() {
+        if(!checkBridge()) return;
+        log("Current Brightness: " + getBridge().getScreenBrightness());
+    }
+
+    function testVolume() {
+        if(!checkBridge()) return;
+        getBridge().setVolume(10); // 这里的数值依赖于系统最大音量
+        log("Set Volume to 10");
+    }
+
+    function testReload() {
+        if(!checkBridge()) return;
+        getBridge().reloadApp();
+    }
+
+    function testExit() {
+        if(!checkBridge()) return;
+        getBridge().exitApp();
+    }
+
 </script>
 </body>
 </html>

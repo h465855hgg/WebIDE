@@ -1,10 +1,6 @@
 package com.web.webide.ui.editor
 
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
-import android.os.Build
-import android.provider.Settings
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -33,7 +29,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
-import androidx.core.content.FileProvider
 import androidx.navigation.NavController
 import com.web.webide.core.utils.LogCatcher
 import com.web.webide.core.utils.WorkspaceManager
@@ -44,6 +39,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.geometry.lerp
+import com.web.webide.build.ApkInstaller
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -73,14 +69,17 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
     // 构建结果状态
     var buildResult by remember { mutableStateOf<BuildResultState?>(null) }
 
-    // 检测 webapp.json 是否存在
+    // 🔥🔥🔥 修改处：检测 webapp.json 和 src/main/assets/ 是否同时存在 🔥🔥🔥
     val hasWebAppConfig = remember(projectPath) {
-        File(projectPath, "webapp.json").exists()
+        val configFile = File(projectPath, "webapp.json")
+        val assetsDir = File(projectPath, "src/main/assets")
+
+        // 必须同时满足：配置文件存在 且 assets文件夹存在(且确实是文件夹)
+        configFile.exists() && assetsDir.exists() && assetsDir.isDirectory
     }
-// 🔥🔥🔥 新增修复：进入项目时清理不属于当前项目的文件 🔥🔥🔥
+
+    // 进入项目时清理不属于当前项目的文件
     LaunchedEffect(folderName) {
-        // 如果当前有打开的文件，且第一个文件的路径不包含当前项目路径，说明是上一个项目的缓存
-        // 或者你可以简单粗暴地每次进入项目都清空： viewModel.closeAllFiles()
         if (viewModel.openFiles.isNotEmpty()) {
             val firstFile = viewModel.openFiles.first().file
             if (!firstFile.absolutePath.startsWith(projectPath)) {
@@ -152,7 +151,6 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                         IconButton(onClick = {
                             scope.launch {
                                 scope.launch {
-                                    // ✅ 传入 snackbarHostState
                                     viewModel.saveAllModifiedFiles(context, snackbarHostState)
                                     navController.navigate("preview/$folderName")
                                 }
@@ -172,7 +170,6 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                     text = { Text("全部保存") },
                                     onClick = {
                                         scope.launch {
-                                            // ✅ 传入 snackbarHostState
                                             viewModel.saveAllModifiedFiles(
                                                 context,
                                                 snackbarHostState
@@ -182,7 +179,7 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                     }
                                 )
 
-
+                                // 只有当 hasWebAppConfig 为 true (即 json 和 assets 都存在) 时才显示
                                 if (hasWebAppConfig) {
 
                                     DropdownMenuItem(
@@ -205,7 +202,7 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
 
 
                                                 val configFile = File(projectPath, "webapp.json")
-                                                // 1. 【核心修改】变量初始化时直接给默认值，不要给 null
+                                                // 变量初始化时直接给默认值
                                                 var pkg: String = "com.example.webapp"  // 默认包名
                                                 var verName: String = "1.0"
                                                 var verCode: String = "1"
@@ -217,14 +214,10 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                                     try {
                                                         var jsonStr = withContext(Dispatchers.IO) { configFile.readText() }
 
-                                                        // 2. 【核心修改】更强的注释清理逻辑
-                                                        // 这一步是为了防止用户写了 // 注释导致解析失败
-                                                        // 简单的正则可能会误伤 http:// 里的 //，所以我们按行处理
+                                                        // 注释清理逻辑
                                                         val cleanLines = jsonStr.lines().map { line ->
                                                             val index = line.indexOf("//")
                                                             if (index != -1) {
-                                                                // 检查 // 前面是不是 http: 或 https:，如果是 URL 就不删
-                                                                // 这只是个简单的判断，防止误删网址
                                                                 if (index > 0 && (line[index - 1] == ':' || line.substring(0, index).contains("http"))) {
                                                                     line
                                                                 } else {
@@ -234,18 +227,14 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                                                 line
                                                             }
                                                         }
-                                                        // 重新组合成字符串
                                                         jsonStr = cleanLines.joinToString("\n")
 
-                                                        // 3. 开始解析
                                                         val json = JSONObject(jsonStr)
 
-                                                        // 使用 optString 读取，这样即使 key 不存在也不会报错
                                                         pkg = json.optString("package", "com.example.webapp")
                                                         verName = json.optString("versionName", "1.0")
                                                         verCode = json.optString("versionCode", "1")
 
-                                                        // ... 解析 icon, permissions 等 ...
                                                         val iconName = json.optString("icon", "")
                                                         if (iconName.isNotEmpty()) {
                                                             val iconFile = File(projectPath, iconName)
@@ -267,11 +256,7 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                                         }
 
                                                     } catch (e: Exception) {
-                                                        // 4. 【关键】如果解析失败，只打印日志，不崩溃
-                                                        // 因为我们在第1步已经给了默认值，所以 pkg 不会是 null
                                                         LogCatcher.e("Build", "webapp.json 格式错误，将使用默认配置构建", e)
-
-                                                        // 强烈建议：弹个窗告诉用户 JSON 写错了
                                                         scope.launch {
                                                             snackbarHostState.showSnackbar("配置文件格式错误，请检查是否漏了 // 或标点")
                                                         }
@@ -280,21 +265,17 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
 
 
                                                 val result = withContext(Dispatchers.IO) {
-                                                    // 2. 将解析出来的数据显式传递给 ApkBuilder
-
                                                     com.web.webide.build.ApkBuilder.bin(
-                                                        context,           // Context context
-                                                        workspacePath,     // String mRootDir
-                                                        projectPath,       // String projectPath
-                                                        folderName,        // String aname
-                                                        pkg,               // String pkg
-                                                        verName,           // String ver
-                                                        verCode,           // String code
-                                                        iconPath,          // String amph
-                                                        permissions,        // String[] ps
-                                                        isDebug            // 🔥 boolean isDebug
-                                                        // 注意：ApkBuilder.bin 方法的参数列表没有 statusBarConfig
-                                                        // 但我们已在 mergeApk 方法中将 webapp.json 打包到 assets
+                                                        context,
+                                                        workspacePath,
+                                                        projectPath,
+                                                        folderName,
+                                                        pkg,
+                                                        verName,
+                                                        verCode,
+                                                        iconPath,
+                                                        permissions,
+                                                        isDebug
                                                     )
                                                 }
 
@@ -342,10 +323,8 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
             }
         )
 
-        // 弹窗逻辑
         buildResult?.let { result ->
             if (result is BuildResultState.Finished) {
-                // 如果有 APK 路径，就视为成功
                 val isSuccess = result.apkPath != null
 
                 AlertDialog(
@@ -360,7 +339,7 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text("输出路径:", style = MaterialTheme.typography.titleSmall)
                                 Text(
-                                    "${result.apkPath}",
+                                    result.apkPath,
                                     style = MaterialTheme.typography.bodySmall
                                 )
                             } else {
@@ -370,8 +349,11 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                         }
                     },
                     confirmButton = {
-                        if (isSuccess && result.apkPath != null) {
+                        if (isSuccess) {
                             TextButton(onClick = {
+                                val apkFile = File(result.apkPath)
+                                println("准备安装: ${apkFile.absolutePath}, 文件存在? ${apkFile.exists()}")
+                                ApkInstaller.install(context, apkFile)
                                 buildResult = null
                             }) {
                                 Text("安装")
@@ -389,93 +371,8 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
     }
 }
 
-// ---------------- 辅助函数 ----------------
+// ---------------- 辅助函数 (保持不变) ----------------
 
-// 确保 Keystore 存在
-private suspend fun ensureKeystoreExists(context: Context, workspacePath: String): String? {
-    return withContext(Dispatchers.IO) {
-        try {
-            val keystoreName = "WebIDE.jks"
-            val targetKeystore = File(workspacePath, keystoreName)
-
-            if (!targetKeystore.exists()) {
-                try {
-                    context.assets.open(keystoreName).use { input ->
-                        targetKeystore.outputStream().use { output ->
-                            input.copyTo(output)
-                        }
-                    }
-                } catch (e: Exception) {
-                    return@withContext null
-                }
-            }
-            targetKeystore.absolutePath
-        } catch (e: Exception) {
-            null
-        }
-    }
-}
-
-// 安装 APK
-private fun installApk(
-    context: Context, apkFile: File,
-    scope: kotlinx.coroutines.CoroutineScope, // 新增
-    snackbarHostState: SnackbarHostState
-) {
-    if (!apkFile.exists()) {
-        return
-    }
-
-    // Android 8.0+ 权限
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        if (!context.packageManager.canRequestPackageInstalls()) {
-            scope.launch { snackbarHostState.showSnackbar("请开启安装权限") }
-            val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-                data = Uri.parse("package:${context.packageName}")
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(intent)
-            return
-        }
-    }
-
-    try {
-        val authority = "${context.packageName}.provider"
-        val uri = FileProvider.getUriForFile(context, authority, apkFile)
-
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/vnd.android.package-archive")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-
-        context.startActivity(intent)
-
-    } catch (e: Exception) {
-        LogCatcher.e("Install", "Error", e)
-    }
-}
-
-// ✅ 修正后的查找逻辑：去 build 目录找
-private fun findBuiltApk(projectPath: String, appName: String): File? {
-    // 你的 Java 代码写的是 File(projectPath, "build")
-    val buildDir = File(projectPath, "build")
-
-    if (buildDir.exists() && buildDir.isDirectory) {
-        // 优先匹配标准命名: appName + "_release.apk"
-        val specificFile = File(buildDir, "${appName}_release.apk")
-        if (specificFile.exists()) return specificFile
-
-        // 如果没找到标准命名的，找任何以 .apk 结尾的最新文件
-        val apks = buildDir.listFiles { _, name -> name.lowercase().endsWith(".apk") }
-        if (!apks.isNullOrEmpty()) {
-            return apks.maxByOrNull { it.lastModified() }
-        }
-    }
-    return null
-}
-
-// 以下 UI 组件保持不变
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SymbolBar(viewModel: EditorViewModel) {

@@ -1,3 +1,4 @@
+include(":web-bridge")
 
 pluginManagement {
     repositories {
@@ -31,4 +32,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "WebIDE"
-include(":app",":signer",":webapp")
+include(":app",":signer",":webapp",":web-bridge")

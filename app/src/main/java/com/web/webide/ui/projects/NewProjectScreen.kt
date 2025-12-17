@@ -1,6 +1,9 @@
 package com.web.webide.ui.projects
 
 import android.content.Context
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -28,6 +31,7 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FileOutputStream
 import java.util.Locale
 
 // 定义项目类型枚举
@@ -43,6 +47,8 @@ fun NewProjectScreen(navController: NavController) {
     var projectName by remember { mutableStateOf("") }
     var packageName by remember { mutableStateOf("com.example.myapp") }
     var targetUrl by remember { mutableStateOf("https://") }
+    // 🔥 新增：图标路径状态
+    var iconPath by remember { mutableStateOf("") }
 
     var selectedType by remember { mutableStateOf(ProjectType.NORMAL) }
     var isLoading by remember { mutableStateOf(false) }
@@ -52,6 +58,16 @@ fun NewProjectScreen(navController: NavController) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var packageError by remember { mutableStateOf<String?>(null) }
+
+    // 🔥 新增：图片选择器
+    val imageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            iconPath = uri.toString()
+        }
+    }
+
     fun validatePackageName(name: String): String? {
         if (name.isBlank()) return "包名不能为空"
         if (name.any { it.isDigit() }) return "包名不能包含数字" // 禁止数字
@@ -63,6 +79,7 @@ fun NewProjectScreen(navController: NavController) {
 
         return null
     }
+
     // 获取当前工作空间路径
     val workspacePath = WorkspaceManager.getWorkspacePath(context)
 
@@ -152,8 +169,7 @@ fun NewProjectScreen(navController: NavController) {
                 onValueChange = {
                     projectName = it
                     if (selectedType != ProjectType.NORMAL) {
-                        // 🔥🔥🔥 [修改 2/4] 修改：过滤掉数字，只保留字母
-                        // 原代码是: it.filter { c -> c.isLetterOrDigit() }
+                        // 过滤掉数字，只保留字母
                         val cleanName = it.filter { c -> c.isLetter() }.lowercase(Locale.ROOT)
 
                         if (cleanName.isNotEmpty()) {
@@ -170,18 +186,34 @@ fun NewProjectScreen(navController: NavController) {
             AnimatedVisibility(visible = selectedType != ProjectType.NORMAL) {
                 Column {
                     Spacer(modifier = Modifier.height(16.dp))
+
                     OutlinedTextField(
                         value = packageName,
-                        onValueChange = { packageName = it
+                        onValueChange = { input ->
+                            // 🔥🔥🔥 核心修改 1：输入拦截过滤 🔥🔥🔥
+                            // 逻辑：遍历输入的每一个字符，只有符合条件的才保留
+                            // 条件：必须是 字母(a-z/A-Z) 或 点(.) 或 下划线(_)
+                            val filtered = input.filter { char ->
+                                char.isLetter() || char == '.' || char == '_'
+                            }
 
-                            // 🔥🔥🔥 [修改 3/4] 新增：实时校验
-                            packageError = validatePackageName(it)
+                            // 更新状态
+                            packageName = filtered
+
+                            // 继续执行校验（检查格式是否完整，比如是否有点号分隔）
+                            packageError = validatePackageName(filtered)
                         },
                         label = { Text("包名 (Package Name)") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
 
-                        // 🔥🔥🔥 [修改 3/4] 新增：绑定错误状态和提示文字
+                        // 🔥🔥🔥 核心修改 2：键盘属性优化 🔥🔥🔥
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Ascii, // 告诉输入法尽量显示英文键盘
+                            autoCorrect = false, // 🔴 必须关闭！否则输入 com 会被自动纠正为 Come 等单词
+                            imeAction = androidx.compose.ui.text.input.ImeAction.Next
+                        ),
+
                         isError = packageError != null,
                         supportingText = {
                             if (packageError != null) {
@@ -189,8 +221,28 @@ fun NewProjectScreen(navController: NavController) {
                             }
                         }
                     )
+
+
+                    // 🔥🔥🔥 新增：图标选择输入框 🔥🔥🔥
+                    Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = iconPath,
+                        onValueChange = { iconPath = it },
+                        label = { Text("应用图标 (可选)") },
+                        placeholder = { Text("选择图片或输入绝对路径") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        trailingIcon = {
+                            IconButton(onClick = {
+                                // 启动相册选择器
+                                imageLauncher.launch("image/*")
+                            }) {
+                                Icon(Icons.Default.Image, "从相册选择")
+                            }
+                        }
+                    )
                 }
-                }
+            }
 
 
             AnimatedVisibility(visible = selectedType == ProjectType.WEBSITE) {
@@ -226,15 +278,13 @@ fun NewProjectScreen(navController: NavController) {
                         return@Button
                     }
 
-                    // 🔥🔥🔥 [修改 4/4] 必须放在这里！在创建项目之前！🔥🔥🔥
                     // 包名严格校验（禁止中文、禁止数字、必须完整）
                     if (selectedType != ProjectType.NORMAL) {
-                        // 注意：这里需要你上面定义的 validatePackageName 函数
                         val error = validatePackageName(packageName)
                         if (error != null) {
                             packageError = error // 让输入框变红
                             scope.launch { snackbarHostState.showSnackbar("包名错误: $error") }
-                            return@Button // ❌ 拦截成功，不再往下执行
+                            return@Button
                         }
                     }
 
@@ -247,8 +297,9 @@ fun NewProjectScreen(navController: NavController) {
 
                     // 4. 一切检查通过，才开始创建
                     isLoading = true
+                    // 🔥 传入 iconPath
                     createNewProject(
-                        context, projectName, packageName, targetUrl, selectedType,
+                        context, projectName, packageName, targetUrl, iconPath, selectedType,
                         onSuccess = {
                             isLoading = false
                             scope.launch {
@@ -296,7 +347,7 @@ fun TemplateSelectionCard(modifier: Modifier = Modifier, title: String, icon: Im
 
 @OptIn(DelicateCoroutinesApi::class)
 private fun createNewProject(
-    context: Context, projectName: String, packageName: String, targetUrl: String, type: ProjectType,
+    context: Context, projectName: String, packageName: String, targetUrl: String, iconPathSource: String, type: ProjectType,
     onSuccess: () -> Unit, onError: (String) -> Unit
 ) {
     // 1. 获取当前配置的路径字符串
@@ -307,10 +358,8 @@ private fun createNewProject(
         try {
             val projectParentDir: File
 
-            // 🔥🔥🔥 核心判断：如果路径里包含包名，说明是私有目录，强制走系统API 🔥🔥🔥
+            // 核心判断：如果路径里包含包名，说明是私有目录，强制走系统API
             if (savedPath.contains("/Android/data/$appPackageName")) {
-                // 不要信任 savedPath 字符串！直接找系统要最新的对象！
-                // 这一步是 100% 成功的关键，系统会保证返回的 File 对象有写入权限
                 val systemPrivateDir = context.getExternalFilesDir(null)
 
                 if (systemPrivateDir == null) {
@@ -319,48 +368,73 @@ private fun createNewProject(
                 }
                 projectParentDir = systemPrivateDir
             } else {
-                // 如果是用户选的 SD 卡其他目录（非私有），才使用字符串构建 File
                 projectParentDir = File(savedPath)
             }
 
             // 2. 目标项目文件夹
             val projectDir = File(projectParentDir, projectName)
-
-            // 3. 打印调试信息 (如果失败，能在报错里看到真实路径)
             println("正在创建项目于: ${projectDir.absolutePath}")
 
-            // 4. 检查是否存在
+            // 3. 检查是否存在
             if (projectDir.exists()) {
                 withContext(Dispatchers.Main) { onError("该项目已存在") }
                 return@launch
             }
 
-            // 5. 暴力创建目录
-            // 先尝试直接创建
+            // 4. 暴力创建目录
             var success = projectDir.mkdirs()
-
-            // 如果失败，尝试先创建父级（针对某些极端情况）
             if (!success) {
                 if (!projectParentDir.exists()) {
-                    projectParentDir.mkdirs() // 尝试创建 /files 目录
+                    projectParentDir.mkdirs()
                 }
-                success = projectDir.mkdirs() // 再试一次
+                success = projectDir.mkdirs()
             }
 
-            // 6. 最终审判
             if (!success && !projectDir.exists()) {
-                // 获取具体的错误原因很困难，但通常是权限或路径问题
                 withContext(Dispatchers.Main) {
                     onError("无法创建目录！\n尝试路径: ${projectDir.absolutePath}\n请确认不是在根目录或受保护的系统目录。")
                 }
                 return@launch
             }
 
-            // 7. 开始写入文件 (逻辑保持不变)
+            // 🔥🔥🔥 5. 处理图标复制逻辑 🔥🔥🔥
+            var iconFileName = "" // 默认为空，表示没有图标
+            if (type != ProjectType.NORMAL && iconPathSource.isNotBlank()) {
+                try {
+                    val destIconFile = File(projectDir, "icon.png")
+                    val uri = Uri.parse(iconPathSource)
+
+                    // 判断是 Content Uri (相册选择) 还是 File Path (手动输入)
+                    if (iconPathSource.startsWith("content://")) {
+                        context.contentResolver.openInputStream(uri)?.use { input ->
+                            FileOutputStream(destIconFile).use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                    } else {
+                        // 认为是绝对路径
+                        val sourceFile = File(iconPathSource)
+                        if (sourceFile.exists()) {
+                            sourceFile.copyTo(destIconFile, overwrite = true)
+                        }
+                    }
+
+                    if (destIconFile.exists()) {
+                        iconFileName = "icon.png" // 复制成功，标记文件名
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    // 图标复制失败不应该阻断项目创建，只打印日志即可
+                    println("图标复制失败: ${e.message}")
+                }
+            }
+
+            // 6. 开始写入文件
             when (type) {
                 ProjectType.NORMAL -> createNormalStructure(projectDir)
-                ProjectType.WEBAPP -> createWebAppStructure(projectDir, packageName)
-                ProjectType.WEBSITE -> createWebsiteStructure(projectDir, packageName, targetUrl)
+                // 将 iconFileName 传给结构生成函数
+                ProjectType.WEBAPP -> createWebAppStructure(projectDir, packageName, iconFileName)
+                ProjectType.WEBSITE -> createWebsiteStructure(projectDir, packageName, targetUrl, iconFileName)
             }
 
             withContext(Dispatchers.Main) { onSuccess() }
@@ -373,18 +447,18 @@ private fun createNewProject(
         }
     }
 }
+
 private fun createNormalStructure(projectDir: File) {
-    // 确保子目录存在
     val css = File(projectDir, "css"); css.mkdirs()
     val js = File(projectDir, "js"); js.mkdirs()
 
-    // 写入文件 (使用 safe write)
     safeWrite(File(projectDir, "index.html"), ProjectTemplates.normalIndexHtml)
     safeWrite(File(css, "style.css"), ProjectTemplates.normalCss)
     safeWrite(File(js, "script.js"), ProjectTemplates.normalJs)
 }
 
-private fun createWebAppStructure(projectDir: File, packageName: String) {
+// 🔥 新增 icon 参数
+private fun createWebAppStructure(projectDir: File, packageName: String, icon: String) {
     val assets = File(projectDir, "src/main/assets")
     assets.mkdirs()
     File(assets, "js").mkdirs()
@@ -395,11 +469,22 @@ private fun createWebAppStructure(projectDir: File, packageName: String) {
     safeWrite(File(assets, "js/index.js"), ProjectTemplates.webAppIndexJs)
     safeWrite(File(assets, "css/style.css"), ProjectTemplates.webAppCss)
 
-    // 生成配置
-    safeWrite(File(projectDir, "webapp.json"), ProjectTemplates.getConfigFile(packageName, projectDir.name, "index.html"))
+    // 生成配置，这里假设你的 ProjectTemplates.getConfigFile 支持 icon 参数，或者你需要手动拼装 JSON
+    // 如果 ProjectTemplates 不支持，建议修改它或者在这里手动覆盖
+    val configContent = ProjectTemplates.getConfigFile(packageName, projectDir.name, "index.html")
+
+    // 简单的 JSON 插入逻辑 (如果 template 没有支持的话)
+    val finalConfig = if (icon.isNotEmpty()) {
+        insertIconToJson(configContent, icon)
+    } else {
+        configContent
+    }
+
+    safeWrite(File(projectDir, "webapp.json"), finalConfig)
 }
 
-private fun createWebsiteStructure(projectDir: File, packageName: String, targetUrl: String) {
+// 🔥 新增 icon 参数
+private fun createWebsiteStructure(projectDir: File, packageName: String, targetUrl: String, icon: String) {
     val assets = File(projectDir, "src/main/assets")
     assets.mkdirs()
 
@@ -411,10 +496,32 @@ private fun createWebsiteStructure(projectDir: File, packageName: String, target
         </html>
     """.trimIndent())
 
-    safeWrite(File(projectDir, "webapp.json"), ProjectTemplates.getConfigFile(packageName, projectDir.name, targetUrl))
+    val configContent = ProjectTemplates.getConfigFile(packageName, projectDir.name, targetUrl)
+    // 简单的 JSON 插入逻辑
+    val finalConfig = if (icon.isNotEmpty()) {
+        insertIconToJson(configContent, icon)
+    } else {
+        configContent
+    }
+
+    safeWrite(File(projectDir, "webapp.json"), finalConfig)
 }
 
-// 辅助方法：安全写入，防止父目录不存在导致崩溃
+// 辅助函数：向 JSON 字符串中插入 icon 字段 (防止 Template 类没更新)
+private fun insertIconToJson(json: String, iconPath: String): String {
+    // 找到最后一个大括号，在它之前插入 icon 字段
+    val lastBraceIndex = json.lastIndexOf('}')
+    if (lastBraceIndex != -1) {
+        val prefix = json.substring(0, lastBraceIndex).trimEnd()
+        // 检查前面是否有逗号，如果没有且前面有内容，可能需要补逗号(简化处理：假设template生成的总是标准的)
+        // 比较安全的做法是直接追加
+        val needsComma = !prefix.endsWith("{") && !prefix.endsWith(",")
+        val comma = if (needsComma) "," else ""
+        return "$prefix$comma\n  \"icon\": \"$iconPath\"\n}"
+    }
+    return json
+}
+
 private fun safeWrite(file: File, content: String) {
     try {
         if (!file.parentFile!!.exists()) {
