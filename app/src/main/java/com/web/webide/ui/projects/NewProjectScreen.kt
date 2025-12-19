@@ -30,6 +30,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Locale
@@ -509,17 +510,23 @@ private fun createWebsiteStructure(projectDir: File, packageName: String, target
 
 // 辅助函数：向 JSON 字符串中插入 icon 字段 (防止 Template 类没更新)
 private fun insertIconToJson(json: String, iconPath: String): String {
-    // 找到最后一个大括号，在它之前插入 icon 字段
-    val lastBraceIndex = json.lastIndexOf('}')
-    if (lastBraceIndex != -1) {
-        val prefix = json.substring(0, lastBraceIndex).trimEnd()
-        // 检查前面是否有逗号，如果没有且前面有内容，可能需要补逗号(简化处理：假设template生成的总是标准的)
-        // 比较安全的做法是直接追加
-        val needsComma = !prefix.endsWith("{") && !prefix.endsWith(",")
-        val comma = if (needsComma) "," else ""
-        return "$prefix$comma\n  \"icon\": \"$iconPath\"\n}"
+    try {
+        val jsonObject = JSONObject(json)
+        jsonObject.put("icon", iconPath)
+        // 如果想在创建时就指定默认 UA，也可以在这里加：
+        // jsonObject.getJSONObject("webview").put("userAgent", "Mozilla/5.0...")
+        return jsonObject.toString(2) // 格式化输出，带2个空格缩进
+    } catch (e: Exception) {
+        // 退而求其次：如果 JSONObject 报错，使用你原来的字符串截取逻辑（作为保底）
+        val lastBraceIndex = json.lastIndexOf('}')
+        if (lastBraceIndex != -1) {
+            val prefix = json.substring(0, lastBraceIndex).trimEnd()
+            val needsComma = !prefix.endsWith("{") && !prefix.endsWith(",")
+            val comma = if (needsComma) "," else ""
+            return "$prefix$comma\n  \"icon\": \"$iconPath\"\n}"
+        }
+        return json
     }
-    return json
 }
 
 private fun safeWrite(file: File, content: String) {

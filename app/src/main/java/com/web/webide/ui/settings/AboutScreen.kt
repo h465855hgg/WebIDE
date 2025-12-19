@@ -150,7 +150,7 @@ fun AboutScreen(navController: NavController) {
     // 3. 捐赠名单
     val donorList = remember {
         listOf(
-            Donor("2051775505", "・是小浣熊哦・", "¥ 20.00", "2025.12"),
+            Donor("2051775505", "・是小浣熊哦・", "¥ 30.00", "2025.12"),
         )
     }
 
@@ -536,7 +536,7 @@ private fun AppHeaderSection() {
                         modifier = Modifier.padding(top = 8.dp)
                     ) {
                         Text(
-                            text = "v0.1.5 Beta",
+                            text = "v0.1.6 Beta",
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSecondaryContainer,

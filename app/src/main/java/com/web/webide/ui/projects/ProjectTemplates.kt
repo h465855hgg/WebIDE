@@ -141,6 +141,11 @@ function testToast() {
     "backgroundColor": "#FFFFFF",
     "style": "dark"
   },
+  "webview": {
+    "userAgent": "",
+    "zoomEnabled": false,
+    "textZoom": 100
+  },
   "permissions": [
     "android.permission.INTERNET",
     "android.permission.VIBRATE",
@@ -149,5 +154,5 @@ function testToast() {
     "android.permission.POST_NOTIFICATIONS"
   ]
 }
-    """.trimIndent()
+""".trimIndent()
 }

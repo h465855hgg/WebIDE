@@ -21,8 +21,6 @@ import android.os.Build
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
-import android.os.VibrationEffect
-import android.os.Vibrator
 import android.provider.MediaStore
 import android.provider.Settings
 import android.telephony.TelephonyManager
@@ -31,19 +29,16 @@ import android.view.WindowManager
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.widget.Toast
+import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.File
-import java.io.FileOutputStream
 import java.net.HttpURLConnection
-import java.net.NetworkInterface
 import java.net.URL
 import java.nio.charset.StandardCharsets
 import java.text.SimpleDateFormat
-import java.util.Collections
 import java.util.Date
 import java.util.Locale
 import kotlin.collections.component1
@@ -107,6 +102,7 @@ open class SharedWebInterface(
     // 通用方法区域
     // ==========================================================
 
+    @RequiresApi(Build.VERSION_CODES.Q)
     @JavascriptInterface
     fun saveToDownloads(filename: String, content: String, mimeType: String): Boolean {
         return try {
@@ -249,24 +245,6 @@ open class SharedWebInterface(
             } catch (e: Exception) {
                 e.printStackTrace()
                 Toast.makeText(context, "通知发送失败: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-    @JavascriptInterface
-    fun vibrate(milliseconds: Long) {
-        runOnMain {
-            try {
-                val v = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-                if (v.hasVibrator()) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        v.vibrate(VibrationEffect.createOneShot(milliseconds, VibrationEffect.DEFAULT_AMPLITUDE))
-                    } else {
-                        @Suppress("DEPRECATION") v.vibrate(milliseconds)
-                    }
-                }
-            } catch (e: Exception) {
-                // 忽略震动错误
             }
         }
     }
@@ -450,6 +428,104 @@ open class SharedWebInterface(
         runOnMain { val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS); intent.data = Uri.fromParts("package", context.packageName, null); context.startActivity(intent) }
     }
 
+    @JavascriptInterface
+    fun startActivity(jsonStr: String, callbackId: String) {
+        runOnMain {
+            try {
+                val config = JSONObject(jsonStr)
+                val intent = Intent()
+
+                // 1. 设置 Action
+                config.optString("action").takeIf { it.isNotEmpty() }?.let { intent.action = it }
+
+                // 2. 设置 Data 和 Type (注意顺序，setDataAndType 会互相清除)
+                val uriStr = config.optString("uri")
+                val type = config.optString("type")
+                if (uriStr.isNotEmpty() && type.isNotEmpty()) {
+                    intent.setDataAndType(Uri.parse(uriStr), type)
+                } else if (uriStr.isNotEmpty()) {
+                    intent.data = Uri.parse(uriStr)
+                } else if (type.isNotEmpty()) {
+                    intent.type = type
+                }
+
+                // 3. 设置 Component (包名类名)
+                val pkg = config.optString("package")
+                val cls = config.optString("className")
+                if (pkg.isNotEmpty() && cls.isNotEmpty()) {
+                    intent.setClassName(pkg, cls)
+                } else if (pkg.isNotEmpty()) {
+                    intent.setPackage(pkg)
+                }
+
+                // 4. 设置 Extras (根据类型自动转换)
+                config.optJSONObject("extras")?.let { extrasJson ->
+                    val keys = extrasJson.keys()
+                    while (keys.hasNext()) {
+                        val key = keys.next()
+                        when (val value = extrasJson.get(key)) {
+                            is String -> intent.putExtra(key, value)
+                            is Int -> intent.putExtra(key, value)
+                            is Boolean -> intent.putExtra(key, value)
+                            is Double -> intent.putExtra(key, value)
+                            is Long -> intent.putExtra(key, value)
+                        }
+                    }
+                }
+
+                // 5. 设置 Flags
+                config.optJSONArray("flags")?.let { flagsArr ->
+                    for (i in 0 until flagsArr.length()) {
+                        intent.addFlags(flagsArr.getInt(i))
+                    }
+                }
+
+                // 确保非 Activity Context 能正常启动
+                if (context !is Activity) {
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+
+                // 6. 执行启动
+                if (intent.resolveActivity(context.packageManager) != null || pkg.isNotEmpty()) {
+                    context.startActivity(intent)
+                    sendResultToJs(callbackId, true, "Success")
+                } else {
+                    sendResultToJs(callbackId, false, "No activity found to handle this intent")
+                }
+
+            } catch (e: Exception) {
+                e.printStackTrace()
+                sendResultToJs(callbackId, false, "Error: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * 快捷跳转系统特定设置页面
+     * @param type 设置类型：wifi, bluetooth, display, battery, location, nfc 等
+     */
+    @JavascriptInterface
+    fun openSystemSetting(type: String) {
+        runOnMain {
+            val action = when (type.lowercase()) {
+                "wifi" -> Settings.ACTION_WIFI_SETTINGS
+                "bluetooth" -> Settings.ACTION_BLUETOOTH_SETTINGS
+                "display" -> Settings.ACTION_DISPLAY_SETTINGS
+                "battery" -> Settings.ACTION_BATTERY_SAVER_SETTINGS
+                "location" -> Settings.ACTION_LOCATION_SOURCE_SETTINGS
+                "nfc" -> Settings.ACTION_NFC_SETTINGS
+                "internal_storage" -> Settings.ACTION_INTERNAL_STORAGE_SETTINGS
+                "date" -> Settings.ACTION_DATE_SETTINGS
+                else -> Settings.ACTION_SETTINGS
+            }
+            try {
+                val intent = Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(intent)
+            } catch (e: Exception) {
+                showToast("无法打开设置: $type")
+            }
+        }
+    }
     @JavascriptInterface
     fun reloadApp() { runOnMain { (context as? Activity)?.recreate() } }
     @JavascriptInterface

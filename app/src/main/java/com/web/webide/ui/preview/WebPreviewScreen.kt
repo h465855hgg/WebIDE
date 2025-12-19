@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Refresh
@@ -41,6 +42,14 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
 
+// 定义 UA 常量
+object UserAgents {
+    const val DEFAULT = "Default"
+    const val PC = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    const val IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+    const val ANDROID = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36"
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WebPreviewScreen(folderName: String, navController: NavController, viewModel: EditorViewModel) {
@@ -50,6 +59,7 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
     val projectDir = File(workspacePath, folderName)
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+
     // --- 0. 状态管理 ---
     val prefs = remember { context.getSharedPreferences("WebIDE_Project_Settings", Context.MODE_PRIVATE) }
 
@@ -57,6 +67,12 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
     var isDebugEnabled by remember {
         mutableStateOf(prefs.getBoolean("debug_$folderName", false))
     }
+
+    // 🔥 新增：UA 类型状态
+    var currentUAType by remember {
+        mutableStateOf(prefs.getString("ua_type_$folderName", UserAgents.DEFAULT) ?: UserAgents.DEFAULT)
+    }
+    var showUAMenu by remember { mutableStateOf(false) }
 
     // 刷新配置的触发器
     var configRefreshTrigger by remember { mutableLongStateOf(0L) }
@@ -69,6 +85,16 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
         isDebugEnabled = !isDebugEnabled
         prefs.edit().putBoolean("debug_$folderName", isDebugEnabled).apply()
         scope.launch { snackbarHostState.showSnackbar(if (isDebugEnabled) "调试模式已开启" else "调试模式已关闭") }
+    }
+
+    // 🔥 新增：切换 UA 函数
+    fun updateUA(type: String) {
+        currentUAType = type
+        prefs.edit().putString("ua_type_$folderName", type).apply()
+        showUAMenu = false
+        // 触发刷新
+        configRefreshTrigger = System.currentTimeMillis()
+        scope.launch { snackbarHostState.showSnackbar("UA 已切换为: ${if(type == UserAgents.DEFAULT) "默认" else "自定义"}") }
     }
 
     // --- 1. 权限申请 ---
@@ -94,7 +120,6 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
             if (configFile.exists()) {
                 try {
                     val rawJson = configFile.readText()
-                    // 去除注释逻辑
                     val cleanJson = rawJson.lines().map { line ->
                         val index = line.indexOf("//")
                         if (index != -1) {
@@ -203,15 +228,14 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
     }
 
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
-    val refreshKey = remember(config, isDebugEnabled) { System.currentTimeMillis() }
+    // 注意：key 里加入了 currentUAType，确保 UA 切换时 WebView 能正确重载配置
+    val refreshKey = remember(config, isDebugEnabled, currentUAType, configRefreshTrigger) { System.currentTimeMillis() }
 
     // --- 物理返回键拦截逻辑 ---
     BackHandler(enabled = true) {
         if (isJsHandlingBack) {
-            // 让 JS 处理返回
             webViewRef?.evaluateJavascript("if(window.onAndroidBack) window.onAndroidBack();", null)
         } else {
-            // 默认 WebView 后退或退出
             if (webViewRef?.canGoBack() == true) {
                 webViewRef?.goBack()
             } else {
@@ -232,6 +256,36 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
                         }
                     },
                     actions = {
+                        // 🔥 新增：UA 切换菜单
+                        Box {
+                            IconButton(onClick = { showUAMenu = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.Devices,
+                                    contentDescription = "切换 UA",
+                                    tint = if (currentUAType != UserAgents.DEFAULT) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            DropdownMenu(expanded = showUAMenu, onDismissRequest = { showUAMenu = false }) {
+                                DropdownMenuItem(
+                                    text = { Text("默认 (移动端)") },
+                                    onClick = { updateUA(UserAgents.DEFAULT) },
+                                    trailingIcon = { if(currentUAType == UserAgents.DEFAULT) Icon(Icons.Default.Refresh, null, Modifier.size(16.dp)) }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("桌面模式 (PC)") },
+                                    onClick = { updateUA(UserAgents.PC) }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("iPhone (Safari)") },
+                                    onClick = { updateUA(UserAgents.IPHONE) }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Android (Chrome)") },
+                                    onClick = { updateUA(UserAgents.ANDROID) }
+                                )
+                            }
+                        }
+
                         IconButton(onClick = { toggleDebugMode() }) {
                             Icon(
                                 imageVector = Icons.Default.BugReport,
@@ -263,12 +317,13 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
                     factory = { ctx ->
                         WebView(ctx).apply {
                             layoutParams = ViewGroup.LayoutParams(-1, -1)
-                            // 传入 onBackStateChange 回调
                             configureFullWebView(
                                 webView = this,
                                 context = ctx,
                                 config = config,
                                 projectDir = projectDir,
+                                // 🔥 传入当前选择的 UA
+                                manualUA = currentUAType,
                                 onShowFileChooser = { callback, params ->
                                     filePathCallback = callback
                                     try {
@@ -401,8 +456,9 @@ private fun configureFullWebView(
     context: Context,
     config: JSONObject?,
     projectDir: File,
+    manualUA: String, // 🔥 新增：手动选择的 UA
     onShowFileChooser: (ValueCallback<Array<Uri>>, WebChromeClient.FileChooserParams?) -> Boolean,
-    onBackStateChange: (Boolean) -> Unit // 新增参数
+    onBackStateChange: (Boolean) -> Unit
 ) {
     val settings = webView.settings
     settings.javaScriptEnabled = true
@@ -417,6 +473,10 @@ private fun configureFullWebView(
     settings.loadWithOverviewMode = true
     settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
 
+    // --- UA 设置逻辑 ---
+    var finalUA = ""
+
+    // 1. 如果有 webapp.json 配置，先取配置里的 UA
     if (config != null) {
         val wv = config.optJSONObject("webview")
         if (wv != null) {
@@ -424,14 +484,25 @@ private fun configureFullWebView(
             settings.builtInZoomControls = wv.optBoolean("zoomEnabled", false)
             settings.displayZoomControls = false
             settings.textZoom = wv.optInt("textZoom", 100)
-            val ua = wv.optString("userAgent", "")
-            if (ua.isNotEmpty()) settings.userAgentString = ua
+            finalUA = wv.optString("userAgent", "")
         }
+    }
+
+    // 2. 如果手动选择了非“默认”模式，则强制覆盖
+    if (manualUA != UserAgents.DEFAULT) {
+        finalUA = manualUA
+    }
+
+    // 3. 应用 UA
+    if (finalUA.isNotEmpty()) {
+        settings.userAgentString = finalUA
+    } else {
+        // 如果 finalUA 为空，表示使用系统默认移动端 UA
+        settings.userAgentString = null
     }
 
     val packageName = config?.optString("package", "com.example.webapp") ?: "com.web.preview"
 
-    // 初始化 Interface 并注入
     webView.addJavascriptInterface(
         FullWebAppInterface(context, webView, packageName, projectDir, onBackStateChange),
         "Android"
@@ -461,4 +532,3 @@ private fun configureFullWebView(
     }
     WebView.setWebContentsDebuggingEnabled(true)
 }
-

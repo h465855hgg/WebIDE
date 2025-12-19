@@ -1,6 +1,7 @@
 package com.web.webide.ui.editor.components
 
 import android.content.Context
+import android.graphics.Typeface
 import android.view.ViewGroup
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
@@ -26,8 +27,10 @@ import io.github.rosemoe.sora.langs.textmate.registry.GrammarRegistry
 import io.github.rosemoe.sora.langs.textmate.registry.ThemeRegistry
 import io.github.rosemoe.sora.langs.textmate.registry.model.ThemeModel
 import io.github.rosemoe.sora.langs.textmate.registry.provider.AssetsFileResolver
-import org.eclipse.tm4e.core.registry.IThemeSource
+import io.github.rosemoe.sora.widget.CodeEditor
 import kotlinx.coroutines.launch
+import org.eclipse.tm4e.core.registry.IThemeSource
+import java.io.File
 
 @Composable
 fun CodeEditorView(
@@ -38,41 +41,47 @@ fun CodeEditorView(
     val context = LocalContext.current
     var isEditorReady by remember { mutableStateOf(false) }
 
-    // ✅ 获取主题 ViewModel
-    val themeViewModel: ThemeViewModel = viewModel(
-        factory = ThemeViewModelFactory(context)
-    )
-    val themeState by themeViewModel.themeState.collectAsState()
+    val editorConfig = viewModel.editorConfig
 
-    // ✅ 确定最终的暗色模式状态
-    val systemDark = isSystemInDarkTheme()
-    val isDark = when (themeState.selectedModeIndex) {
-        0 -> systemDark  // 跟随系统
-        1 -> false       // 强制浅色
-        2 -> true        // 强制深色
-        else -> systemDark
-    }
-
-    // ✅ 确定主题色
-    val seedColor = if (themeState.isCustomTheme) {
-        themeState.customColor
-    } else {
-        MaterialTheme.colorScheme.primary
-    }
-
-    // ✅ 当主题色或明暗模式变化时，更新编辑器配色
-    LaunchedEffect(seedColor, isDark, isEditorReady) {
-        if (isEditorReady) {
-            viewModel.updateEditorTheme(seedColor, isDark)
+    // === 字体加载逻辑优化 ===
+    // 优先尝试加载外部文件，如果不存在则加载 assets，最后回退到默认
+    val editorTypeface = remember(editorConfig.fontPath) {
+        if (editorConfig.fontPath.isBlank()) {
+            Typeface.MONOSPACE
+        } else {
+            try {
+                val file = File(editorConfig.fontPath)
+                if (file.exists() && file.isFile && file.canRead()) {
+                    // 1. 尝试从绝对路径加载
+                    Typeface.createFromFile(file)
+                } else {
+                    // 2. 尝试从 Assets 加载
+                    Typeface.createFromAsset(context.assets, editorConfig.fontPath)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                Typeface.MONOSPACE
+            }
         }
     }
 
-    // 获取编辑器实例
-    val editor = remember(state.file.absolutePath) {
-        viewModel.getOrCreateEditor(context, state)
+    val themeViewModel: ThemeViewModel = viewModel(factory = ThemeViewModelFactory(context))
+    val themeState by themeViewModel.themeState.collectAsState()
+    val systemDark = isSystemInDarkTheme()
+    val isDark = when (themeState.selectedModeIndex) {
+        0 -> systemDark
+        1 -> false
+        2 -> true
+        else -> systemDark
+    }
+    val seedColor = if (themeState.isCustomTheme) themeState.customColor else MaterialTheme.colorScheme.primary
+
+    LaunchedEffect(seedColor, isDark, isEditorReady) {
+        if (isEditorReady) viewModel.updateEditorTheme(seedColor, isDark)
     }
 
-    // 等待 TextMate 初始化完成并编辑器准备好
+    val editor = remember(state.file.absolutePath) { viewModel.getOrCreateEditor(context, state) }
+
     LaunchedEffect(state.file.absolutePath) {
         if (!TextMateInitializer.isReady()) {
             TextMateInitializer.initialize(context) {
@@ -85,24 +94,36 @@ fun CodeEditorView(
         }
     }
 
-    DisposableEffect(state.file.absolutePath) {
-        onDispose {
-            // ViewModel 管理编辑器生命周期
-        }
-    }
-
     Box(
         modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
         if (isEditorReady) {
             AndroidView(
-                factory = { factoryContext ->
+                factory = { _ ->
                     (editor.parent as? ViewGroup)?.removeView(editor)
                     editor
                 },
                 modifier = Modifier.fillMaxSize(),
                 update = { view ->
+                    // 应用字体
+                    view.typefaceText = editorTypeface
+                    view.typefaceLineNumber = editorTypeface
+
+                    // 其他配置
+                    view.isWordwrap = editorConfig.wordWrap
+                    view.tabWidth = editorConfig.tabWidth
+
+                    if (editorConfig.showInvisibles) {
+                        view.nonPrintablePaintingFlags =
+                            CodeEditor.FLAG_DRAW_WHITESPACE_LEADING or
+                                    CodeEditor.FLAG_DRAW_WHITESPACE_INNER or
+                                    CodeEditor.FLAG_DRAW_WHITESPACE_TRAILING or
+                                    CodeEditor.FLAG_DRAW_LINE_SEPARATOR
+                    } else {
+                        view.nonPrintablePaintingFlags = 0
+                    }
+
                     if (view.text.toString() != state.content) {
                         val cursor = view.cursor
                         val cursorLine = cursor.leftLine
@@ -111,7 +132,7 @@ fun CodeEditorView(
                         try {
                             val lineCount = view.text.lineCount
                             val targetLine = cursorLine.coerceIn(0, lineCount - 1)
-                            val lineLength = view.text.getColumnCount(targetLine)
+                            val lineLength = if (targetLine < view.text.lineCount) view.text.getColumnCount(targetLine) else 0
                             val targetColumn = cursorColumn.coerceIn(0, lineLength)
                             view.setSelection(targetLine, targetColumn)
                         } catch (e: Exception) {

@@ -5,6 +5,7 @@ agp = "8.13.1"
 coilCompose = "2.7.0"
 datastoreCore = "1.2.0"
 editorVersion = "0.24.3"
+jsoup = "1.21.2"
 kotlin = "2.2.21"
 coreKtx = "1.17.0"
 junit = "4.13.2"
@@ -24,6 +25,10 @@ gson = "2.13.2"
 zipalignJava = "1.2.2"
 material = "1.13.0"
 volley = "1.2.1"
+foundation = "1.10.0"
+uiText = "1.10.0"
+runtime = "1.10.0"
+material3 = "1.4.0"
 
 [libraries]
 aboutlibraries-compose = { module = "com.mikepenz:aboutlibraries-compose", version.ref = "aboutlibrariesCompose" }
@@ -36,6 +41,7 @@ androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-
 androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigationCompose" }
 coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coilCompose" }
 editor = { module = "io.github.rosemoe:editor", version.ref = "editorVersion" }
+jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
@@ -61,6 +67,10 @@ gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 zipalign-java = { module = "com.github.iyxan23:zipalign-java", version.ref = "zipalignJava" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 volley = { group = "com.android.volley", name = "volley", version.ref = "volley" }
+androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
+androidx-compose-ui-text = { group = "androidx.compose.ui", name = "ui-text", version.ref = "uiText" }
+androidx-compose-runtime = { group = "androidx.compose.runtime", name = "runtime", version.ref = "runtime" }
+androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

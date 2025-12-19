@@ -17,6 +17,7 @@ import io.github.rosemoe.sora.langs.textmate.TextMateColorScheme
 import io.github.rosemoe.sora.langs.textmate.TextMateLanguage
 import io.github.rosemoe.sora.langs.textmate.registry.ThemeRegistry
 import io.github.rosemoe.sora.text.Content
+import io.github.rosemoe.sora.widget.EditorSearcher
 import io.github.rosemoe.sora.text.ContentListener
 import io.github.rosemoe.sora.widget.CodeEditor
 import kotlinx.coroutines.Dispatchers
@@ -41,6 +42,20 @@ data class CodeEditorState(
         savedContent = content
     }
 }
+// 1. 定义配置数据类
+// 1. 修改配置数据类，增加 fontPath
+data class EditorConfig(
+    val fontSize: Float = 14f,
+    val tabWidth: Int = 4,
+    val showLineNumbers: Boolean = true,
+    val wordWrap: Boolean = false,
+    val showInvisibles: Boolean = false,
+    val showToolbar: Boolean = true,
+    val fontPath: String = "", // 空字符串代表系统默认，否则填文件名如 "JetBrainsMono-Regular.ttf"
+    val customSymbols: String = "Tab,<,>,/,=,\",',!,?,;,:,{,},[,],(,),+,-,*,_,&,|"
+) {
+    fun getSymbolList(): List<String> = customSymbols.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+}
 
 class EditorViewModel : ViewModel() {
     var hasShownInitialLoader by mutableStateOf(false)
@@ -53,11 +68,25 @@ class EditorViewModel : ViewModel() {
         private set
     private val editorInstances = mutableMapOf<String, CodeEditor>()
     private val supportedLanguageScopes = setOf("text.html.basic", "source.css", "source.js")
-
+    var editorConfig by mutableStateOf(EditorConfig())
+        private set
     // 权限检查
     private var hasPermissions = false
     private lateinit var appContext: Context
 
+    // 2. 更新加载逻辑
+    fun reloadEditorConfig(context: Context) {
+        val prefs = context.getSharedPreferences("WebIDE_Editor_Settings", Context.MODE_PRIVATE)
+        editorConfig = EditorConfig(
+            fontSize = prefs.getFloat("editor_font_size", 14f),
+            tabWidth = prefs.getInt("editor_tab_width", 4),
+            wordWrap = prefs.getBoolean("editor_word_wrap", false),
+            showInvisibles = prefs.getBoolean("editor_show_invisibles", false),
+            showToolbar = prefs.getBoolean("editor_show_toolbar", true),
+            fontPath = prefs.getString("editor_font_path", "") ?: "", // 加载字体路径
+            customSymbols = prefs.getString("editor_custom_symbols", "Tab,<,>,/,=,\",',!,?,;,:,{,},[,],(,),+,-,*,_,&,|") ?: ""
+        )
+    }
     fun initializePermissions(context: Context) {
         appContext = context.applicationContext
         hasPermissions = PermissionManager.hasRequiredPermissions(appContext)
@@ -181,6 +210,140 @@ class EditorViewModel : ViewModel() {
         }
     }
 
+    private var lastSearchQuery = ""
+    private var isIgnoreCase = true // 默认忽略大小写
+    fun getActiveEditor(): CodeEditor? {
+        val activeFile = openFiles.getOrNull(activeFileIndex) ?: return null
+        return editorInstances[activeFile.file.absolutePath]
+    }
+    fun searchText(query: String, ignoreCase: Boolean = isIgnoreCase) {
+        lastSearchQuery = query
+        isIgnoreCase = ignoreCase
+        val editor = getActiveEditor() ?: return
+
+        if (query.isNotEmpty()) {
+            editor.searcher.search(query, EditorSearcher.SearchOptions(ignoreCase, false))
+        } else {
+            editor.searcher.stopSearch()
+        }
+    }
+    // EditorViewModel.kt 中的修改
+    fun searchNext() {
+        val editor = getActiveEditor() ?: return
+        // 关键：只有在已经有查询词且搜索结果不为空时才跳转
+        if (editor.searcher.hasQuery()) {
+            try {
+                editor.searcher.gotoNext()
+            } catch (e: Exception) {
+                LogCatcher.e("Search", "Next failed", e)
+            }
+        }
+    }
+
+    fun searchPrev() {
+        val editor = getActiveEditor() ?: return
+        if (editor.searcher.hasQuery()) {
+            try {
+                editor.searcher.gotoPrevious()
+            } catch (e: Exception) {
+                LogCatcher.e("Search", "Prev failed", e)
+            }
+        }
+    }
+
+    fun replaceCurrent(replaceText: String) {
+        try {
+            getActiveEditor()?.searcher?.replaceCurrentMatch(replaceText)
+        } catch (e: Exception) {
+            LogCatcher.e("Search", "Replace failed", e)
+        }
+    }
+
+    fun replaceAll(replaceText: String) {
+        try {
+            getActiveEditor()?.searcher?.replaceAll(replaceText)
+        } catch (e: Exception) {
+            LogCatcher.e("Search", "Replace all failed", e)
+        }
+    }
+
+    fun stopSearch() {
+        getActiveEditor()?.searcher?.stopSearch()
+    }
+
+    private var isFormatting = false
+    fun formatCode() {
+        if (isFormatting) return
+        isFormatting = true
+        val activeFile = openFiles.getOrNull(activeFileIndex) ?: return
+        val filePath = activeFile.file.absolutePath
+        val editor = editorInstances[filePath] ?: return
+        val extension = activeFile.file.extension
+
+        viewModelScope.launch(Dispatchers.Default) {
+            val originalCode = editor.text.toString()
+            // 传入当前配置的缩进宽度
+            val formattedCode = com.web.webide.core.utils.CodeFormatter.format(originalCode, extension, editorConfig.tabWidth)
+
+            if (formattedCode != originalCode) {
+                withContext(Dispatchers.Main) {
+                    val text = editor.text
+                    // ...
+                    val lastLine = text.lineCount - 1
+                    // 修复 getColumnCount 可能越界的问题
+                    val lastColumn = if(lastLine >= 0) text.getColumnCount(lastLine) else 0
+                    text.replace(0, 0, lastLine, lastColumn, formattedCode)
+                    activeFile.content = formattedCode
+                }
+            }
+            isFormatting = false // 别忘了重置标志位
+        }
+    }
+
+    fun jumpToLine(lineStr: String) {
+        val line = lineStr.toIntOrNull() ?: return
+        val editor = getActiveEditor() ?: return
+        val totalLines = editor.text.lineCount
+
+        // 限制范围
+        val targetLine = (line - 1).coerceIn(0, totalLines - 1)
+
+        // 执行跳转
+        editor.setSelection(targetLine, 0)
+        editor.ensureSelectionVisible()
+
+    }
+
+    // 2. 插入文本 (用于调色板)
+    fun insertText(text: String) {
+        val editor = getActiveEditor() ?: return
+        val cursor = editor.cursor
+        editor.text.insert(cursor.leftLine, cursor.leftColumn, text)
+    }
+
+    // 3. 创建文件或文件夹
+    fun createNewItem(parentPath: String, name: String, isFile: Boolean, onSuccess: (File) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val newItem = File(parentPath, name)
+                if (newItem.exists()) return@launch
+
+                val success = if (isFile) {
+                    newItem.createNewFile()
+                } else {
+                    newItem.mkdirs()
+                }
+
+                if (success) {
+                    withContext(Dispatchers.Main) {
+                        onSuccess(newItem)
+                    }
+                }
+            } catch (e: Exception) {
+                LogCatcher.e("FileOps", "创建失败", e)
+            }
+        }
+    }
     suspend fun saveAllModifiedFiles(context: Context, snackbarHostState: SnackbarHostState) {
         withContext(Dispatchers.IO) {
             val modifiedFiles = openFiles.filter { it.isModified }
