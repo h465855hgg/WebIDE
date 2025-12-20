@@ -4,6 +4,9 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.*
+import android.content.pm.ActivityInfo
+import android.content.pm.PackageManager
+import android.graphics.Color as AndroidColor
 import android.net.Uri
 import android.os.*
 import android.view.View
@@ -28,10 +31,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.navigation.NavController
 import com.web.webide.core.utils.LogCatcher
 import com.web.webide.core.utils.WorkspaceManager
@@ -42,7 +49,6 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
 
-// 定义 UA 常量
 object UserAgents {
     const val DEFAULT = "Default"
     const val PC = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -60,79 +66,50 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    // --- 0. 状态管理 ---
+    // --- 0. 自动关闭软键盘 ---
+    val keyboardController = LocalSoftwareKeyboardController.current
+    LaunchedEffect(Unit) {
+        keyboardController?.hide()
+    }
+
+    // --- 状态管理 ---
     val prefs = remember { context.getSharedPreferences("WebIDE_Project_Settings", Context.MODE_PRIVATE) }
-
-    // 调试开关状态
-    var isDebugEnabled by remember {
-        mutableStateOf(prefs.getBoolean("debug_$folderName", false))
-    }
-
-    // 🔥 新增：UA 类型状态
-    var currentUAType by remember {
-        mutableStateOf(prefs.getString("ua_type_$folderName", UserAgents.DEFAULT) ?: UserAgents.DEFAULT)
-    }
+    var isDebugEnabled by remember { mutableStateOf(prefs.getBoolean("debug_$folderName", false)) }
+    var currentUAType by remember { mutableStateOf(prefs.getString("ua_type_$folderName", UserAgents.DEFAULT) ?: UserAgents.DEFAULT) }
     var showUAMenu by remember { mutableStateOf(false) }
-
-    // 刷新配置的触发器
     var configRefreshTrigger by remember { mutableLongStateOf(0L) }
-
-    // 管理网页是否接管返回键的状态
     var isJsHandlingBack by remember { mutableStateOf(false) }
 
-    // 切换调试模式
     fun toggleDebugMode() {
         isDebugEnabled = !isDebugEnabled
         prefs.edit().putBoolean("debug_$folderName", isDebugEnabled).apply()
         scope.launch { snackbarHostState.showSnackbar(if (isDebugEnabled) "调试模式已开启" else "调试模式已关闭") }
     }
 
-    // 🔥 新增：切换 UA 函数
     fun updateUA(type: String) {
         currentUAType = type
         prefs.edit().putString("ua_type_$folderName", type).apply()
         showUAMenu = false
-        // 触发刷新
         configRefreshTrigger = System.currentTimeMillis()
-        scope.launch { snackbarHostState.showSnackbar("UA 已切换为: ${if(type == UserAgents.DEFAULT) "默认" else "自定义"}") }
+        scope.launch { snackbarHostState.showSnackbar("UA 已切换") }
     }
 
-    // --- 1. 权限申请 ---
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        LogCatcher.d("WebPreview", "Permissions granted: $permissions")
-    }
-
-    LaunchedEffect(Unit) {
-        permissionLauncher.launch(arrayOf(
-            Manifest.permission.CAMERA,
-            Manifest.permission.RECORD_AUDIO,
-            Manifest.permission.READ_EXTERNAL_STORAGE,
-            Manifest.permission.WRITE_EXTERNAL_STORAGE
-        ))
-    }
-
-    // --- 2. 读取配置 (增强版：支持注释 + 错误提示) ---
+    // --- 1. 读取配置 ---
     val webAppConfig = produceState<JSONObject?>(initialValue = null, key1 = projectDir, key2 = configRefreshTrigger) {
         value = withContext(Dispatchers.IO) {
             val configFile = File(projectDir, "webapp.json")
             if (configFile.exists()) {
                 try {
                     val rawJson = configFile.readText()
-                    val cleanJson = rawJson.lines().map { line ->
+                    // 简单的去注释处理
+                    val cleanJson = rawJson.lines().joinToString("\n") { line ->
                         val index = line.indexOf("//")
-                        if (index != -1) {
-                            if (index > 0 && (line[index - 1] == ':' || line.substring(0, index).contains("http"))) line
-                            else line.substring(0, index)
+                        if (index != -1 && !line.substring(0, index).trim().endsWith(":")) {
+                            if(!line.contains("http:") && !line.contains("https:")) line.substring(0, index) else line
                         } else line
-                    }.joinToString("\n")
+                    }
                     JSONObject(cleanJson)
                 } catch (e: Exception) {
-                    LogCatcher.e("WebPreview", "配置解析失败", e)
-                    launch(Dispatchers.Main) {
-                        scope.launch { snackbarHostState.showSnackbar("webapp.json 格式错误: ${e.message}") }
-                    }
                     null
                 }
             } else null
@@ -140,79 +117,105 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
     }
     val config = webAppConfig.value
 
-    // 全屏模式状态
-    var isFullScreenMode by remember(config) {
-        mutableStateOf(config?.optBoolean("fullscreen", false) == true)
+    // --- 2. 动态权限申请 ---
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { }
+
+    LaunchedEffect(config) {
+        config?.let { json ->
+            val permsJson = json.optJSONArray("permissions")
+            if (permsJson != null) {
+                val permsList = mutableListOf<String>()
+                for (i in 0 until permsJson.length()) permsList.add(permsJson.getString(i))
+                val neededPerms = permsList.filter {
+                    ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
+                }.toTypedArray()
+                if (neededPerms.isNotEmpty()) permissionLauncher.launch(neededPerms)
+            }
+        }
     }
 
-    // --- 3. 应用状态栏配置 ---
+    // --- 3. 屏幕方向控制 (优化版) ---
     DisposableEffect(config) {
-        val statusBarConfig = config?.optJSONObject("statusBar")
-        if (statusBarConfig != null && activity != null) {
+        if (activity != null && config != null) {
+            val orientation = config.optString("orientation", "0")
+            val targetOrientation = when (orientation) {
+                "1" -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                "0" -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                "auto" -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                else -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            }
+            // 只有当前方向与目标不一致时才设置，避免无意义的重建
+            if (activity.requestedOrientation != targetOrientation) {
+                activity.requestedOrientation = targetOrientation
+            }
+        }
+        onDispose {
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+    }
+
+    // --- 4. 状态栏与全屏控制 ---
+    var isFullScreenConfig by remember(config) {
+        mutableStateOf(config?.optBoolean("fullscreen", false) == true)
+    }
+    var isUserFullScreen by remember(isFullScreenConfig) { mutableStateOf(isFullScreenConfig) }
+
+    DisposableEffect(config, isUserFullScreen) {
+        if (activity != null) {
             val window = activity.window
-            val decorView = window.decorView
+            val windowController = WindowCompat.getInsetsController(window, window.decorView)
 
-            if (statusBarConfig.optBoolean("hidden", false)) {
-                val flags = View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                decorView.systemUiVisibility = flags
+            if (isUserFullScreen) {
+                windowController.hide(WindowInsetsCompat.Type.systemBars())
+                windowController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             } else {
-                decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
-                try {
-                    val colorStr = statusBarConfig.optString("backgroundColor", "")
-                    if (colorStr.isNotEmpty() && colorStr.startsWith("#")) {
-                        val color = Color(android.graphics.Color.parseColor(colorStr))
-                        window.statusBarColor = color.toArgb()
-                    }
-                } catch (e: Exception) { }
+                windowController.show(WindowInsetsCompat.Type.systemBars())
 
-                val style = statusBarConfig.optString("style", "dark")
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    when (style) {
-                        "light" -> decorView.systemUiVisibility = decorView.systemUiVisibility or View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
-                        "dark" -> decorView.systemUiVisibility = decorView.systemUiVisibility and View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv()
-                    }
-                }
-                if (statusBarConfig.optBoolean("translucent", false)) {
-                    window.addFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
+                val statusBarConfig = config?.optJSONObject("statusBar")
+                if (statusBarConfig != null) {
+                    try {
+                        val colorStr = statusBarConfig.optString("backgroundColor", "#FFFFFF")
+                        if (colorStr.isNotEmpty()) window.statusBarColor = AndroidColor.parseColor(colorStr)
+
+                        val style = statusBarConfig.optString("style", "dark")
+                        // style="dark" 代表想要深色文字，所以 LightStatusBars = true
+                        windowController.isAppearanceLightStatusBars = (style == "dark")
+                    } catch (e: Exception) {}
                 } else {
-                    window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
+                    window.statusBarColor = AndroidColor.WHITE
+                    windowController.isAppearanceLightStatusBars = true
                 }
             }
         }
         onDispose {
             if (activity != null) {
                 val window = activity.window
-                window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
-                window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    window.statusBarColor = android.graphics.Color.TRANSPARENT
-                }
+                val windowController = WindowCompat.getInsetsController(window, window.decorView)
+                windowController.show(WindowInsetsCompat.Type.systemBars())
+                windowController.isAppearanceLightStatusBars = true
+                window.statusBarColor = AndroidColor.TRANSPARENT
             }
         }
     }
 
-    // --- 4. 智能路径查找 ---
+    // --- 5. 路径解析 ---
     val targetUrl = remember(projectDir, config) {
         val rawUrl = config?.optString("targetUrl")?.takeIf { it.isNotEmpty() }
             ?: config?.optString("url")?.takeIf { it.isNotEmpty() }
-            ?: config?.optString("entry")?.takeIf { it.isNotEmpty() }
             ?: "index.html"
 
-        if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) {
+        if (rawUrl.startsWith("http")) {
             rawUrl
         } else {
             val cleanPath = rawUrl.removePrefix("./").removePrefix("/")
             val rootFile = File(projectDir, cleanPath)
             val assetFile = File(projectDir, "src/main/assets/$cleanPath")
-            val defaultAssetIndex = File(projectDir, "src/main/assets/index.html")
-            val defaultRootIndex = File(projectDir, "index.html")
-
             when {
                 rootFile.exists() -> "file://${rootFile.absolutePath}"
                 assetFile.exists() -> "file://${assetFile.absolutePath}"
-                defaultAssetIndex.exists() -> "file://${defaultAssetIndex.absolutePath}"
-                defaultRootIndex.exists() -> "file://${defaultRootIndex.absolutePath}"
-                else -> "file://${rootFile.absolutePath}"
+                else -> "file://${File(projectDir, "index.html").absolutePath}"
             }
         }
     }
@@ -221,77 +224,51 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
     val fileChooserLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (filePathCallback == null) return@rememberLauncherForActivityResult
-        val results = WebChromeClient.FileChooserParams.parseResult(result.resultCode, result.data)
-        filePathCallback?.onReceiveValue(results)
+        filePathCallback?.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(result.resultCode, result.data))
         filePathCallback = null
     }
 
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
-    // 注意：key 里加入了 currentUAType，确保 UA 切换时 WebView 能正确重载配置
     val refreshKey = remember(config, isDebugEnabled, currentUAType, configRefreshTrigger) { System.currentTimeMillis() }
 
-    // --- 物理返回键拦截逻辑 ---
     BackHandler(enabled = true) {
         if (isJsHandlingBack) {
             webViewRef?.evaluateJavascript("if(window.onAndroidBack) window.onAndroidBack();", null)
         } else {
-            if (webViewRef?.canGoBack() == true) {
-                webViewRef?.goBack()
-            } else {
-                navController.popBackStack()
-            }
+            if (webViewRef?.canGoBack() == true) webViewRef?.goBack() else navController.popBackStack()
         }
     }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            if (!isFullScreenMode) {
+            if (!isUserFullScreen) {
                 TopAppBar(
-                    title = { Text(if (targetUrl.startsWith("http")) "网页预览" else "App 预览") },
+                    // 🔥 这里修改了：固定标题
+                    title = { Text("App 预览") },
                     navigationIcon = {
                         IconButton(onClick = { navController.popBackStack() }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
                         }
                     },
                     actions = {
-                        // 🔥 新增：UA 切换菜单
                         Box {
                             IconButton(onClick = { showUAMenu = true }) {
-                                Icon(
-                                    imageVector = Icons.Default.Devices,
-                                    contentDescription = "切换 UA",
-                                    tint = if (currentUAType != UserAgents.DEFAULT) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                Icon(Icons.Default.Devices, "UA", tint = if (currentUAType != UserAgents.DEFAULT) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             DropdownMenu(expanded = showUAMenu, onDismissRequest = { showUAMenu = false }) {
-                                DropdownMenuItem(
-                                    text = { Text("默认 (移动端)") },
-                                    onClick = { updateUA(UserAgents.DEFAULT) },
-                                    trailingIcon = { if(currentUAType == UserAgents.DEFAULT) Icon(Icons.Default.Refresh, null, Modifier.size(16.dp)) }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("桌面模式 (PC)") },
-                                    onClick = { updateUA(UserAgents.PC) }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("iPhone (Safari)") },
-                                    onClick = { updateUA(UserAgents.IPHONE) }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Android (Chrome)") },
-                                    onClick = { updateUA(UserAgents.ANDROID) }
-                                )
+                                listOf(
+                                    UserAgents.DEFAULT to "默认",
+                                    UserAgents.PC to "PC",
+                                    UserAgents.IPHONE to "iOS",
+                                    UserAgents.ANDROID to "Android"
+                                ).forEach { (ua, name) ->
+                                    DropdownMenuItem(text = { Text(name) }, onClick = { updateUA(ua) })
+                                }
                             }
                         }
-
                         IconButton(onClick = { toggleDebugMode() }) {
-                            Icon(
-                                imageVector = Icons.Default.BugReport,
-                                contentDescription = "调试模式",
-                                tint = if (isDebugEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Icon(Icons.Default.BugReport, "调试", tint = if (isDebugEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         IconButton(onClick = {
                             webViewRef?.reload()
@@ -299,16 +276,16 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
                         }) {
                             Icon(Icons.Default.Refresh, "刷新")
                         }
-                        IconButton(onClick = { isFullScreenMode = true }) {
+                        IconButton(onClick = { isUserFullScreen = true }) {
                             Icon(Icons.Default.Fullscreen, "全屏")
                         }
                     }
                 )
             }
         },
-        containerColor = if (isFullScreenMode) Color.Black else MaterialTheme.colorScheme.background
+        containerColor = if (isUserFullScreen) Color.Black else MaterialTheme.colorScheme.background
     ) { innerPadding ->
-        val actualPadding = if (isFullScreenMode) PaddingValues(0.dp) else innerPadding
+        val actualPadding = if (isUserFullScreen) PaddingValues(0.dp) else innerPadding
 
         Box(modifier = Modifier.padding(actualPadding).fillMaxSize()) {
             key(refreshKey) {
@@ -322,46 +299,30 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
                                 context = ctx,
                                 config = config,
                                 projectDir = projectDir,
-                                // 🔥 传入当前选择的 UA
                                 manualUA = currentUAType,
                                 onShowFileChooser = { callback, params ->
                                     filePathCallback = callback
                                     try {
-                                        val intent = params?.createIntent()
-                                        if (intent != null) {
-                                            fileChooserLauncher.launch(intent)
-                                            true
-                                        } else false
+                                        params?.createIntent()?.let { fileChooserLauncher.launch(it); true } ?: false
                                     } catch (e: Exception) {
-                                        filePathCallback = null
-                                        false
+                                        filePathCallback = null; false
                                     }
                                 },
-                                onBackStateChange = { shouldIntercept ->
-                                    isJsHandlingBack = shouldIntercept
-                                }
+                                onBackStateChange = { isJsHandlingBack = it }
                             )
                             webViewRef = this
                         }
                     },
                     update = { webView ->
                         if (webView.url != null && webView.url == targetUrl) return@AndroidView
-
                         if (targetUrl.startsWith("file://") && isDebugEnabled) {
                             try {
-                                val filePath = targetUrl.replace("file://", "")
-                                val file = File(filePath)
+                                val file = File(targetUrl.replace("file://", ""))
                                 if (file.exists()) {
-                                    val rawHtml = file.readText()
-                                    val injectedHtml = injectErudaIntoHtml(context, rawHtml)
-                                    webView.loadDataWithBaseURL(targetUrl, injectedHtml, "text/html", "UTF-8", targetUrl)
-                                } else {
-                                    webView.loadUrl(targetUrl)
-                                }
-                            } catch (e: Exception) {
-                                LogCatcher.e("WebPreview", "注入失败", e)
-                                webView.loadUrl(targetUrl)
-                            }
+                                    val html = injectErudaIntoHtml(context, file.readText())
+                                    webView.loadDataWithBaseURL(targetUrl, html, "text/html", "UTF-8", targetUrl)
+                                } else webView.loadUrl(targetUrl)
+                            } catch (e: Exception) { webView.loadUrl(targetUrl) }
                         } else {
                             if (webView.url != targetUrl) webView.loadUrl(targetUrl)
                         }
@@ -369,52 +330,13 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
                 )
             }
 
-            if (isFullScreenMode) {
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .statusBarsPadding()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+            if (isUserFullScreen) {
+                Row(modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(16.dp)) {
                     IconButton(
-                        onClick = { navController.popBackStack() },
-                        modifier = Modifier
-                            .background(Color.Black.copy(alpha = 0.3f), CircleShape)
-                            .size(36.dp)
+                        onClick = { isUserFullScreen = false },
+                        modifier = Modifier.background(Color.Black.copy(0.3f), CircleShape)
                     ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            "返回",
-                            tint = Color.White.copy(alpha = 0.8f),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    IconButton(
-                        onClick = { isFullScreenMode = false },
-                        modifier = Modifier
-                            .background(Color.Black.copy(alpha = 0.3f), CircleShape)
-                            .size(36.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.FullscreenExit,
-                            "退出全屏",
-                            tint = Color.White.copy(alpha = 0.8f),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-
-                    if (isDebugEnabled) {
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Icon(
-                            Icons.Default.BugReport,
-                            "Debug On",
-                            tint = Color.Green.copy(alpha = 0.6f),
-                            modifier = Modifier.size(20.dp)
-                        )
+                        Icon(Icons.Default.FullscreenExit, "退出", tint = Color.White)
                     }
                 }
             }
@@ -422,6 +344,7 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
     }
 }
 
+// 辅助函数保持不变，无需修改
 private fun injectErudaIntoHtml(context: Context, htmlContent: String): String {
     try {
         val erudaCode = context.assets.open("eruda.min.js").bufferedReader().use { it.readText() }
@@ -435,7 +358,6 @@ private fun injectErudaIntoHtml(context: Context, htmlContent: String): String {
                 if (entryBtn) {
                     entryBtn.position({ x: window.innerWidth - 50, y: window.innerHeight / 2 });
                 }
-                console.log("Eruda injected");
             })();
             </script>
         """
@@ -445,7 +367,6 @@ private fun injectErudaIntoHtml(context: Context, htmlContent: String): String {
             htmlContent + script
         }
     } catch (e: Exception) {
-        LogCatcher.e("WebPreview", "读取本地 eruda 失败", e)
         return htmlContent
     }
 }
@@ -456,7 +377,7 @@ private fun configureFullWebView(
     context: Context,
     config: JSONObject?,
     projectDir: File,
-    manualUA: String, // 🔥 新增：手动选择的 UA
+    manualUA: String,
     onShowFileChooser: (ValueCallback<Array<Uri>>, WebChromeClient.FileChooserParams?) -> Boolean,
     onBackStateChange: (Boolean) -> Unit
 ) {
@@ -473,31 +394,29 @@ private fun configureFullWebView(
     settings.loadWithOverviewMode = true
     settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
 
-    // --- UA 设置逻辑 ---
     var finalUA = ""
+    var textZoom = 100
+    var zoomEnabled = false
 
-    // 1. 如果有 webapp.json 配置，先取配置里的 UA
     if (config != null) {
         val wv = config.optJSONObject("webview")
         if (wv != null) {
-            settings.setSupportZoom(wv.optBoolean("zoomEnabled", false))
-            settings.builtInZoomControls = wv.optBoolean("zoomEnabled", false)
-            settings.displayZoomControls = false
-            settings.textZoom = wv.optInt("textZoom", 100)
+            zoomEnabled = wv.optBoolean("zoomEnabled", false)
+            textZoom = wv.optInt("textZoom", 100)
             finalUA = wv.optString("userAgent", "")
         }
     }
 
-    // 2. 如果手动选择了非“默认”模式，则强制覆盖
-    if (manualUA != UserAgents.DEFAULT) {
-        finalUA = manualUA
-    }
+    settings.setSupportZoom(zoomEnabled)
+    settings.builtInZoomControls = zoomEnabled
+    settings.displayZoomControls = false
+    settings.textZoom = textZoom
 
-    // 3. 应用 UA
-    if (finalUA.isNotEmpty()) {
+    if (manualUA != UserAgents.DEFAULT) {
+        settings.userAgentString = manualUA
+    } else if (finalUA.isNotEmpty()) {
         settings.userAgentString = finalUA
     } else {
-        // 如果 finalUA 为空，表示使用系统默认移动端 UA
         settings.userAgentString = null
     }
 

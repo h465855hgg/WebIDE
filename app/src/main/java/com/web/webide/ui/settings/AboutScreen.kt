@@ -536,7 +536,7 @@ private fun AppHeaderSection() {
                         modifier = Modifier.padding(top = 8.dp)
                     ) {
                         Text(
-                            text = "v0.1.6 Beta",
+                            text = "v0.1.7 Beta",
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSecondaryContainer,

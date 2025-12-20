@@ -134,7 +134,7 @@ function testToast() {
   "package": "$packageName",
   "versionName": "1.0.0",
   "versionCode": 1,
-  "orientation": "portrait",
+  "orientation": "0",
   "fullscreen": false,
   "targetUrl": "$targetUrl",
   "statusBar": {
@@ -148,10 +148,7 @@ function testToast() {
   },
   "permissions": [
     "android.permission.INTERNET",
-    "android.permission.VIBRATE",
-    "android.permission.READ_EXTERNAL_STORAGE",
-    "android.permission.WRITE_EXTERNAL_STORAGE",
-    "android.permission.POST_NOTIFICATIONS"
+    "android.permission.VIBRATE"
   ]
 }
 """.trimIndent()
