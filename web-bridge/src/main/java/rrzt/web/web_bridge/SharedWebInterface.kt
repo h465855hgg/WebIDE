@@ -43,6 +43,9 @@ import java.util.Date
 import java.util.Locale
 import kotlin.collections.component1
 import kotlin.collections.component2
+import android.app.DownloadManager
+import android.webkit.CookieManager
+import android.webkit.URLUtil
 
 open class SharedWebInterface(
     protected val context: Context,
@@ -165,6 +168,56 @@ open class SharedWebInterface(
                 conn?.disconnect()
             }
         }.start()
+    }
+    /**
+     * 调用系统下载管理器下载文件
+     * @param url 下载链接
+     * @param userAgent (可选) UserAgent
+     * @param contentDisposition (可选) 用于提取文件名
+     * @param mimeType (可选) 文件类型
+     */
+    @JavascriptInterface
+    fun downloadFile(url: String, userAgent: String?, contentDisposition: String?, mimeType: String?) {
+        runOnMain {
+            try {
+                val request = DownloadManager.Request(Uri.parse(url))
+
+                // 1. 设置文件类型
+                if (!mimeType.isNullOrEmpty()) {
+                    request.setMimeType(mimeType)
+                }
+
+                // 2. 提取文件名 (优先用参数，没有则从 URL 猜)
+                var filename = URLUtil.guessFileName(url, contentDisposition, mimeType)
+
+                // 3. 设置 Cookies (如果是登录后的下载，必须带 Cookie)
+                val cookie = CookieManager.getInstance().getCookie(url)
+                request.addRequestHeader("Cookie", cookie)
+                if (!userAgent.isNullOrEmpty()) {
+                    request.addRequestHeader("User-Agent", userAgent)
+                }
+
+                // 4. 设置通知栏可见
+                request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+
+                // 5. 设置保存路径 (Downloads 文件夹)
+                request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename)
+
+                // 6. 加入队列
+                val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+                dm.enqueue(request)
+
+                Toast.makeText(context, "开始下载: $filename", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "下载失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                e.printStackTrace()
+            }
+        }
+    }
+    // 供 JS 直接调用的简化版
+    @JavascriptInterface
+    fun triggerDownload(url: String) {
+        downloadFile(url, null, null, null)
     }
 
     @JavascriptInterface

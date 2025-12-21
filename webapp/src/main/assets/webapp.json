@@ -1,0 +1,22 @@
+{
+  "name": "webapp",
+  "package": "com.web.webapp",
+  "versionName": "1.0.0",
+  "versionCode": 1,
+  "orientation": "",
+  "fullscreen": false,
+  "targetUrl": "index.html",
+  "statusBar": {
+    "backgroundColor": "#FFFFFF",
+    "style": "dark"
+  },
+  "webview": {
+    "userAgent": "",
+    "zoomEnabled": false,
+    "textZoom": 100
+  },
+  "permissions": [
+    "android.permission.INTERNET",
+    "android.permission.VIBRATE"
+  ]
+}
