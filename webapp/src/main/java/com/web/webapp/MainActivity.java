@@ -39,11 +39,15 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
+
+import kotlin.jvm.functions.Function1;
+import rrzt.web.web_bridge.WebsApiAdapter;
 
 public class MainActivity extends Activity {
     private static final String TAG = "WebIDE_Main";
@@ -264,6 +268,19 @@ public class MainActivity extends Activity {
 
         webAppInterface = new WebAppInterface(this, webView);
         webView.addJavascriptInterface(webAppInterface, "Android");
+
+        WebsApiAdapter websAdapter = new WebsApiAdapter(
+                this,
+                webView,
+                webAppInterface,
+                path -> {
+                    // 打包应用中无法直接获取 Assets 的 File 对象
+                    // 如果 WebsApiAdapter 内部检测到是 assets 路径，应该使用 AssetManager 流式读取
+                    // 这里的返回 null 即可，WebsApiAdapter.readFile 需要做针对 assets 的流处理（上面 Kotlin 代码已处理部分，但建议完善）
+                    return null;
+                }
+        );
+        webView.addJavascriptInterface(websAdapter, "websApp");
 
         // 下载监听
         webView.setDownloadListener((url, userAgent, contentDisposition, mimetype, contentLength) -> {

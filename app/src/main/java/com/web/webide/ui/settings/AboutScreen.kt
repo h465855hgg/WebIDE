@@ -150,7 +150,7 @@ fun AboutScreen(navController: NavController) {
     // 3. 捐赠名单
     val donorList = remember {
         listOf(
-            Donor("2051775505", "・是小浣熊哦・", "¥ 30.00", "2025.12"),
+            Donor("2051775505", "・是小浣熊哦・", "¥ 35.00", "2025.12"),
         )
     }
 

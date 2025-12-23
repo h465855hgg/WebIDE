@@ -47,9 +47,9 @@ import java.net.Socket
 import java.net.URLDecoder
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
-import android.webkit.DownloadListener // 必需
 import android.webkit.URLUtil
 import android.widget.Toast
+import rrzt.web.web_bridge.WebsApiAdapter
 
 // --- 1. 智能微型 HTTP 服务器 (修复 404 问题) ---
 class TinyWebServer(private val rootDir: File) {
@@ -495,10 +495,24 @@ private fun configureFullWebView(
     }
 
     val packageName = config?.optString("package", "com.example.webapp") ?: "com.web.preview"
+
+    // 1. 创建原生 Interface
+    val fullInterface = FullWebAppInterface(context, webView, packageName, projectDir, onBackStateChange)
     webView.addJavascriptInterface(
         FullWebAppInterface(context, webView, packageName, projectDir, onBackStateChange),
         "Android"
     )
+    // 3. 注入 websApp 对象 (新增兼容)
+    val websAdapter = WebsApiAdapter(
+        context = context,
+        webView = webView,
+        sharedInterface = fullInterface,
+        pathResolver = { path ->
+            // 解析 IDE 中的相对路径到真实 File
+            if (path.startsWith("/")) File(path) else File(projectDir, path)
+        }
+    )
+    webView.addJavascriptInterface(websAdapter, "websApp")
 
     webView.webChromeClient = object : WebChromeClient() {
         override fun onShowFileChooser(
