@@ -139,11 +139,18 @@ fun AboutScreen(navController: NavController) {
         listOf(
             SpecialThanks(
                 qq = "2547601734",
-                name = "逸尘", // 您可以手动填入他的昵称
+                name = "逸尘",
                 title = "Designer",
                 message = "Designed the application icon.",
-                url = "https://user.qzone.qq.com/2547601734" // 可选：跳转到空间
+               // url = "https://user.qzone.qq.com/2547601734"
             ),
+            SpecialThanks(
+                qq = "2084019782",
+                name = "问心",
+                title = "Special Thanks",
+                message = "感谢WebS的api文档 命名规则.",// 或者是 "Provided naming conventions for WebS API docs."
+              // url = "https://user.qzone.qq.com/2084019782"
+            )
         )
     }
 

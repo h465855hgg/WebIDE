@@ -51,7 +51,6 @@ import android.webkit.URLUtil
 import android.widget.Toast
 import rrzt.web.web_bridge.WebsApiAdapter
 
-// --- 1. 智能微型 HTTP 服务器 (修复 404 问题) ---
 class TinyWebServer(private val rootDir: File) {
     private var serverSocket: ServerSocket? = null
     private val isRunning = AtomicBoolean(false)

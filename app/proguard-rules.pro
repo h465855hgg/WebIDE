@@ -21,23 +21,7 @@
 #-renamesourcefileattribute SourceFile
 
 
-# 1. Kotlin 标准库 ----------------------------------------------------------
--dontwarn kotlin.**
--keep class kotlin.** { *; }
--keepclassmembers class kotlin.** { *; }
 
-# 2. kotlin.Cloneable 相关
--keep interface kotlin.Cloneable { *; }
--keep class kotlin.Cloneable$DefaultImpls { *; }
-
-
-# 4. Gson 反射需要 ---------------------------------------------------------
--keepattributes Signature,InnerClasses,EnclosingMethod
--keep class com.google.gson.** { *; }
--keepclassmembers class * {
-    <init>();
-    <fields>;
-}
 
 # -------------------------------------------------------------------------
 # R8 error seen during release build:

@@ -416,11 +416,12 @@ class EditorViewModel : ViewModel() {
     fun insertSymbol(symbol: String) {
         openFiles.getOrNull(activeFileIndex)?.let { state ->
             editorInstances[state.file.absolutePath]?.let { editor ->
-                val startLine = editor.cursor.leftLine
-                val startColumn = editor.cursor.leftColumn
                 val processedSymbol = if (symbol == "Tab") "\t" else symbol
-                editor.text.insert(startLine, startColumn, processedSymbol)
-                editor.setSelection(startLine, startColumn + processedSymbol.length)
+
+                // 修改点：使用 editor.insertText 而不是 editor.text.insert
+                // 1. 自动处理选中状态：如果有选中内容，会先被替换
+                // 2. 第二个参数是光标移动的偏移量，传入 length 表示光标停在插入符号的后面
+                editor.insertText(processedSymbol, processedSymbol.length)
             }
         }
     }
