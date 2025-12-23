@@ -1,8 +1,10 @@
 # WebIDE
 
+![Version](https://img.shields.io/badge/version-0.1.9-blue?style=flat-square)
 [![Language](https://img.shields.io/badge/Language-Kotlin-blue?style=flat-square)](https://kotlinlang.org/)
 [![UI](https://img.shields.io/badge/UI-Jetpack_Compose-green?style=flat-square)](https://developer.android.com/jetpack/compose)
 [![License](https://img.shields.io/badge/License-GPLv3-orange?style=flat-square)](LICENSE)
+
 
 [ [English](README.md) ] | [ **中文** ]
 
@@ -42,21 +44,44 @@ com.web.webide
 │   ├── theme/          # 设计系统
 │   │   └── ...         # 动态色彩、字体排版定义
 │   └── welcome/        # 欢迎引导流程
-└── signer/             # 签名基础设施
-    └── ...             # 纯 Kotlin 实现的 APK V1/V2/V3 签名方案
 ```
 
 ## 功能特性
 
 *   **语法高亮**: 基于 TextMate 语法文件，完美支持 HTML, CSS, JavaScript 和 JSON。
-*   **原生构建**: 内置自定义构建系统，集成 `apksig`，可直接在手机上将 Web 项目打包为可安装的 Android APK。
 *   **项目管理**: 完整的文件系统访问权限，支持多文件 Web 项目的创建与管理。
 *   **实时预览**: 集成 WebView 预览环境，支持 JavaScript 交互测试。
 *   **现代化 UI**: 100% 使用 Kotlin 和 Jetpack Compose 编写，支持动态主题。
 
-## 开源协议
+## 讨论
 
-本项目采用 **GNU General Public License v3.0** 协议授权。
-Copyright (C) 2025 程国荣
+* QQ群:[1050254184](https://qm.qq.com/q/tFXuqMQDlK)
 
-[![Star History Chart](https://api.star-history.com/svg?repos=h465855hgg/WebIDE&type=Date&theme=dark)](https://star-history.com/#h465855hgg/WebIDE&Date)
+## 贡献者
+
+<a href="https://github.com/h465855hgg/WebIDE/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=h465855hgg/WebIDE" />
+</a>
+
+## 许可证
+
+```
+WebIDE - A powerful IDE for Android web development.
+Copyright (C) 2025  程国荣  <3382198490@qq.com>
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+```
+
+
+[![Star History Chart](https://api.star-history.com/svg?repos=h465855hgg/WebIDE&type=Date)](https://star-history.com/#h465855hgg/WebIDE&Date)
