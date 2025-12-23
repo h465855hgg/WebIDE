@@ -60,4 +60,3 @@ com.web.webide
 Copyright (C) 2025 程国荣
 
 [![Star History Chart](https://api.star-history.com/svg?repos=h465855hgg/WebIDE&type=Date&theme=dark)](https://star-history.com/#h465855hgg/WebIDE&Date)
-```
