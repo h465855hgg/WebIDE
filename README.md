@@ -1,93 +1,66 @@
-# WebIDE - AI协作开发的web for Android IDE
+# WebIDE
 
-## 📖 项目简介
+[![Language](https://img.shields.io/badge/Language-Kotlin-blue?style=flat-square)](https://kotlinlang.org/)
+[![UI](https://img.shields.io/badge/UI-Jetpack_Compose-green?style=flat-square)](https://developer.android.com/jetpack/compose)
+[![License](https://img.shields.io/badge/License-GPLv3-orange?style=flat-square)](LICENSE)
 
-采用Jetpack Compose构建。这个项目最大的特色是**完全由AI开发**，展示了AI在软件开发中的强大潜力。
+[ **English** ] | [ [中文](README_CN.md) ]
 
-## 🤖 AI开发
+WebIDE is a native Android integrated development environment tailored for web technologies. Built entirely with Jetpack Compose, it demonstrates a complete workflow from code editing to APK building directly on a mobile device.
 
-这个项目是多个AI模型协作的成果：
+This project is an experimental engineering feat, architected and coded collaboratively by AI models (Claude, Gemini, and DeepSeek).
 
-- **Claude**: 负责编写了欢迎界面和主题系统
-- **Gemini**: 开发了主要UI界面和文件树组件  
-- **DeepSeek**: 与Gemini分别开发了部分代码编辑器核心功能
+## Screenshots
 
-## 🛠️ 技术栈
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/2eac6ea4-25a1-4a02-b814-2925ffb2092e" width="45%" />
+  <img src="https://github.com/user-attachments/assets/7999b42a-af56-4aea-b705-920e7e168844" width="45%" />
+</div>
 
-- **语言**: Kotlin
-- **UI框架**: Jetpack Compose
-- **目标平台**: Android
+## Project Structure
 
-## 📁 项目结构
+A breakdown of the core codebase located in `app/src/main/java/com/web/webide/`:
 
+```text
+com.web.webide
+├── build/              # Custom APK build system
+│   ├── ApkBuilder.kt   # Orchestrates the compilation and packaging process
+│   └── ApkInstaller.kt # Handles installation of generated APKs
+├── core/               # Core infrastructure
+│   ├── utils/          # Utilities for logging, formatting, and permissions
+│   └── ...
+├── files/              # File System
+│   └── FileTree.kt     # Recursive file tree visualization logic
+├── ui/                 # User Interface (Jetpack Compose)
+│   ├── editor/         # Code Editor Module
+│   │   ├── viewmodel/  # Editor state management (TextMate integration)
+│   │   └── components/ # Editor UI components (Line numbers, gutter, etc.)
+│   ├── preview/        # Live Preview Module
+│   │   └── webview/    # WebView implementation with JS Bridge
+│   ├── projects/       # Project Management
+│   │   └── ...         # Workspace creation and template logic
+│   ├── theme/          # Design System
+│   │   └── ...         # Dynamic colors and typography definitions
+│   └── welcome/        # Onboarding flow
+└── signer/             # Signing Infrastructure
+    └── ...             # Pure Kotlin implementation of APK V1/V2/V3 signing schemes
 ```
-app/src/main/java/com/web/webide/
-├── core/           # 核心业务逻辑
-├── files/          # 文件管理模块
-├── html/           # HTML处理相关
-├── textmate/       # 语法高亮支持
-├── ui/             # 用户界面层
-│   ├── components/ # 可复用组件
-│   ├── editor/     # 代码编辑器
-│   ├── preview/    # 实时预览
-│   ├── projects/   # 项目管理
-│   ├── settings/   # 设置界面
-│   ├── theme/      # 主题系统
-│   └── welcome/    # 欢迎界面
-├── App.kt          # 应用入口
-└── MainActivity.kt # 主活动
-```
 
-## ✨ 主要功能
+## Features
 
-### 🎨 界面特性
-- **现代化UI**: 基于Jetpack Compose的流畅界面
-- **主题系统**: 支持多种主题切换
-- **响应式设计**: 适配不同屏幕尺寸
+*   **Syntax Highlighting**: Powered by TextMate grammars, supporting HTML, CSS, JavaScript, and JSON.
+*   **Native Build System**: Capable of packaging web projects into installable Android APKs utilizing a custom implementation of `apksig`.
+*   **Project Management**: Full filesystem access for creating and managing multi-file web projects.
+*   **Live Preview**: Integrated WebView with bridge capabilities for real-time testing.
+*   **Modern UI**: 100% Kotlin and Jetpack Compose implementation with dynamic theming.
 
-### 📝 代码编辑
-- **语法高亮**: 支持html css js
-- **文件树**: 直观的项目文件管理
-- **实时预览**: Web页面即时预览功能
+## License
 
-### 🔧 开发工具
-- **项目管理**: 完整的项目创建和管理功能
-- **设置系统**: 可定制的开发环境配置
-- **欢迎界面**: 友好的用户引导体验
-
-## 🤝 贡献
-Null
-
-这个项目目前处于开源状态，但由于是AI协作开发的实验性项目，作者已停止维护。欢迎有兴趣的开发者继续完善和扩展功能。
-
-**作者的美好幻想**
-- build app [complete]
-- 工具栏
-- 更强的代码补全
-- 代码实时查错
-- 预览界面加入调试功能
-- 想给预览界面实现DevServer
-- 加入全路径自定义功能
-- 自定义主题色（已实现但未加入）
-- 更好更美观的settings
-- 写个关于界面，更新日志之类的
-
-## 💡 项目意义
-
-这个项目是一个功能残缺的Android开发WebIDE，当时想着干掉'WebIDE'我来重新定义WebIDE这个名字，后来因为手机性能带不动准备放弃了
-
-展示了：
-- AI在复杂软件开发中的能力
-- 不同AI模型在特定领域的专长
-- 未来AI辅助开发的潜力
-
-
-
-
-*这是一个由AI开发的创新项目，体现了人工智能在软件开发领域的新可能性。*
-![4E4F3CE84A52E0F7F44184A31D7B88C1](https://github.com/user-attachments/assets/2eac6ea4-25a1-4a02-b814-2925ffb2092e)
-![64BCA2DEE442663508A919A2156299F6](https://github.com/user-attachments/assets/7999b42a-af56-4aea-b705-920e7e168844)
+This project is licensed under the **GNU General Public License v3.0**.
+Copyright (C) 2025 程国荣
 
 ---
-[![Star History Chart](https://api.star-history.com/svg?repos=h465855hgg/WebIDE&type=Date)](https://star-history.com/#h465855hgg/WebIDE&Date)
+
+[![Star History Chart](https://api.star-history.com/svg?repos=h465855hgg/WebIDE&type=Date&theme=dark)](https://star-history.com/#h465855hgg/WebIDE&Date)
+
 
