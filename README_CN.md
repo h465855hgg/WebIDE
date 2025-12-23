@@ -67,7 +67,7 @@ com.web.webide
 
 ```
 WebIDE - A powerful IDE for Android web development.
-Copyright (C) 2025  程国荣  <3382198490@qq.com>
+Copyright (C) 2025  如日中天  <3382198490@qq.com>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
