@@ -1,26 +1,20 @@
-/* JKS.java -- implementation of the "JKS" key store.
-   Copyright (C) 2003  Casey Marshall <rsdio@metastatic.org>
-
-Permission to use, copy, modify, distribute, and sell this software and
-its documentation for any purpose is hereby granted without fee,
-provided that the above copyright notice appear in all copies and that
-both that copyright notice and this permission notice appear in
-supporting documentation.  No representations are made about the
-suitability of this software for any purpose.  It is provided "as is"
-without express or implied warranty.
-
-This program was derived by reverse-engineering Sun's own
-implementation, using only the public API that is available in the 1.4.1
-JDK.  Hence nothing in this program is, or is derived from, anything
-copyrighted by Sun Microsystems.  While the "Binary Evaluation License
-Agreement" that the JDK is licensed under contains blanket statements
-that forbid reverse-engineering (among other things), it is my position
-that US copyright law does not and cannot forbid reverse-engineering of
-software to produce a compatible implementation.  There are, in fact,
-numerous clauses in copyright law that specifically allow
-reverse-engineering, and therefore I believe it is outside of Sun's
-power to enforce restrictions on reverse-engineering of their software,
-and it is irresponsible for them to claim they can.  */
+/*
+ * WebIDE - A powerful IDE for Android web development.
+ * Copyright (C) 2025  如日中天  <3382198490@qq.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.mcal.apksigner.utils;
 
 import java.io.ByteArrayInputStream;
