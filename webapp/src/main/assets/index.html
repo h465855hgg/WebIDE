@@ -6,14 +6,6 @@
   ~ it under the terms of the GNU General Public License as published by
   ~ the Free Software Foundation, either version 3 of the License, or
   ~ (at your option) any later version.
-  ~
-  ~ This program is distributed in the hope that it will be useful,
-  ~ but WITHOUT ANY WARRANTY; without even the implied warranty of
-  ~ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  ~ GNU General Public License for more details.
-  ~
-  ~ You should have received a copy of the GNU General Public License
-  ~ along with this program.  If not, see <https://www.gnu.org/licenses/>.
   -->
 
 <!DOCTYPE html>
@@ -21,435 +13,299 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RRZT Web Bridge 测试</title>
+    <title>WebIDE 接口功能测试</title>
     <style>
-        body { font-family: sans-serif; background: #f0f2f5; padding: 10px; padding-bottom: 200px; }
-        h3 { border-bottom: 2px solid #007bff; padding-bottom: 5px; margin-top: 20px; color: #333; }
-        .card { background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 10px; }
-        .btn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f6f9;
+            margin: 0;
+            padding: 15px;
+            padding-bottom: 250px; /* 为底部日志留空间 */
+        }
+        h2 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px; margin-top: 20px; }
+        h4 { margin: 10px 0 5px 0; color: #555; }
+
+        .card {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        /* 按钮网格布局 */
+        .btn-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 10px;
+        }
+
         button {
-            background: #007bff; color: white; border: none; padding: 10px;
-            border-radius: 4px; font-size: 13px; cursor: pointer; text-align: center;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.2s;
         }
-        button:active { background: #0056b3; }
-        button.secondary { background: #6c757d; }
-        button.danger { background: #dc3545; }
+        button:active { background-color: #1f618d; transform: translateY(1px); }
+        button.danger { background-color: #e74c3c; }
+        button.success { background-color: #27ae60; }
+        button.warning { background-color: #f39c12; }
 
-        /* 日志控制台样式 */
-        #console-container {
-            position: fixed; bottom: 0; left: 0; right: 0; height: 180px;
-            background: #212529; color: #00ff00; font-family: monospace;
-            padding: 10px; overflow-y: auto; z-index: 1000; border-top: 2px solid #444;
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            margin-bottom: 8px;
+            font-family: monospace;
+        }
+
+        /* 底部日志控制台 */
+        #console-log {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            height: 200px;
+            background: #222;
+            color: #0f0;
+            font-family: 'Consolas', monospace;
             font-size: 12px;
+            overflow-y: auto;
+            padding: 10px;
+            border-top: 3px solid #444;
+            z-index: 999;
         }
-        .log-entry { margin-bottom: 4px; border-bottom: 1px solid #333; padding-bottom: 2px; }
-        .log-success { color: #00ff00; }
-        .log-error { color: #ff4444; }
-        .log-info { color: #00d4ff; }
-
-        input[type="text"] { padding: 5px; width: 60%; border: 1px solid #ddd; border-radius: 4px; }
+        .log-item { border-bottom: 1px solid #333; padding: 2px 0; }
+        .log-err { color: #ff5555; }
     </style>
 </head>
 <body>
 
+<!-- 配置区域 -->
 <div class="card">
-    <div><strong>当前注入对象名:</strong> <span id="bridgeNameDisplay">Android</span></div>
-    <div style="margin-top:5px;">
-        <input type="text" id="customBridgeName" placeholder="如果不是Android，请输入">
-        <button onclick="setBridgeName()" class="secondary" style="padding: 5px 10px;">设置</button>
+    <h4>🔌 接口配置</h4>
+    <input type="text" id="bridgeName" value="websApp" placeholder="输入注入对象的名称 (默认 websApp)">
+    <div style="font-size: 12px; color: #666;">
+        当前状态: <span id="status">检测中...</span>
     </div>
 </div>
 
-<h3>1. 设备与系统信息</h3>
-<div class="card btn-grid">
-    <button onclick="testDeviceInfo()">获取设备信息</button>
-    <button onclick="testAppConfig()">获取App配置(Abstract)</button>
-    <button onclick="testPermissions()">检查/请求 存储权限</button>
-    <button onclick="testTime()">获取当前时间</button>
-    <button onclick="testFormatDate()">格式化时间</button>
+<!-- 脚本执行区域 (核心功能) -->
+<div class="card">
+    <h2>🚀 动态脚本 (Java/BeanShell)</h2>
+    <p style="font-size:12px; color:#666;">前提：App 需集成 BeanShell 或 Groovy 并在 evalJavaCode 中实现。</p>
+    <textarea id="javaCode" rows="6" placeholder="在此输入 Java 代码...">import android.widget.Toast;
+Toast.makeText(context, "Hello from BeanShell!", 1).show();
+return "执行成功";</textarea>
+    <div class="btn-group">
+        <button class="success" onclick="runJava()">执行 Java 代码</button>
+        <button onclick="runJs()">执行 JS 代码</button>
+    </div>
 </div>
 
-<h3>2. UI 交互与反馈</h3>
-<div class="card btn-grid">
-    <button onclick="testToast()">显示 Toast</button>
-    <button onclick="testDialog()">显示 Dialog (回调)</button>
-    <button onclick="testNotification()">发送通知</button>
-    <button onclick="testVibrate()">震动 500ms</button>
+<!-- 系统交互 -->
+<div class="card">
+    <h2>📱 系统与 UI</h2>
+    <div class="btn-group">
+        <button onclick="callApi('toast', '这是一个 Toast')">Toast 提示</button>
+        <button onclick="testNotification()">发送通知</button>
+        <button onclick="callApi('openFlashLight')">打开手电筒</button>
+        <button onclick="callApi('closeFlashLight')">关闭手电筒</button>
+        <button onclick="callApi('shockDevice', 500)">震动 500ms</button>
+        <button onclick="getClip()">获取剪贴板</button>
+        <button onclick="callApi('setClipContent', 'WebIDE 复制测试')">写入剪贴板</button>
+    </div>
+
+    <h4>状态栏/导航栏颜色</h4>
+    <div class="btn-group">
+        <button onclick="callApi('setStatuColor', '#FF0000')">红状态栏</button>
+        <button onclick="callApi('setStatuColor', '#FFFFFF')">白状态栏</button>
+        <button onclick="callApi('setNavColor', '#00FF00')">绿导航栏</button>
+    </div>
 </div>
 
-<h3>3. 存储 (SharedPrefs)</h3>
-<div class="card btn-grid">
-    <button onclick="testSaveStorage()">写入存储 (TestKey)</button>
-    <button onclick="testGetStorage()">读取存储 (TestKey)</button>
-    <button onclick="testGetAllStorage()">读取所有存储</button>
-    <button onclick="testRemoveStorage()">删除存储 (TestKey)</button>
-    <button onclick="testClearStorage()" class="danger">清空存储</button>
+<!-- 硬件信息 -->
+<div class="card">
+    <h2>🔋 硬件与状态</h2>
+    <div class="btn-group">
+        <button onclick="showRet('getBatteryTemperature')">电池温度</button>
+        <button onclick="showRet('getMediaVolume')">媒体音量</button>
+        <button onclick="showRet('getScreenBrightness')">屏幕亮度</button>
+        <button onclick="showRet('getMemoryUsage')">内存占用</button>
+        <button onclick="showRet('getDeviceStatus')">设备信息</button>
+    </div>
 </div>
 
-<h3>4. 文件与下载</h3>
-<div class="card btn-grid">
-    <button onclick="testSaveToDownloads()">保存文本到下载</button>
-    <button onclick="testReadFile()">读取文件 (Abstract)</button>
-    <button onclick="testWriteFile()">写入文件 (Abstract)</button>
-    <button onclick="testListFiles()">列出文件 (Abstract)</button>
+<!-- 文件操作 -->
+<div class="card">
+    <h2>📂 文件系统</h2>
+    <input type="text" id="filePath" value="/sdcard/webide_test.txt" placeholder="文件路径">
+    <textarea id="fileContent" rows="3" placeholder="写入内容">Hello WebIDE File System</textarea>
+    <div class="btn-group">
+        <button onclick="doWriteFile()">写入文件</button>
+        <button onclick="doReadFile()">读取文件</button>
+        <button onclick="doListFiles()">列出目录(sdcard)</button>
+        <button class="danger" onclick="doDeleteFile()">删除文件</button>
+    </div>
+    <div class="btn-group" style="margin-top:10px;">
+        <button onclick="callApi('openFile', getValue('filePath'))">调用系统打开</button>
+        <button onclick="callApi('installAPK', getValue('filePath'))">安装 APK</button>
+    </div>
 </div>
 
-<h3>5. 网络请求</h3>
-<div class="card btn-grid">
-    <button onclick="testHttpRequest()">GET 请求 (httpbin)</button>
+<!-- App 操作 -->
+<div class="card">
+    <h2>🛠 App 控制</h2>
+    <div class="btn-group">
+        <button onclick="showRet('getAppName')">App 名称</button>
+        <button onclick="showRet('getAppVersion')">App 版本</button>
+        <button class="warning" onclick="callApi('restartApp')">重启 App</button>
+        <button class="danger" onclick="callApi('exitApp')">退出 App</button>
+    </div>
 </div>
 
-<h3>6. 传感器 (加速度计)</h3>
-<div class="card btn-grid">
-    <button onclick="testStartSensor()">开启传感器</button>
-    <button onclick="testStopSensor()" class="danger">停止传感器</button>
-</div>
-
-<h3>7. 剪贴板</h3>
-<div class="card btn-grid">
-    <button onclick="testCopyToClip()">复制 "Hello Bridge"</button>
-    <button onclick="testGetFromClip()">获取剪贴板内容</button>
-</div>
-
-<h3>8. 系统 Intents</h3>
-<div class="card btn-grid">
-    <button onclick="testOpenBrowser()">打开浏览器</button>
-    <button onclick="testShare()">分享文本</button>
-    <button onclick="testCall()">拨打电话 (10086)</button>
-    <button onclick="testSMS()">发送短信</button>
-    <button onclick="testEmail()">发送邮件</button>
-    <button onclick="testMap()">打开地图 (北京)</button>
-    <button onclick="testSettings()">打开应用设置</button>
-</div>
-
-<h3>9. 屏幕与控制</h3>
-<div class="card btn-grid">
-    <button onclick="testKeepScreen(true)">屏幕常亮: 开</button>
-    <button onclick="testKeepScreen(false)">屏幕常亮: 关</button>
-    <button onclick="testBrightness()">设置亮度 (50%)</button>
-    <button onclick="testGetBrightness()">获取亮度</button>
-    <button onclick="testVolume()">设置音量 (Max)</button>
-    <button onclick="testReload()" class="secondary">重载 App</button>
-    <button onclick="testExit()" class="danger">退出 App</button>
-</div>
-
-<div id="console-container">
-    <div class="log-entry">Waiting for interaction...</div>
+<!-- 底部日志 -->
+<div id="console-log">
+    <div class="log-item">Ready. Waiting for commands...</div>
 </div>
 
 <script>
-    // ==========================================
-    // 核心桥接逻辑
-    // ==========================================
-    let BRIDGE_NAME = "Android"; // 默认注入名
-    const callbacks = {};
-
+    // 获取注入对象名 (默认 websApp，但也可能是 Android)
     function getBridge() {
-        return window[BRIDGE_NAME];
+        var name = document.getElementById('bridgeName').value || 'websApp';
+        return window[name];
     }
 
-    function setBridgeName() {
-        const val = document.getElementById('customBridgeName').value;
-        if(val) {
-            BRIDGE_NAME = val;
-            document.getElementById('bridgeNameDisplay').innerText = val;
-            log(`注入对象名已更新为: ${BRIDGE_NAME}`, "info");
-        }
+    function getValue(id) {
+        return document.getElementById(id).value;
     }
 
-    // 处理 Android 发回的 Base64 响应
-    window.onAndroidResponse = function(callbackId, base64Data) {
-        try {
-            // 解决 Base64 中文乱码问题
-            const jsonStr = decodeURIComponent(escape(window.atob(base64Data)));
-            const result = JSON.parse(jsonStr);
+    // 基础日志打印
+    function log(msg, isError) {
+        var consoleDiv = document.getElementById('console-log');
+        var div = document.createElement('div');
+        div.className = 'log-item' + (isError ? ' log-err' : '');
 
-            // 传感器特殊逻辑：callbackId + "_data" 是持续回调
-            if (callbackId.endsWith("_data")) {
-                const realId = callbackId.replace("_data", "");
-                // 仅在 Console 打印，防止刷屏
-                console.log(`[Sensor Data] ${realId}:`, result.data);
-                const logDiv = document.getElementById("console-container");
-                // 只是闪烁一下状态，不追加 DOM
-                return;
-            }
+        var time = new Date().toLocaleTimeString();
+        div.innerText = "[" + time + "] " + msg;
 
-            log(`Callback [${callbackId}] Success: ${result.success}`, result.success ? "success" : "error");
-            log(`Data: ${typeof result.data === 'object' ? JSON.stringify(result.data) : result.data}`);
-
-            if (callbacks[callbackId]) {
-                callbacks[callbackId](result.success, result.data);
-                // 注意：一般一次性回调调用后删除，如果是持续监听（如传感器初始）则保留
-                if (!callbackId.includes("sensor")) {
-                    delete callbacks[callbackId];
-                }
-            }
-        } catch (e) {
-            log(`Error parsing response: ${e.message}`, "error");
-        }
-    };
-
-    // 辅助：生成回调 ID
-    function createCallback(fn) {
-        const id = 'cb_' + Math.random().toString(36).substr(2, 9);
-        callbacks[id] = fn;
-        return id;
-    }
-
-    // 日志函数
-    function log(msg, type="info") {
-        const container = document.getElementById("console-container");
-        const div = document.createElement("div");
-        div.className = `log-entry log-${type}`;
-        const time = new Date().toLocaleTimeString();
-        div.innerText = `[${time}] ${msg}`;
-        container.appendChild(div);
-        container.scrollTop = container.scrollHeight;
+        consoleDiv.appendChild(div);
+        consoleDiv.scrollTop = consoleDiv.scrollHeight;
         console.log(msg);
     }
 
-    // ==========================================
-    // 测试函数实现
-    // ==========================================
-
-    function checkBridge() {
-        if (!getBridge()) {
-            log(`Error: window.${BRIDGE_NAME} 未找到。请检查注入名。`, "error");
-            return false;
+    // 检测接口状态
+    setInterval(function() {
+        var bridge = getBridge();
+        var statusSpan = document.getElementById('status');
+        if (bridge) {
+            statusSpan.innerText = "✅ 已连接 (" + document.getElementById('bridgeName').value + ")";
+            statusSpan.style.color = "green";
+        } else {
+            statusSpan.innerText = "❌ 未找到对象";
+            statusSpan.style.color = "red";
         }
-        return true;
+    }, 1000);
+
+    // 通用调用方法
+    function callApi(methodName, ...args) {
+        var bridge = getBridge();
+        if (!bridge) {
+            log("Error: 桥接对象未找到", true);
+            return;
+        }
+        if (typeof bridge[methodName] === 'function') {
+            try {
+                log("调用: " + methodName + "(" + args.join(", ") + ")");
+                bridge[methodName](...args);
+            } catch (e) {
+                log("调用异常: " + e.message, true);
+            }
+        } else {
+            log("方法 " + methodName + " 不存在", true);
+        }
     }
 
-    // 1. 设备信息
-    function testDeviceInfo() {
-        if(!checkBridge()) return;
+    // 调用并显示返回值
+    function showRet(methodName, ...args) {
+        var bridge = getBridge();
+        if (!bridge) return log("Bridge not found", true);
+
         try {
-            const info = getBridge().getDeviceInfo();
-            log("Device Info: " + info);
-        } catch(e) { log(e.message, "error"); }
+            var ret = bridge[methodName](...args);
+            log(methodName + " 返回: " + ret);
+            return ret;
+        } catch (e) {
+            log(methodName + " 错误: " + e.message, true);
+        }
     }
 
-    function testAppConfig() {
-        if(!checkBridge()) return;
-        log("App Config: " + getBridge().getAppConfig());
+    // --- 具体功能实现 ---
+
+    // 1. 运行 Java 代码 (BeanShell/Groovy)
+    function runJava() {
+        var code = document.getElementById('javaCode').value;
+        callApi('evalJavaCode', code);
     }
 
-    function testPermissions() {
-        if(!checkBridge()) return;
-        // 检查
-        const perm = "android.permission.WRITE_EXTERNAL_STORAGE";
-        const has = getBridge().hasPermission(perm);
-        log(`Has Write Permission: ${has}`);
-
-        // 请求
-        const cbId = createCallback((success, data) => {
-            log(`Request Permission Result: ${data}`, success ? "success" : "error");
-        });
-        getBridge().requestPermission(perm, cbId);
+    // 2. 运行 JS 代码 (evalJsCode)
+    function runJs() {
+        // 测试反向注入
+        callApi('evalJsCode', 'alert("这是由 Android 调起的 JS Alert");');
     }
 
-    function testTime() {
-        if(!checkBridge()) return;
-        log("Timestamp: " + getBridge().getCurrentTimeMillis());
-    }
-
-    function testFormatDate() {
-        if(!checkBridge()) return;
-        log("Formatted: " + getBridge().formatDate(new Date().getTime(), "yyyy-MM-dd HH:mm:ss"));
-    }
-
-    // 2. UI
-    function testToast() {
-        if(!checkBridge()) return;
-        getBridge().showToast("来自 Web 的 Toast!");
-    }
-
-    function testDialog() {
-        if(!checkBridge()) return;
-        const cbId = createCallback((success, data) => {
-            log(`Dialog clicked: ${data}`); // positive or negative
-        });
-        getBridge().showDialog("测试标题", "这是一个来自 Web 的弹窗测试", "确定", "取消", cbId);
-    }
-
+    // 3. 通知测试
     function testNotification() {
-        if(!checkBridge()) return;
-        getBridge().showNotification(1001, "Web 通知", "点击查看详情 (测试)");
-        log("Notification sent (check status bar)");
+        // 调用 adapter.sendNotification(title, content)
+        callApi('sendNotification', 'WebIDE 通知', '这是一条来自网页的消息');
     }
 
-    function testVibrate() {
-        if(!checkBridge()) return;
-        getBridge().vibrate(500);
+    // 4. 获取剪贴板
+    function getClip() {
+        var content = showRet('getClipContent');
+        if(content) alert("剪贴板内容:\n" + content);
     }
 
-    // 3. 存储
-    function testSaveStorage() {
-        if(!checkBridge()) return;
-        getBridge().saveStorage("web_test_key", "Hello from JS " + new Date().getTime());
-        log("Saved to storage.");
+    // 5. 文件写入
+    function doWriteFile() {
+        var path = getValue('filePath');
+        var content = getValue('fileContent');
+        callApi('writeFile', path, content);
+        log("写入指令已发送");
     }
 
-    function testGetStorage() {
-        if(!checkBridge()) return;
-        const val = getBridge().getStorage("web_test_key");
-        log(`Read Storage: ${val}`);
+    // 6. 文件读取
+    function doReadFile() {
+        var path = getValue('filePath');
+        var content = showRet('readFile', path);
+        if (content) {
+            document.getElementById('fileContent').value = content;
+        }
     }
 
-    function testGetAllStorage() {
-        if(!checkBridge()) return;
-        const all = getBridge().getAllStorage();
-        log(`All Storage: ${all}`);
+    // 7. 列出文件
+    function doListFiles() {
+        var path = "/sdcard/";
+        var result = showRet('listFiles', path);
+        // Adapter 中用 [FG] 分割
+        if (result) {
+            var files = result.split("[FG]");
+            log("文件列表: " + files.join(", "));
+            alert("SD卡根目录文件:\n" + files.slice(0, 10).join("\n") + "\n(仅显示前10个)");
+        }
     }
 
-    function testRemoveStorage() {
-        if(!checkBridge()) return;
-        getBridge().removeStorage("web_test_key");
-        log("Removed key.");
-    }
-
-    function testClearStorage() {
-        if(!checkBridge()) return;
-        getBridge().clearStorage();
-        log("Storage cleared.");
-    }
-
-    // 4. 文件
-    function testSaveToDownloads() {
-        if(!checkBridge()) return;
-        const content = "This is a test file content created at " + new Date();
-        const success = getBridge().saveToDownloads("web_test.txt", content, "text/plain");
-        log(`Save to Downloads: ${success}`);
-    }
-
-    function testReadFile() {
-        if(!checkBridge()) return;
-        log("ReadFile (Abstract): " + getBridge().readFile("/sdcard/test.txt"));
-    }
-
-    function testWriteFile() {
-        if(!checkBridge()) return;
-        log("WriteFile (Abstract): " + getBridge().writeFile("/sdcard/test.txt", "content"));
-    }
-
-    function testListFiles() {
-        if(!checkBridge()) return;
-        log("ListFiles (Abstract): " + getBridge().listFiles("/sdcard/"));
-    }
-
-    // 5. 网络
-    function testHttpRequest() {
-        if(!checkBridge()) return;
-        const cbId = createCallback((success, data) => {
-            // data is JSON string
-            log("Http Result: " + data);
-        });
-        // 使用 httpbin.org 测试 GET
-        getBridge().httpRequest("GET", "https://httpbin.org/get", "{}", "", cbId);
-        log("Http Request sent...");
-    }
-
-    // 6. 传感器
-    let sensorCbId = null;
-    function testStartSensor() {
-        if(!checkBridge()) return;
-        sensorCbId = createCallback((success, data) => {
-            log(`Sensor Start Status: ${data}`);
-        });
-        // 你的代码支持: accelerometer, gyroscope, magnetometer, light, proximity
-        getBridge().startSensor("accelerometer", sensorCbId);
-        log("Starting Accelerometer (Look at adb logcat or console logs for data stream)...");
-    }
-
-    function testStopSensor() {
-        if(!checkBridge()) return;
-        getBridge().stopSensor();
-        log("Sensor Stopped");
-        if(sensorCbId) delete callbacks[sensorCbId];
-    }
-
-    // 7. 剪贴板
-    function testCopyToClip() {
-        if(!checkBridge()) return;
-        getBridge().copyToClipboard("Hello Bridge Content");
-    }
-
-    function testGetFromClip() {
-        if(!checkBridge()) return;
-        const cbId = createCallback((success, data) => {
-            log(`Clipboard Content: ${data}`);
-        });
-        getBridge().getFromClipboard(cbId);
-    }
-
-    // 8. Intent
-    function testOpenBrowser() {
-        if(!checkBridge()) return;
-        getBridge().openBrowser("https://www.google.com");
-    }
-
-    function testShare() {
-        if(!checkBridge()) return;
-        getBridge().shareText("分享这段文字给朋友");
-    }
-
-    function testCall() {
-        if(!checkBridge()) return;
-        getBridge().callPhone("10086");
-    }
-
-    function testSMS() {
-        if(!checkBridge()) return;
-        getBridge().sendSMS("10086", "CXLL");
-    }
-
-    function testEmail() {
-        if(!checkBridge()) return;
-        getBridge().sendEmail("test@example.com", "Subject", "Body content");
-    }
-
-    function testMap() {
-        if(!checkBridge()) return;
-        getBridge().openMap(39.9042, 116.4074, "Beijing");
-    }
-
-    function testSettings() {
-        if(!checkBridge()) return;
-        getBridge().openAppSettings();
-    }
-
-    // 9. Screen
-    function testKeepScreen(on) {
-        if(!checkBridge()) return;
-        getBridge().keepScreenOn(on);
-        log(`Keep Screen On: ${on}`);
-    }
-
-    function testBrightness() {
-        if(!checkBridge()) return;
-        getBridge().setScreenBrightness(0.5); // 0.0 - 1.0
-        log("Set brightness to 50%");
-    }
-
-    function testGetBrightness() {
-        if(!checkBridge()) return;
-        log("Current Brightness: " + getBridge().getScreenBrightness());
-    }
-
-    function testVolume() {
-        if(!checkBridge()) return;
-        getBridge().setVolume(10); // 这里的数值依赖于系统最大音量
-        log("Set Volume to 10");
-    }
-
-    function testReload() {
-        if(!checkBridge()) return;
-        getBridge().reloadApp();
-    }
-
-    function testExit() {
-        if(!checkBridge()) return;
-        getBridge().exitApp();
+    // 8. 删除文件
+    function doDeleteFile() {
+        var path = getValue('filePath');
+        if(confirm("确定删除 " + path + " 吗？")) {
+            callApi('deletFiles', path); // 注意你的 Kotlin 方法名是 deletFiles (拼写是这样的)
+            log("删除指令已发送");
+        }
     }
 
 </script>

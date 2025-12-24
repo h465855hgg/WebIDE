@@ -52,5 +52,6 @@ android {
 }
 
 dependencies {
+    implementation(libs.bsh)
     implementation(libs.androidx.core.ktx)
 }

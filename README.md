@@ -1,6 +1,6 @@
 # WebIDE
 
-![Version](https://img.shields.io/badge/version-0.1.9-blue?style=flat-square)
+![Version](https://img.shields.io/badge/version-0.2.0-blue?style=flat-square)
 [![Language](https://img.shields.io/badge/Language-Kotlin-blue?style=flat-square)](https://kotlinlang.org/)
 [![UI](https://img.shields.io/badge/UI-Jetpack_Compose-green?style=flat-square)](https://developer.android.com/jetpack/compose)
 [![License](https://img.shields.io/badge/License-GPLv3-orange?style=flat-square)](LICENSE)

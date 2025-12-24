@@ -47,6 +47,7 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.provider.Settings
 import android.util.Base64
+import bsh.Interpreter
 import android.webkit.JavascriptInterface
 import android.webkit.MimeTypeMap
 import android.webkit.WebView
@@ -61,7 +62,6 @@ import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import java.util.regex.Pattern
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
@@ -115,14 +115,41 @@ class WebsApiAdapter(
 
     @JavascriptInterface
     fun evalJavaCode(code: String) {
-        mainHandler.post {
-            Toast.makeText(context, "BeanShell Java 暂不支持，仅支持原生 JS 接口", Toast.LENGTH_SHORT).show()
-            // 简单的正则匹配演示，防止脚本报错
-            if (code.contains("Toast")) {
-                val matcher = Pattern.compile("results*\"(.*?)\"").matcher(code)
-                if (matcher.find()) Toast.makeText(context, matcher.group(1), Toast.LENGTH_LONG).show()
+        // 建议在子线程执行，防止脚本卡死主线程
+        Thread {
+            try {
+                // 1. 创建解释器
+                val interpreter = Interpreter()
+
+                // 2. 注入全局变量 (让脚本能用到这些对象)
+                interpreter.set("context", context)
+                interpreter.set("webView", webView)
+                interpreter.set("adapter", this) // 把自己也传进去
+
+                // 3. 执行代码
+                // BeanShell 支持直接返回最后一行结果
+                val result = interpreter.eval(code)
+
+                // 4. 反馈结果到 UI (Toast)
+                if (result != null) {
+                    mainHandler.post {
+                        Toast.makeText(context, "执行结果: $result", Toast.LENGTH_LONG).show()
+                    }
+                } else {
+                    mainHandler.post {
+                        Toast.makeText(context, "执行成功", Toast.LENGTH_SHORT).show()
+                    }
+                }
+
+            } catch (e: Exception) {
+                e.printStackTrace()
+                // 捕获脚本错误
+                mainHandler.post {
+                    // AlertDialog 可能更好，这里简单用 Toast
+                    Toast.makeText(context, "脚本错误: ${e.message}", Toast.LENGTH_LONG).show()
+                }
             }
-        }
+        }.start()
     }
 
     @JavascriptInterface

@@ -84,3 +84,22 @@
 # 有些签名库引用了 Android 系统内部类，忽略警告以保证编译通过
 -dontwarn com.android.apksig.**
 -dontwarn java.nio.file.**
+
+
+# 1. 忽略桌面端 UI 库 (AWT 和 Swing)
+# BeanShell 自带了一个桌面调试控制台，但在手机上我们要么用不到，要么用 JS 模拟
+-dontwarn java.awt.**
+-dontwarn javax.swing.**
+-dontwarn java.applet.**
+
+# 2. 忽略服务端和标准脚本接口
+# 安卓没有 Servlet 和 javax.script.*
+-dontwarn javax.servlet.**
+-dontwarn javax.script.**
+
+# 3. 忽略旧版脚本框架 (BSF)
+-dontwarn org.apache.bsf.**
+
+# 4. 保持 BeanShell 核心代码不被移除/混淆
+# BeanShell 极其依赖反射，混淆会导致“找不到构造函数”等运行时错误
+-keep class bsh.** { *; }

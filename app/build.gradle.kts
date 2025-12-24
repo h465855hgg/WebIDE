@@ -16,6 +16,26 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import com.android.build.api.dsl.Packaging
+
+/*
+ * WebIDE - A powerful IDE for Android web development.
+ * Copyright (C) 2025  如日中天  <3382198490@qq.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -32,8 +52,8 @@ android {
         applicationId = "com.web.webide"
         minSdk = 29
         targetSdk = 36
-        versionCode = 19
-        versionName = "0.1.9"
+        versionCode = 20
+        versionName = "0.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a")
@@ -136,7 +156,6 @@ dependencies {
 
 
     implementation(project(":signer"))
-
 
     implementation(libs.zipalign.java)
 
