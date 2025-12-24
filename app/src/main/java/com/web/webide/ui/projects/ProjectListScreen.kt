@@ -55,6 +55,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import androidx.core.content.edit
 
 // --- 常量定义 ---
 private const val PREFS_NAME = "project_prefs"
@@ -127,14 +128,14 @@ fun ProjectListScreen(navController: NavController) {
         searchHistory = newHistory
         // 简单持久化：用换行符分隔保存 (假设项目名不含换行符)
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit().putString(KEY_SEARCH_HISTORY, newHistory.joinToString("\n")).apply()
+            .edit { putString(KEY_SEARCH_HISTORY, newHistory.joinToString("\n")) }
     }
 
     fun deleteHistoryItem(item: String) {
         val newHistory = searchHistory - item
         searchHistory = newHistory
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit().putString(KEY_SEARCH_HISTORY, newHistory.joinToString("\n")).apply()
+            .edit { putString(KEY_SEARCH_HISTORY, newHistory.joinToString("\n")) }
     }
 
     fun loadHistory() {
@@ -191,14 +192,14 @@ fun ProjectListScreen(navController: NavController) {
         val newPinned = pinnedProjects.toMutableSet()
         if (newPinned.contains(folderName)) newPinned.remove(folderName) else newPinned.add(folderName)
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit().putStringSet(KEY_PINNED_PROJECTS, newPinned).apply()
+            .edit { putStringSet(KEY_PINNED_PROJECTS, newPinned) }
         refreshList()
     }
 
     fun changeSortOrder(newOrder: SortOrder) {
         currentSortOrder = newOrder
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit().putInt(KEY_SORT_ORDER, newOrder.ordinal).apply()
+            .edit { putInt(KEY_SORT_ORDER, newOrder.ordinal) }
         refreshList()
     }
 
@@ -404,7 +405,7 @@ fun ProjectListScreen(navController: NavController) {
                                 onClick = {
                                     searchHistory = emptyList()
                                     context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                                        .edit().remove(KEY_SEARCH_HISTORY).apply()
+                                        .edit { remove(KEY_SEARCH_HISTORY) }
                                 },
                                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                             ) {

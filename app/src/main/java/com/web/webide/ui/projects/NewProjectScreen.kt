@@ -28,6 +28,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -39,6 +40,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.web.webide.core.utils.PermissionManager
@@ -52,6 +56,7 @@ import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Locale
+import androidx.core.net.toUri
 
 // 定义项目类型枚举
 enum class ProjectType {
@@ -227,10 +232,9 @@ fun NewProjectScreen(navController: NavController) {
                         modifier = Modifier.fillMaxWidth(),
 
                         // 🔥🔥🔥 核心修改 2：键盘属性优化 🔥🔥🔥
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Ascii, // 告诉输入法尽量显示英文键盘
-                            autoCorrect = false, // 🔴 必须关闭！否则输入 com 会被自动纠正为 Come 等单词
-                            imeAction = androidx.compose.ui.text.input.ImeAction.Next
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Unspecified, autoCorrectEnabled = false, // 🔴 必须关闭！否则输入 com 会被自动纠正为 Come 等单词
+                            keyboardType = KeyboardType.Ascii, // 告诉输入法尽量显示英文键盘
+                            imeAction = ImeAction.Next
                         ),
 
                         isError = packageError != null,
@@ -421,7 +425,7 @@ private fun createNewProject(
             if (type != ProjectType.NORMAL && iconPathSource.isNotBlank()) {
                 try {
                     val destIconFile = File(projectDir, "icon.png")
-                    val uri = Uri.parse(iconPathSource)
+                    val uri = iconPathSource.toUri()
 
                     // 判断是 Content Uri (相册选择) 还是 File Path (手动输入)
                     if (iconPathSource.startsWith("content://")) {
@@ -534,7 +538,7 @@ private fun insertIconToJson(json: String, iconPath: String): String {
         // 如果想在创建时就指定默认 UA，也可以在这里加：
         // jsonObject.getJSONObject("webview").put("userAgent", "Mozilla/5.0...")
         return jsonObject.toString(2) // 格式化输出，带2个空格缩进
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         // 退而求其次：如果 JSONObject 报错，使用你原来的字符串截取逻辑（作为保底）
         val lastBraceIndex = json.lastIndexOf('}')
         if (lastBraceIndex != -1) {
