@@ -99,8 +99,6 @@ object WorkspaceManager {
         if (file.exists() && file.isDirectory) return true
 
         try {
-            val defaultPath = getDefaultPath(context)
-            // 简单的字符串包含检查，兼容性更好
             if (path.contains(context.packageName)) {
                 return file.mkdirs() || file.exists()
             }
