@@ -32,8 +32,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,7 +72,6 @@ fun FileTree(
 ) {
     var rootFiles by remember { mutableStateOf<List<FileNode>>(emptyList()) }
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
 
     var containerWidth by remember { mutableIntStateOf(0) }
     val sideMargin = 12.dp
@@ -343,7 +344,7 @@ private fun FileNodeItem(
 
             if (node.isDirectory) {
                 Icon(
-                    Icons.Default.KeyboardArrowRight,
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = "Expand",
                     modifier = Modifier.size(24.dp).rotate(arrowRotation)
                 )
@@ -404,6 +405,7 @@ private fun BottomSheetActionItem(icon: ImageVector, text: String, onClick: () -
     }
 }
 
+@Suppress("DEPRECATION")
 @Composable
 fun FileActionBottomSheet(
     node: FileNode,
@@ -418,7 +420,11 @@ fun FileActionBottomSheet(
     Column(modifier = Modifier.padding(vertical = 8.dp)) {
         BottomSheetActionItem(Icons.Default.Description, "新建文件", { onCreateFileRequest(); onDismiss() })
         BottomSheetActionItem(Icons.Default.CreateNewFolder, "新建文件夹", { onCreateFolderRequest(); onDismiss() })
-        Divider(modifier = Modifier.padding(vertical = 8.dp))
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 8.dp),
+            thickness = DividerDefaults.Thickness,
+            color = DividerDefaults.color
+        )
         BottomSheetActionItem(Icons.Default.DriveFileRenameOutline, "重命名", { onRenameRequest(); onDismiss() })
         BottomSheetActionItem(Icons.Default.ContentCopy, "复制绝对路径", {
             clipboardManager.setText(AnnotatedString(node.file.absolutePath))
