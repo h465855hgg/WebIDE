@@ -20,6 +20,7 @@ package com.web.webide.core.utils
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
 
 /**
  * 管理欢迎页面显示状态的工具类
@@ -43,15 +44,8 @@ object WelcomePreferences {
      * 标记欢迎流程已完成
      */
     fun setWelcomeCompleted(context: Context) {
-        getPreferences(context).edit().putBoolean(KEY_WELCOME_COMPLETED, true).apply()
+        getPreferences(context).edit { putBoolean(KEY_WELCOME_COMPLETED, true) }
         LogCatcher.i("WelcomePreferences", "欢迎流程已标记为完成")
     }
-    
-    /**
-     * 重置欢迎流程状态（用于测试）
-     */
-    fun resetWelcome(context: Context) {
-        getPreferences(context).edit().putBoolean(KEY_WELCOME_COMPLETED, false).apply()
-        LogCatcher.i("WelcomePreferences", "欢迎流程状态已重置")
-    }
+
 }
