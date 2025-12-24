@@ -78,7 +78,7 @@ object CodeFormatter {
         val indentStr = " ".repeat(indentSize)
 
         for (line in lines) {
-            var trimmed = line.trim()
+            val trimmed = line.trim()
             if (trimmed.startsWith("}")) indentLevel--
             repeat(maxOf(0, indentLevel)) { result.append(indentStr) }
             result.append(trimmed).append("\n")
