@@ -42,7 +42,6 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -55,6 +54,7 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
+import androidx.core.graphics.toColorInt
 
 @Composable
 fun ColorPickerDialog(
@@ -119,7 +119,7 @@ fun ColorPickerDialog(
                                         saturation = hsv[1]
                                         value = hsv[2]
                                         alpha = 1f
-                                    } catch (e: Exception) { }
+                                    } catch (_: Exception) { }
                                 } else if (filtered.length == 8) {
                                     try {
                                         val color = hexToColor(filtered)
@@ -128,7 +128,7 @@ fun ColorPickerDialog(
                                         saturation = hsv[1]
                                         value = hsv[2]
                                         alpha = color.alpha
-                                    } catch (e: Exception) { }
+                                    } catch (_: Exception) { }
                                 }
                             },
                             textStyle = MaterialTheme.typography.headlineMedium.copy(
@@ -479,7 +479,6 @@ private fun RowScope.NumberInput(
     max: Int,
     onValueChange: (Int) -> Unit
 ) {
-    val focusManager = LocalFocusManager.current
     var text by remember(value) { mutableStateOf(value.toString()) }
 
     Column(modifier = Modifier.weight(1f)) {
@@ -558,7 +557,7 @@ fun hexToColor(hex: String): Color {
         val blue = cleanHex.substring(6, 8).toInt(16)
         Color(red, green, blue, alpha)
     } else {
-        Color(android.graphics.Color.parseColor("#$cleanHex"))
+        Color("#$cleanHex".toColorInt())
     }
 }
 
