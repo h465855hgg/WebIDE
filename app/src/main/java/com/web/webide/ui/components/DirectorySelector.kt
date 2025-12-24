@@ -38,7 +38,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -59,7 +58,6 @@ fun DirectorySelector(
     val rootPath = "/storage/emulated/0"
     var currentPath by remember { mutableStateOf(initialPath.ifEmpty { rootPath }) }
     var showCreateFolderDialog by remember { mutableStateOf(false) }
-    val context = LocalContext.current
     val listState = rememberLazyListState()
     rememberCoroutineScope()
 
@@ -98,7 +96,7 @@ fun DirectorySelector(
                         currentPath = tempPath
                     } else {
                          }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                      }
                 showCreateFolderDialog = false
             }
@@ -276,7 +274,7 @@ fun DirectorySelector(
 /**
  * 快速滑动条组件 - Material Design 3 风格
  */
-@SuppressLint("UnusedBoxWithConstraintsScope")
+@SuppressLint("UnusedBoxWithConstraintsScope", "FrequentlyChangingValue")
 @Composable
 private fun FastScrollbar(
     listState: LazyListState,
@@ -301,13 +299,11 @@ private fun FastScrollbar(
     val scrollProgress = remember(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset, totalItems, visibleItems, isDragging) {
         if (isDragging) {
             null
-        } else if (totalItems > visibleItems) {
+        } else run {
             val index = listState.firstVisibleItemIndex.toFloat()
             val offset = listState.firstVisibleItemScrollOffset.toFloat()
             val itemHeight = layoutInfo.visibleItemsInfo.firstOrNull()?.size ?: 1
             (index + offset / itemHeight.toFloat()) / (totalItems - visibleItems).coerceAtLeast(1).toFloat()
-        } else {
-            0f
         }
     }
 
