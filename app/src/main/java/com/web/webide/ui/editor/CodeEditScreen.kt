@@ -197,7 +197,7 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                             IconButton(onClick = {
                                 scope.launch {
                                     scope.launch {
-                                        viewModel.saveAllModifiedFiles(context, snackbarHostState)
+                                        viewModel.saveAllModifiedFiles(snackbarHostState)
                                         navController.navigate("preview/$folderName")
                                     }
                                 }
@@ -216,7 +216,7 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                         text = { Text("全部保存") },
                                         onClick = {
                                             scope.launch {
-                                                viewModel.saveAllModifiedFiles(context, snackbarHostState)
+                                                viewModel.saveAllModifiedFiles(snackbarHostState)
                                             }
                                             isMoreMenuExpanded = false
                                         }
@@ -265,7 +265,8 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                     // 工具栏 (根据配置显示)
                     if (editorConfig.showToolbar) {
                         EditorToolbar(
-                            onSave = { scope.launch { viewModel.saveAllModifiedFiles(context, snackbarHostState) } },
+                            onSave = { scope.launch { viewModel.saveAllModifiedFiles(
+                                snackbarHostState) } },
                             onSearch = {
                                 isOpenSearch = !isOpenSearch
                                 isOpenJump = false
@@ -428,7 +429,7 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                 Text("APK 已生成，是否立即安装？")
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text("输出路径:", style = MaterialTheme.typography.titleSmall)
-                                Text(result.apkPath ?: "", style = MaterialTheme.typography.bodySmall)
+                                Text(result.apkPath, style = MaterialTheme.typography.bodySmall)
                             } else {
                                 Text("错误信息：", color = MaterialTheme.colorScheme.error)
                                 Text(result.message)
@@ -438,7 +439,7 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                     confirmButton = {
                         if (isSuccess) {
                             TextButton(onClick = {
-                                val apkFile = File(result.apkPath!!)
+                                val apkFile = File(result.apkPath)
                                 ApkInstaller.install(context, apkFile)
                                 buildResult = null
                             }) { Text("安装") }
@@ -688,7 +689,7 @@ private suspend fun performBuild(
     snackbarHostState: SnackbarHostState,
     onResult: (BuildResultState) -> Unit
 ) {
-    viewModel.saveAllModifiedFiles(context, snackbarHostState)
+    viewModel.saveAllModifiedFiles(snackbarHostState)
     val prefs = context.getSharedPreferences("WebIDE_Project_Settings", android.content.Context.MODE_PRIVATE)
     val isDebug = prefs.getBoolean("debug_$folderName", false)
 

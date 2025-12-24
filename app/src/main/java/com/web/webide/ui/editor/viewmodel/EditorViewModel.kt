@@ -110,7 +110,7 @@ class EditorViewModel : ViewModel() {
         hasPermissions = PermissionManager.hasRequiredPermissions(appContext)
     }
 
-    private fun checkPermissions(operation: String): Boolean {
+    private fun checkPermissions(): Boolean {
         if (!hasPermissions) {
             return false
         }
@@ -362,12 +362,12 @@ class EditorViewModel : ViewModel() {
             }
         }
     }
-    suspend fun saveAllModifiedFiles(context: Context, snackbarHostState: SnackbarHostState) {
+    suspend fun saveAllModifiedFiles(snackbarHostState: SnackbarHostState) {
         withContext(Dispatchers.IO) {
             val modifiedFiles = openFiles.filter { it.isModified }
             if (modifiedFiles.isEmpty()) return@withContext
 
-            if (!checkPermissions("保存文件")) {
+            if (!checkPermissions()) {
                 withContext(Dispatchers.Main) {
                     viewModelScope.launch { snackbarHostState.showSnackbar("需要存储权限才能保存文件") }
                 }
@@ -406,7 +406,7 @@ class EditorViewModel : ViewModel() {
                 val content = withContext(Dispatchers.IO) {
                     try {
                         file.readText(Charsets.UTF_8)
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         ""
                     }
                 }

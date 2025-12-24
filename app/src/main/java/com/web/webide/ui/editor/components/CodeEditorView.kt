@@ -46,6 +46,7 @@ import io.github.rosemoe.sora.langs.textmate.registry.ThemeRegistry
 import io.github.rosemoe.sora.langs.textmate.registry.model.ThemeModel
 import io.github.rosemoe.sora.langs.textmate.registry.provider.AssetsFileResolver
 import io.github.rosemoe.sora.widget.CodeEditor
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.launch
 import org.eclipse.tm4e.core.registry.IThemeSource
 import java.io.File
@@ -181,6 +182,7 @@ object TextMateInitializer {
     private var isInitializing = false
     private val callbacks = mutableListOf<() -> Unit>()
 
+    @OptIn(DelicateCoroutinesApi::class)
     @Synchronized
     fun initialize(context: Context, onComplete: (() -> Unit)? = null) {
         if (isInitialized) {
@@ -234,9 +236,4 @@ object TextMateInitializer {
 
     fun isReady() = isInitialized
 
-    fun preloadCommonLanguages(context: Context) {
-        if (!isInitialized && !isInitializing) {
-            initialize(context)
-        }
-    }
 }
