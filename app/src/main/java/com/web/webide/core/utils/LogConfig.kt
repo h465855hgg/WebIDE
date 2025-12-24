@@ -29,6 +29,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.flow.Flow
@@ -154,28 +155,11 @@ object LogCatcher {
         }
     }
 
-    @JvmStatic
-    fun permission(tag: String, action: String, result: String) {
-        if (shouldLog()) {
-            val message = "权限操作: $action - $result"
-            android.util.Log.i("$tag-Permission", message)
-            writeToFile("PERMISSION", tag, message)
-        }
-    }
-
-    @JvmStatic
-    fun fileOperation(tag: String, operation: String, filePath: String, result: String) {
-        if (shouldLog()) {
-            val message = "文件操作: $operation - $filePath - $result"
-            android.util.Log.i("$tag-File", message)
-            writeToFile("FILE", tag, message)
-        }
-    }
-
     private fun shouldLog(): Boolean {
         return isInitialized && logConfig?.isLogEnabled == true
     }
 
+    @OptIn(DelicateCoroutinesApi::class)
     private fun writeToFile(level: String, tag: String, message: String) {
         val config = logConfig ?: return
         if (!config.isLogEnabled) return
