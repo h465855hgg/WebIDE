@@ -148,10 +148,10 @@ fun FileTree(
 
     LaunchedEffect(rootPath) {
         val rootFile = File(rootPath)
-        if (rootFile.exists()) {
-            rootFiles = listOf(FileNode(file = rootFile, isDirectory = rootFile.isDirectory))
+        rootFiles = if (rootFile.exists()) {
+            listOf(FileNode(file = rootFile, isDirectory = rootFile.isDirectory))
         } else {
-            rootFiles = emptyList()
+            emptyList()
         }
     }
 
