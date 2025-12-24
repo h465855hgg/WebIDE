@@ -44,8 +44,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
@@ -54,18 +56,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-// 文件树节点的数据结构
 data class FileNode(
     val file: File,
     val isDirectory: Boolean,
 )
 
-/**
- * 一个可重用的文件树UI组件。
- * @param rootPath 要显示的文件树的根路径。
- * @param modifier 修饰符。
- * @param onFileClick 当文件被点击时调用的回调函数。
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FileTree(
@@ -77,13 +72,21 @@ fun FileTree(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
-    var containerWidth by remember { mutableStateOf(0) }
+    var containerWidth by remember { mutableIntStateOf(0) }
+    val sideMargin = 12.dp
+    val density = LocalDensity.current
+
+    val minItemWidth = remember(containerWidth, sideMargin) {
+        if (containerWidth == 0) 0.dp else
+            with(density) { (containerWidth.toDp() - (sideMargin * 2)).coerceAtLeast(0.dp) }
+    }
+
     var itemWidths by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
     val maxContentWidth = itemWidths.values.maxOrNull() ?: 0
-    val isHorizontalScrollEnabled = maxContentWidth > containerWidth && containerWidth > 0
+    val viewportWidthPx = if (containerWidth > 0) containerWidth - with(density) { (sideMargin * 2).toPx() } else 0f
+    val isHorizontalScrollEnabled = maxContentWidth > viewportWidthPx && containerWidth > 0
     val horizontalScrollState = rememberScrollState()
 
-    // 默认展开根目录
     var expandedNodes by remember(rootPath) { mutableStateOf(setOf(File(rootPath).path)) }
 
     val onSmartToggle: (FileNode) -> Unit = smartToggle@{ node ->
@@ -116,8 +119,7 @@ fun FileTree(
             }
         }
     }
-    
-    // 简化刷新逻辑，通过重新开关抽屉来强制刷新
+
     fun refreshDirectory(directory: File) {
         scope.launch {
             val path = directory.absolutePath
@@ -128,7 +130,7 @@ fun FileTree(
             }
         }
     }
-    
+
     val sheetState = rememberModalBottomSheetState()
     var showBottomSheet by remember { mutableStateOf(false) }
     var selectedFileNode by remember { mutableStateOf<FileNode?>(null) }
@@ -136,14 +138,13 @@ fun FileTree(
     var showCreateFolderDialog by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
     var showDeleteConfirmationDialog by remember { mutableStateOf(false) }
-    
+
     LaunchedEffect(isHorizontalScrollEnabled) {
         if (!isHorizontalScrollEnabled) {
             horizontalScrollState.animateScrollTo(0)
         }
     }
-    
-    // 初始化时加载根目录本身作为根节点
+
     LaunchedEffect(rootPath) {
         val rootFile = File(rootPath)
         if (rootFile.exists()) {
@@ -152,7 +153,7 @@ fun FileTree(
             rootFiles = emptyList()
         }
     }
-    
+
     if (rootFiles.isEmpty()) {
         Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
@@ -169,13 +170,17 @@ fun FileTree(
                         state = horizontalScrollState,
                         enabled = isHorizontalScrollEnabled
                     ),
-                contentPadding = PaddingValues(end = 8.dp, top = 4.dp, bottom = 4.dp)
+                contentPadding = PaddingValues(
+                    horizontal = sideMargin,
+                    vertical = 4.dp
+                )
             ) {
                 items(rootFiles, key = { it.file.path }) { node ->
                     FileNodeItem(
                         node = node,
                         depth = 0,
                         expandedNodes = expandedNodes,
+                        minWidth = minItemWidth,
                         onToggle = onSmartToggle,
                         onFileClick = onFileClick,
                         onLongClick = {
@@ -193,8 +198,7 @@ fun FileTree(
             }
         }
     }
-
-    if (showBottomSheet) {
+    if (showBottomSheet && selectedFileNode != null) {
         ModalBottomSheet(
             onDismissRequest = { showBottomSheet = false },
             sheetState = sheetState
@@ -214,116 +218,51 @@ fun FileTree(
         AlertDialog(
             onDismissRequest = { showDeleteConfirmationDialog = false },
             title = { Text("确认删除") },
-            text = { Text("你确定要删除 “${selectedFileNode?.file?.name}” 吗？此操作无法撤销。") },
+            text = { Text("你确定要删除 “${selectedFileNode?.file?.name}” 吗？") },
             confirmButton = {
-                Button(
-                    onClick = {
-                        showDeleteConfirmationDialog = false
-                        showBottomSheet = false
-                        selectedFileNode?.let { node ->
-                            scope.launch {
-                                val parent = node.file.parentFile ?: File(rootPath)
-                                val success = withContext(Dispatchers.IO) {
-                                    if (node.isDirectory) node.file.deleteRecursively() else node.file.delete()
-                                }
-                                  if (success) refreshDirectory(parent)
-                            }
+                Button(onClick = {
+                    showDeleteConfirmationDialog = false
+                    showBottomSheet = false
+                    selectedFileNode?.let { node ->
+                        scope.launch {
+                            val parent = node.file.parentFile ?: File(rootPath)
+                            val success = withContext(Dispatchers.IO) { if (node.isDirectory) node.file.deleteRecursively() else node.file.delete() }
+                            if (success) refreshDirectory(parent)
                         }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) { Text("删除") }
+                    }
+                }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("删除") }
             },
-            dismissButton = {
-                TextButton(onClick = { showDeleteConfirmationDialog = false }) { Text("取消") }
-            }
+            dismissButton = { TextButton(onClick = { showDeleteConfirmationDialog = false }) { Text("取消") } }
         )
     }
-
     if (showCreateFileDialog) {
-        InputDialog(
-            title = "新建文件",
-            label = "文件名",
-            onDismiss = { showCreateFileDialog = false },
-            onConfirm = { name ->
-                showCreateFileDialog = false
-                showBottomSheet = false
-                selectedFileNode?.let { node ->
-                    val parentDir = if (node.isDirectory) node.file else node.file.parentFile
-                    parentDir?.let {
-                        scope.launch {
-                            try {
-                                val newFile = File(it, name)
-                                val success = withContext(Dispatchers.IO) { newFile.createNewFile() }
-                                if (success) {
-                                    Toast.makeText(context, "文件创建成功", Toast.LENGTH_SHORT).show()
-                                    refreshDirectory(it)
-                                } else {
-                                    Toast.makeText(context, "文件已存在", Toast.LENGTH_SHORT).show()
-                                }
-                            } catch (e: Exception) {
-                                Toast.makeText(context, "创建失败: ${e.message}", Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    }
-                }
+        InputDialog(title = "新建文件", label = "文件名", onDismiss = { showCreateFileDialog = false }) { name ->
+            showCreateFileDialog = false; showBottomSheet = false
+            selectedFileNode?.let { node ->
+                val parent = if (node.isDirectory) node.file else node.file.parentFile
+                parent?.let { scope.launch { withContext(Dispatchers.IO) { File(it, name).createNewFile() }; refreshDirectory(it) } }
             }
-        )
+        }
     }
-
     if (showCreateFolderDialog) {
-        InputDialog(
-            title = "新建文件夹",
-            label = "文件夹名",
-            onDismiss = { showCreateFolderDialog = false },
-            onConfirm = { name ->
-                showCreateFolderDialog = false
-                showBottomSheet = false
-                selectedFileNode?.let { node ->
-                    val parentDir = if (node.isDirectory) node.file else node.file.parentFile
-                    parentDir?.let {
-                        scope.launch {
-                            val newDir = File(it, name)
-                            val success = withContext(Dispatchers.IO) { newDir.mkdirs() }
-                            if (success) {
-                                Toast.makeText(context, "文件夹创建成功", Toast.LENGTH_SHORT).show()
-                                refreshDirectory(it)
-                            } else {
-                                Toast.makeText(context, "创建失败", Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    }
-                }
+        InputDialog(title = "新建文件夹", label = "文件夹名", onDismiss = { showCreateFolderDialog = false }) { name ->
+            showCreateFolderDialog = false; showBottomSheet = false
+            selectedFileNode?.let { node ->
+                val parent = if (node.isDirectory) node.file else node.file.parentFile
+                parent?.let { scope.launch { withContext(Dispatchers.IO) { File(it, name).mkdirs() }; refreshDirectory(it) } }
             }
-        )
+        }
     }
-
     if (showRenameDialog) {
-        InputDialog(
-            title = "重命名",
-            label = "新名称",
-            initialValue = selectedFileNode?.file?.name ?: "",
-            onDismiss = { showRenameDialog = false },
-            onConfirm = { newName ->
-                showRenameDialog = false
-                showBottomSheet = false
-                selectedFileNode?.let { node ->
-                    scope.launch {
-                        val parent = node.file.parentFile ?: return@launch
-                        val newFile = File(parent, newName)
-                        val success = withContext(Dispatchers.IO) { node.file.renameTo(newFile) }
-                        if (success) {
-                            Toast.makeText(context, "重命名成功", Toast.LENGTH_SHORT).show()
-                            refreshDirectory(parent)
-                        } else {
-                            Toast.makeText(context, "重命名失败", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                }
+        InputDialog(title = "重命名", label = "新名称", initialValue = selectedFileNode?.file?.name ?: "", onDismiss = { showRenameDialog = false }) { name ->
+            showRenameDialog = false; showBottomSheet = false
+            selectedFileNode?.let { node ->
+                val parent = node.file.parentFile
+                parent?.let { scope.launch { withContext(Dispatchers.IO) { node.file.renameTo(File(it, name)) }; refreshDirectory(it) } }
             }
-        )
+        }
     }
 }
-
 
 /**
  * 可递归的文件树节点 UI
@@ -334,6 +273,7 @@ private fun FileNodeItem(
     node: FileNode,
     depth: Int,
     expandedNodes: Set<String>,
+    minWidth: Dp,
     onToggle: (FileNode) -> Unit,
     onFileClick: (File) -> Unit,
     onLongClick: (FileNode) -> Unit,
@@ -341,7 +281,7 @@ private fun FileNodeItem(
     onDisposed: (String) -> Unit
 ) {
     val isExpanded = expandedNodes.contains(node.file.path)
-    
+
     val animationSpec = tween<Float>(durationMillis = 150)
     val arrowRotation by animateFloatAsState(
         targetValue = if (isExpanded) 90f else 0f,
@@ -361,15 +301,20 @@ private fun FileNodeItem(
             }
         }
     }
-    
+
     DisposableEffect(node.file.path) {
         onDispose { onDisposed(node.file.path) }
     }
-    
+
+    val widthModifier = if (minWidth > 0.dp) {
+        Modifier.widthIn(min = minWidth)
+    } else {
+        Modifier.fillMaxWidth()
+    }
+
     Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 8.dp)
+            .then(widthModifier)
             .clip(RoundedCornerShape(8.dp))
             .combinedClickable(
                 onClick = {
@@ -384,14 +329,18 @@ private fun FileNodeItem(
     ) {
         Row(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxWidth() // Row 填满外层 Column
                 .onSizeChanged { onWidthMeasured(node.file.path, it.width) }
-                .padding(start = (depth * 16).dp)
-                .padding(horizontal = 4.dp, vertical = 10.dp),
+                .padding(vertical = 10.dp, horizontal = 4.dp), // 内部上下边距
             verticalAlignment = Alignment.CenterVertically
         ) {
+            if (depth > 0) {
+                Spacer(modifier = Modifier.width((depth * 20).dp))
+            }
+
             val icon = if (node.isDirectory) Icons.Default.Folder else Icons.Default.Description
             val tint = if (node.isDirectory) MaterialTheme.colorScheme.primary else LocalContentColor.current.copy(alpha = 0.7f)
+
             if (node.isDirectory) {
                 Icon(
                     Icons.Default.KeyboardArrowRight,
@@ -401,23 +350,32 @@ private fun FileNodeItem(
             } else {
                 Spacer(modifier = Modifier.width(24.dp))
             }
+
             Icon(icon, null, Modifier.size(20.dp), tint = tint)
             Spacer(modifier = Modifier.width(8.dp))
-            Text(node.file.name, maxLines = 1, overflow = TextOverflow.Visible, fontSize = 14.sp)
-            Spacer(modifier = Modifier.width(100.dp))
+
+            Text(
+                text = node.file.name,
+                maxLines = 1,
+                overflow = TextOverflow.Visible,
+                fontSize = 14.sp
+            )
+
+            Spacer(modifier = Modifier.width(24.dp))
         }
-        
+
         AnimatedVisibility(
             visible = isExpanded,
             enter = expandVertically(animationSpec = tween(150)),
             exit = shrinkVertically(animationSpec = tween(150))
         ) {
-            Column {
+            Column(modifier = Modifier.fillMaxWidth()) {
                 children.forEach { child ->
                     FileNodeItem(
                         node = child,
                         depth = depth + 1,
                         expandedNodes = expandedNodes,
+                        minWidth = minWidth,
                         onToggle = onToggle,
                         onFileClick = onFileClick,
                         onLongClick = onLongClick,
@@ -430,20 +388,8 @@ private fun FileNodeItem(
     }
 }
 
-/**
- * 一个自定义的 BottomSheet 动作项，用于替代 ListItem。
- * @param icon 动作的图标。
- * @param text 动作的文本。
- * @param onClick 点击时执行的回调。
- * @param color 文本和图标的颜色，默认为当前内容颜色。
- */
 @Composable
-private fun BottomSheetActionItem(
-    icon: ImageVector,
-    text: String,
-    onClick: () -> Unit,
-    color: Color = Color.Unspecified
-) {
+private fun BottomSheetActionItem(icon: ImageVector, text: String, onClick: () -> Unit, color: Color = Color.Unspecified) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -452,24 +398,12 @@ private fun BottomSheetActionItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         val tint = if (color != Color.Unspecified) color else LocalContentColor.current
-        Icon(
-            imageVector = icon,
-            contentDescription = text,
-            tint = tint
-        )
+        Icon(imageVector = icon, contentDescription = text, tint = tint)
         Spacer(modifier = Modifier.width(16.dp))
-        Text(
-            text = text,
-            color = tint,
-            fontSize = 16.sp
-        )
+        Text(text = text, color = tint, fontSize = 16.sp)
     }
 }
 
-
-/**
- * BottomSheet 的内容 UI (使用自定义布局)
- */
 @Composable
 fun FileActionBottomSheet(
     node: FileNode,
@@ -481,87 +415,28 @@ fun FileActionBottomSheet(
 ) {
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
-
     Column(modifier = Modifier.padding(vertical = 8.dp)) {
-        BottomSheetActionItem(
-            icon = Icons.Default.Description,
-            text = "新建文件",
-            onClick = {
-                onCreateFileRequest()
-                onDismiss()
-            }
-        )
-        BottomSheetActionItem(
-            icon = Icons.Default.CreateNewFolder,
-            text = "新建文件夹",
-            onClick = {
-                onCreateFolderRequest()
-                onDismiss()
-            }
-        )
+        BottomSheetActionItem(Icons.Default.Description, "新建文件", { onCreateFileRequest(); onDismiss() })
+        BottomSheetActionItem(Icons.Default.CreateNewFolder, "新建文件夹", { onCreateFolderRequest(); onDismiss() })
         Divider(modifier = Modifier.padding(vertical = 8.dp))
-        BottomSheetActionItem(
-            icon = Icons.Default.DriveFileRenameOutline,
-            text = "重命名",
-            onClick = {
-                onRenameRequest()
-                onDismiss()
-            }
-        )
-        BottomSheetActionItem(
-            icon = Icons.Default.ContentCopy,
-            text = "复制绝对路径",
-            onClick = {
-                clipboardManager.setText(AnnotatedString(node.file.absolutePath))
-                Toast.makeText(context, "路径已复制", Toast.LENGTH_SHORT).show()
-                onDismiss()
-            }
-        )
-        BottomSheetActionItem(
-            icon = Icons.Default.Delete,
-            text = "删除",
-            color = MaterialTheme.colorScheme.error,
-            onClick = {
-                onDeleteRequest()
-                onDismiss()
-            }
-        )
+        BottomSheetActionItem(Icons.Default.DriveFileRenameOutline, "重命名", { onRenameRequest(); onDismiss() })
+        BottomSheetActionItem(Icons.Default.ContentCopy, "复制绝对路径", {
+            clipboardManager.setText(AnnotatedString(node.file.absolutePath))
+            Toast.makeText(context, "路径已复制", Toast.LENGTH_SHORT).show()
+            onDismiss()
+        })
+        BottomSheetActionItem(Icons.Default.Delete, "删除", { onDeleteRequest(); onDismiss() }, MaterialTheme.colorScheme.error)
     }
 }
 
-/**
- * 用于获取用户输入的对话框
- */
 @Composable
-fun InputDialog(
-    title: String,
-    label: String,
-    initialValue: String = "",
-    onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit
-) {
+fun InputDialog(title: String, label: String, initialValue: String = "", onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
     var text by remember { mutableStateOf(initialValue) }
-
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
-        text = {
-            OutlinedTextField(
-                value = text,
-                onValueChange = { text = it },
-                label = { Text(label) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-        },
-        confirmButton = {
-            Button(
-                onClick = { if (text.isNotBlank()) onConfirm(text) },
-                enabled = text.isNotBlank()
-            ) { Text("确认") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
-        }
+        text = { OutlinedTextField(value = text, onValueChange = { text = it }, label = { Text(label) }, singleLine = true, modifier = Modifier.fillMaxWidth()) },
+        confirmButton = { Button(onClick = { if (text.isNotBlank()) onConfirm(text) }, enabled = text.isNotBlank()) { Text("确认") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
     )
 }
