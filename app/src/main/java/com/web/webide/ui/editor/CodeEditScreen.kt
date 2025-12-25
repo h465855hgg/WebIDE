@@ -19,19 +19,28 @@
 package com.web.webide.ui.editor
 
 import android.content.Context
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.*
@@ -56,7 +65,13 @@ import com.web.webide.ui.editor.viewmodel.EditorViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.lerp
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import com.web.webide.build.ApkInstaller
 import com.web.webide.ui.editor.components.EditorToolbar
 import com.web.webide.ui.editor.components.JumpLinePanel
@@ -81,9 +96,15 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
     var isMoreMenuExpanded by remember { mutableStateOf(false) }
     val workspacePath = WorkspaceManager.getWorkspacePath(context)
     val projectPath = File(workspacePath, folderName).absolutePath
-
+    val keyboardController = LocalSoftwareKeyboardController.current
     val snackbarHostState = remember { SnackbarHostState() }
-
+    val focusManager = LocalFocusManager.current
+    LaunchedEffect(drawerState.targetValue) {
+        if (drawerState.targetValue == DrawerValue.Open) {
+            keyboardController?.hide()
+            focusManager.clearFocus()
+        }
+    }
     // 加载配置
     LaunchedEffect(Unit) {
         viewModel.reloadEditorConfig(context)
@@ -161,205 +182,229 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
             }
         }
     ) {
-        Scaffold(
-            snackbarHost = { SnackbarHost(snackbarHostState) },
-            topBar = {
-                Column {
-                    TopAppBar(
-                        title = {
-                            Column {
-                                Text("WebIDE", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(
-                                    text = folderName,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+        Box(modifier = Modifier.fillMaxSize()) {
+            Scaffold(
+                snackbarHost = { SnackbarHost(snackbarHostState) },
+                topBar = {
+                    Column {
+                        TopAppBar(
+                            title = {
+                                Column {
+                                    Text("WebIDE", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(
+                                        text = folderName,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            },
+                            navigationIcon = {
+                                AnimatedDrawerToggle(
+                                    isOpen = drawerState.targetValue == DrawerValue.Open,
+                                    onClick = {
+                                        scope.launch {
+                                            if (drawerState.isClosed) drawerState.open() else drawerState.close()
+                                        }
+                                    }
                                 )
-                            }
-                        },
-                        navigationIcon = {
-                            AnimatedDrawerToggle(
-                                isOpen = drawerState.isOpen,
-                                onClick = {
+                            },
+                            actions = {
+                                IconButton(onClick = { viewModel.undo() }) {
+                                    Icon(Icons.AutoMirrored.Filled.Undo, "撤销")
+                                }
+                                IconButton(onClick = { viewModel.redo() }) {
+                                    Icon(Icons.AutoMirrored.Filled.Redo, "重做")
+                                }
+                                IconButton(onClick = {
                                     scope.launch {
-                                        if (drawerState.isClosed) drawerState.open() else drawerState.close()
-                                    }
-                                }
-                            )
-                        },
-                        actions = {
-                            IconButton(onClick = { viewModel.undo() }) {
-                                Icon(Icons.AutoMirrored.Filled.Undo, "撤销")
-                            }
-                            IconButton(onClick = { viewModel.redo() }) {
-                                Icon(Icons.AutoMirrored.Filled.Redo, "重做")
-                            }
-                            IconButton(onClick = {
-                                scope.launch {
-                                    scope.launch {
-                                        viewModel.saveAllModifiedFiles(snackbarHostState)
-                                        navController.navigate("preview/$folderName")
-                                    }
-                                }
-                            }) {
-                                Icon(Icons.Filled.PlayArrow, "运行")
-                            }
-                            Box {
-                                IconButton(onClick = { isMoreMenuExpanded = true }) {
-                                    Icon(Icons.Filled.MoreVert, "更多选项")
-                                }
-                                DropdownMenu(
-                                    expanded = isMoreMenuExpanded,
-                                    onDismissRequest = { isMoreMenuExpanded = false }
-                                ) {
-                                    DropdownMenuItem(
-                                        text = { Text("全部保存") },
-                                        onClick = {
-                                            scope.launch {
-                                                viewModel.saveAllModifiedFiles(snackbarHostState)
-                                            }
-                                            isMoreMenuExpanded = false
+                                        scope.launch {
+                                            viewModel.saveAllModifiedFiles(snackbarHostState)
+                                            navController.navigate("preview/$folderName")
                                         }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text(if (isOpenSearch) "关闭搜索" else "搜索") },
-                                        leadingIcon = {
-                                            Icon(
-                                                if (isOpenSearch) Icons.Default.SearchOff else Icons.Default.Search,
-                                                contentDescription = null
-                                            )
-                                        },
-                                        onClick = {
-                                            if (isOpenSearch) viewModel.stopSearch()
-                                            isOpenSearch = !isOpenSearch
-                                            isMoreMenuExpanded = false
-                                        }
-                                    )
-                                    if (hasWebAppConfig) {
+                                    }
+                                }) {
+                                    Icon(Icons.Filled.PlayArrow, "运行")
+                                }
+                                Box {
+                                    IconButton(onClick = { isMoreMenuExpanded = true }) {
+                                        Icon(Icons.Filled.MoreVert, "更多选项")
+                                    }
+                                    DropdownMenu(
+                                        expanded = isMoreMenuExpanded,
+                                        onDismissRequest = { isMoreMenuExpanded = false }
+                                    ) {
                                         DropdownMenuItem(
-                                            text = { Text("构建 APK") },
-                                            enabled = !isBuilding,
+                                            text = { Text("全部保存") },
                                             onClick = {
-                                                isMoreMenuExpanded = false
                                                 scope.launch {
-                                                    isBuilding = true
-                                                    performBuild(
-                                                        context = context,
-                                                        projectPath = projectPath,
-                                                        folderName = folderName,
-                                                        viewModel = viewModel,
-                                                        snackbarHostState = snackbarHostState,
-                                                        onResult = { resultState ->
-                                                            buildResult = resultState
-                                                            isBuilding = false
-                                                        }
-                                                    )
+                                                    viewModel.saveAllModifiedFiles(snackbarHostState)
                                                 }
+                                                isMoreMenuExpanded = false
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text(if (isOpenSearch) "关闭搜索" else "搜索") },
+                                            leadingIcon = {
+                                                Icon(
+                                                    if (isOpenSearch) Icons.Default.SearchOff else Icons.Default.Search,
+                                                    contentDescription = null
+                                                )
+                                            },
+                                            onClick = {
+                                                if (isOpenSearch) viewModel.stopSearch()
+                                                isOpenSearch = !isOpenSearch
+                                                isMoreMenuExpanded = false
+                                            }
+                                        )
+                                        if (hasWebAppConfig) {
+                                            DropdownMenuItem(
+                                                text = { Text("构建 APK") },
+                                                enabled = !isBuilding,
+                                                onClick = {
+                                                    isMoreMenuExpanded = false
+                                                    scope.launch {
+                                                        isBuilding = true
+                                                        performBuild(
+                                                            context = context,
+                                                            projectPath = projectPath,
+                                                            folderName = folderName,
+                                                            viewModel = viewModel,
+                                                            snackbarHostState = snackbarHostState,
+                                                            onResult = { resultState ->
+                                                                buildResult = resultState
+                                                                isBuilding = false
+                                                            }
+                                                        )
+                                                    }
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        )
+                        // 工具栏 (根据配置显示)
+                        if (editorConfig.showToolbar) {
+                            EditorToolbar(
+                                onSave = {
+                                    scope.launch {
+                                        viewModel.saveAllModifiedFiles(
+                                            snackbarHostState
+                                        )
+                                    }
+                                },
+                                onSearch = {
+                                    isOpenSearch = !isOpenSearch
+                                    isOpenJump = false
+                                },
+                                onJump = {
+                                    isOpenJump = !isOpenJump
+                                    isOpenSearch = false
+                                },
+                                onFormat = { viewModel.formatCode() },
+                                onCreate = { showCreateDialog = true },
+                                onPalette = { showColorPicker = true },
+                                isBuilding = isBuilding,
+                                hasWebAppConfig = hasWebAppConfig,
+                                onBuild = {
+                                    scope.launch {
+                                        isBuilding = true
+                                        performBuild(
+                                            context = context,
+                                            projectPath = projectPath,
+                                            folderName = folderName,
+                                            viewModel = viewModel,
+                                            snackbarHostState = snackbarHostState,
+                                            onResult = { resultState ->
+                                                buildResult = resultState
+                                                isBuilding = false
                                             }
                                         )
                                     }
-                                }
+                                },
+                            )
+                        }
+
+                        // 搜索面板
+                        AnimatedVisibility(visible = isOpenSearch) {
+                            Column {
+                                HorizontalDivider(
+                                    thickness = 0.5.dp,
+                                    color = MaterialTheme.colorScheme.outlineVariant
+                                )
+                                SearchPanel(
+                                    viewModel = viewModel,
+                                    searchText = currentSearchText,
+                                    onSearchTextChange = { currentSearchText = it },
+                                    onClose = {
+                                        viewModel.stopSearch()
+                                        isOpenSearch = false
+                                    }
+                                )
                             }
                         }
-                    )
-                    // 工具栏 (根据配置显示)
-                    if (editorConfig.showToolbar) {
-                        EditorToolbar(
-                            onSave = { scope.launch { viewModel.saveAllModifiedFiles(
-                                snackbarHostState) } },
-                            onSearch = {
-                                isOpenSearch = !isOpenSearch
-                                isOpenJump = false
-                            },
-                            onJump = {
-                                isOpenJump = !isOpenJump
-                                isOpenSearch = false
-                            },
-                            onFormat = { viewModel.formatCode() },
-                            onCreate = { showCreateDialog = true },
-                            onPalette = { showColorPicker = true },
-                            isBuilding = isBuilding,
-                            hasWebAppConfig = hasWebAppConfig,
-                            onBuild = {
-                                scope.launch {
-                                    isBuilding = true
-                                    performBuild(
-                                        context = context,
-                                        projectPath = projectPath,
-                                        folderName = folderName,
-                                        viewModel = viewModel,
-                                        snackbarHostState = snackbarHostState,
-                                        onResult = { resultState ->
-                                            buildResult = resultState
-                                            isBuilding = false
-                                        }
-                                    )
-                                }
-                            },
-                        )
-                    }
-
-                    // 搜索面板
-                    AnimatedVisibility(visible = isOpenSearch) {
-                        Column {
-                            HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
-                            SearchPanel(
-                                viewModel = viewModel,
-                                searchText = currentSearchText,
-                                onSearchTextChange = { currentSearchText = it },
-                                onClose = {
-                                    viewModel.stopSearch()
-                                    isOpenSearch = false
-                                }
-                            )
+                        AnimatedVisibility(visible = isOpenJump) {
+                            Column {
+                                HorizontalDivider(
+                                    thickness = 0.5.dp,
+                                    color = MaterialTheme.colorScheme.outlineVariant
+                                )
+                                JumpLinePanel(
+                                    onJump = { line -> viewModel.jumpToLine(line) },
+                                    onClose = {
+                                        isOpenJump = false
+                                        viewModel.getActiveEditor()?.requestFocus()
+                                    }
+                                )
+                            }
                         }
                     }
-                    AnimatedVisibility(visible = isOpenJump) {
-                        Column {
-                            HorizontalDivider(
-                                thickness = 0.5.dp,
-                                color = MaterialTheme.colorScheme.outlineVariant
-                            )
-                            JumpLinePanel(
-                                onJump = { line -> viewModel.jumpToLine(line) },
-                                onClose = {
-                                    isOpenJump = false
-                                    viewModel.getActiveEditor()?.requestFocus()
-                                }
-                            )
-                        }
-                    }
-                }
-            },
-            bottomBar = {
-                Column {
-                    HorizontalDivider(
-                        thickness = 1.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant
-                    )
-                    // 使用配置中的自定义符号
-                    SymbolBar(
-                        viewModel = viewModel,
-                        symbols = editorConfig.getSymbolList()
-                    )
-                }
-            },
-            content = { innerPadding ->
-                Column(modifier = Modifier.padding(innerPadding)) {
-                    AnimatedVisibility(visible = showInitialLoader || isBuilding) {
-                        LinearProgressIndicator(
-                            modifier = Modifier.fillMaxWidth(),
-                            strokeCap = StrokeCap.Butt
+                },
+                bottomBar = {
+                    Column {
+                        HorizontalDivider(
+                            thickness = 1.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant
+                        )
+                        // 使用配置中的自定义符号
+                        SymbolBar(
+                            viewModel = viewModel,
+                            symbols = editorConfig.getSymbolList()
                         )
                     }
-                    EditCode(
-                        modifier = Modifier.fillMaxSize(),
-                        viewModel = viewModel
-                    )
+                },
+                content = { innerPadding ->
+                    Column(modifier = Modifier.padding(innerPadding)) {
+                        AnimatedVisibility(visible = showInitialLoader || isBuilding) {
+                            LinearProgressIndicator(
+                                modifier = Modifier.fillMaxWidth(),
+                                strokeCap = StrokeCap.Butt
+                            )
+                        }
+                        EditCode(
+                            modifier = Modifier.fillMaxSize(),
+                            viewModel = viewModel
+                        )
+                    }
                 }
-            }
-        )
-
+            )
+        }
+        if (drawerState.isOpen) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = {
+                                // 点击时：关闭侧滑栏
+                                scope.launch { drawerState.close() }
+                            }
+                        )
+                    }
+            )
+        }
+    }
         // 1. 新建对话框
         if (showCreateDialog) {
             var nameInput by remember { mutableStateOf("") }
@@ -452,7 +497,7 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
             }
         }
     }
-}
+
 
 // ---------------- 辅助函数 ----------------
 
@@ -612,68 +657,106 @@ fun FileManagerDrawer(projectPath: String, onFileClick: (File) -> Unit) {
     }
 }
 
+
+
+
+
 @Composable
-fun AnimatedDrawerToggle(isOpen: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun AnimatedDrawerToggle(
+    isOpen: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    // 0f = 菜单, 1f = 箭头
     val progress by animateFloatAsState(
         targetValue = if (isOpen) 1f else 0f,
-        animationSpec = tween(durationMillis = 200),
-        label = "DrawerToggleProgress"
+        label = "DrawerToggleProgress",
+        animationSpec = tween(durationMillis = 300)
     )
 
     IconButton(onClick = onClick, modifier = modifier) {
         val color = LocalContentColor.current
+
         Canvas(
-            modifier = Modifier
-                .size(24.dp)
-                .padding(2.dp)
+            modifier = Modifier.size(24.dp)
         ) {
             val strokeWidth = 2.dp.toPx()
-            val cap = StrokeCap.Round
-            val width = size.width
-            val height = size.height
-            val centerY = height / 2
-            val yOffset = 5.dp.toPx()
-            val arrowheadSize = width * 0.3f
+            val cap = StrokeCap.Square // 保持直角
 
-            withTransform({
-                rotate(
-                    degrees = lerp(0f, 180f, progress),
-                    pivot = Offset(x = width / 2, y = height / 2)
-                )
-            }) {
+            val w = size.width
+            val h = size.height
+            val centerX = w / 2
+            val centerY = h / 2
+
+            // --- 1. 菜单状态参数 (宽一点) ---
+            val menuWidth = 18.dp.toPx() // 菜单总宽 18dp (标准 Material 尺寸)
+            val startX = (w - menuWidth) / 2
+            val endX = w - startX
+            val menuGap = 6.dp.toPx() // 汉堡菜单间距
+
+            // --- 2. 箭头状态参数 (短一点) ---
+            // 箭头尖端 X (保持在 endX，即最右侧，作为旋转中心)
+            val arrowTipX = endX
+
+            // 缩短箭头的关键：
+            // 让箭头的“尾巴”比菜单的“左边”更靠右
+            val shrinkOffset = 3.dp.toPx() // 缩进量
+            val arrowShaftStartX = startX + shrinkOffset
+
+            // 箭头翅膀的起始 X (决定翅膀长度)
+            // 稍微往右移一点，让翅膀不要太长
+            val arrowWingStartX = centerX + 1.dp.toPx()
+
+            // 计算直角(90度)所需的 Y 偏移量
+            // 翅膀长度在 X轴的投影 = arrowTipX - arrowWingStartX
+            val arrowWingYOffset = (arrowTipX - arrowWingStartX)
+
+            rotate(degrees = progress * 180f, pivot = Offset(centerX, centerY)) {
+
+                // --- 中间线 (轴) ---
+                // 菜单: startX -> endX
+                // 箭头: arrowShaftStartX -> endX (变短了)
+                val midStartX = lerp(startX, arrowShaftStartX, progress)
                 drawLine(
                     color = color,
                     strokeWidth = strokeWidth,
                     cap = cap,
-                    start = Offset(x = 0f, y = centerY),
-                    end = Offset(x = width, y = centerY)
+                    start = Offset(midStartX, centerY),
+                    end = Offset(endX, centerY)
+                )
+
+                // --- 上面的线 ---
+                // 菜单: 左侧 -> 右侧
+                // 箭头: 翅膀末端 -> 尖端
+                val topStartX = lerp(startX, arrowWingStartX, progress)
+                val topStartY = lerp(centerY - menuGap, centerY - arrowWingYOffset, progress)
+
+                val topEndX = lerp(endX, arrowTipX, progress) // 始终固定在右侧
+                val topEndY = lerp(centerY - menuGap, centerY, progress) // 右侧下沉到中心
+
+                drawLine(
+                    color = color,
+                    strokeWidth = strokeWidth,
+                    cap = cap,
+                    start = Offset(topStartX, topStartY),
+                    end = Offset(topEndX, topEndY)
+                )
+
+                // --- 下面的线 ---
+                val bottomStartX = lerp(startX, arrowWingStartX, progress)
+                val bottomStartY = lerp(centerY + menuGap, centerY + arrowWingYOffset, progress)
+
+                val bottomEndX = lerp(endX, arrowTipX, progress)
+                val bottomEndY = lerp(centerY + menuGap, centerY, progress) // 右侧上浮到中心
+
+                drawLine(
+                    color = color,
+                    strokeWidth = strokeWidth,
+                    cap = cap,
+                    start = Offset(bottomStartX, bottomStartY),
+                    end = Offset(bottomEndX, bottomEndY)
                 )
             }
-            val bottomInitialStart = Offset(x = 0f, y = centerY + yOffset)
-            val bottomInitialEnd = Offset(x = width, y = centerY + yOffset)
-            val bottomFinalStart = Offset(x = arrowheadSize, y = centerY - arrowheadSize)
-            val bottomFinalEnd = Offset(x = 0f, y = centerY)
-
-            drawLine(
-                color = color,
-                strokeWidth = strokeWidth,
-                cap = cap,
-                start = lerp(bottomInitialStart, bottomFinalStart, progress),
-                end = lerp(bottomInitialEnd, bottomFinalEnd, progress)
-            )
-
-            val topInitialStart = Offset(x = 0f, y = centerY - yOffset)
-            val topInitialEnd = Offset(x = width, y = centerY - yOffset)
-            val finalTopStart = Offset(x = arrowheadSize, y = centerY + arrowheadSize)
-            val finalTopEnd = Offset(x = 0f, y = centerY)
-
-            drawLine(
-                color = color,
-                strokeWidth = strokeWidth,
-                cap = cap,
-                start = lerp(topInitialStart, finalTopStart, progress),
-                end = lerp(topInitialEnd, finalTopEnd, progress)
-            )
         }
     }
 }
