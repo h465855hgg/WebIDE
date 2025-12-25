@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 
 #
-# TreeCompose - A tree-structured file viewer built with Jetpack Compose
+# WebIDE - A powerful IDE for Android web development.
 # Copyright (C) 2025  如日中天  <3382198490@qq.com>
 #
 # This program is free software: you can redistribute it and/or modify
