@@ -52,8 +52,8 @@ android {
         applicationId = "com.web.webide"
         minSdk = 29
         targetSdk = 36
-        versionCode = 20
-        versionName = "0.2.0"
+        versionCode = 21
+        versionName = "0.2.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             //noinspection ChromeOsAbiSupport
@@ -73,7 +73,7 @@ android {
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
-            versionNameSuffix = "-beta"
+            versionNameSuffix = "-beta-debug"
 
             signingConfig = signingConfigs.getByName("release")
 
@@ -81,7 +81,7 @@ android {
 
         release {
            // applicationIdSuffix = ".release"
-
+            versionNameSuffix = "-release"
 
             isMinifyEnabled = true
             isShrinkResources = true // 资源缩减
@@ -94,6 +94,22 @@ android {
 
         }
     }
+    packaging {
+        resources {
+            // 2. 排除 LSP4J 和其他库可能产生的冲突文件
+            excludes += "META-INF/DEPENDENCIES"
+            excludes += "META-INF/LICENSE"
+            excludes += "META-INF/LICENSE.txt"
+            excludes += "META-INF/license.txt"
+            excludes += "META-INF/NOTICE"
+            excludes += "META-INF/NOTICE.txt"
+            excludes += "META-INF/notice.txt"
+            excludes += "META-INF/ASL2.0"
+            excludes += "META-INF/*.kotlin_module"
+            excludes += "META-INF/INDEX.LIST"
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -145,6 +161,10 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.compose.animation)
     implementation(libs.androidx.compose.ui)
+    // LSP 支持
+    implementation(libs.editor.lsp)
+    implementation(libs.org.eclipse.lsp4j)
+    // Editor
     implementation(libs.editor)
     implementation(libs.language.textmate)
     implementation(libs.androidx.lifecycle.viewmodel.compose)

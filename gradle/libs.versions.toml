@@ -5,6 +5,7 @@ agp = "8.13.1"
 bsh = "2.0b6"
 coilCompose = "2.7.0"
 datastoreCore = "1.2.0"
+editorLsp = "0.23.6"
 editorVersion = "0.24.3"
 jsoup = "1.21.2"
 kotlin = "2.2.21"
@@ -17,6 +18,7 @@ activityCompose = "1.12.2"
 composeBom = "2025.12.01"
 animation = "1.10.0"
 navigationCompose = "2.9.6"
+orgEclipseLsp4j = "0.24.0"
 ui = "1.10.0"
 aboutlibraries = "13.2.1"
 appcompat = "1.7.1"
@@ -42,6 +44,7 @@ androidx-navigation-compose = { module = "androidx.navigation:navigation-compose
 bsh = { module = "org.apache-extras.beanshell:bsh", version.ref = "bsh" }
 coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coilCompose" }
 editor = { module = "io.github.rosemoe:editor", version.ref = "editorVersion" }
+editor-lsp = { module = "io.github.Rosemoe.sora-editor:editor-lsp", version.ref = "editorLsp" }
 jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
@@ -65,6 +68,7 @@ language-textmate = { module = "io.github.rosemoe:language-textmate", version.re
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
+org-eclipse-lsp4j = { module = "org.eclipse.lsp4j:org.eclipse.lsp4j", version.ref = "orgEclipseLsp4j" }
 zipalign-java = { module = "com.github.iyxan23:zipalign-java", version.ref = "zipalignJava" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 volley = { group = "com.android.volley", name = "volley", version.ref = "volley" }

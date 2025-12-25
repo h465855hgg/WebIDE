@@ -103,3 +103,28 @@
 # 4. 保持 BeanShell 核心代码不被移除/混淆
 # BeanShell 极其依赖反射，混淆会导致“找不到构造函数”等运行时错误
 -keep class bsh.** { *; }
+
+
+
+# ============================================
+# WebIDE 核心依赖混淆保护规则
+# ============================================
+
+# 1. 保护 TextMate 语法高亮引擎 (tm4e, jcodings, joni)
+# 这些库包含大量反射和资源加载逻辑，严禁混淆
+-keep class org.eclipse.tm4e.** { *; }
+-keep class org.jcodings.** { *; }
+-keep class org.joni.** { *; }
+
+
+# 2. 保护 LSP 协议库 (LSP4J)
+# LSP 依赖 JSON 序列化，字段名不能变
+-keep class org.eclipse.lsp4j.** { *; }
+-keep class com.google.gson.** { *; }
+
+# 3. 保护 Kotlin 协程 (防止异步任务崩溃)
+-keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
+-keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
+-keepclassmembers class kotlinx.coroutines.android.AndroidExceptionPreHandler {
+    <init>();
+}
