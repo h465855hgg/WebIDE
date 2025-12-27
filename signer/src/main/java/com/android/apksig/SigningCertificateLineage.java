@@ -1,20 +1,5 @@
-/*
- * WebIDE - A powerful IDE for Android web development.
- * Copyright (C) 2025  如日中天  <3382198490@qq.com>
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+
+
 
 package com.android.apksig;
 
@@ -54,22 +39,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * APK Signer Lineage.
- *
- * <p>The signer lineage contains a history of signing certificates with each ancestor attesting to
- * the validity of its descendant.  Each additional descendant represents a new identity that can be
- * used to sign an APK, and each generation has accompanying attributes which represent how the
- * APK would like to view the older signing certificates, specifically how they should be trusted in
- * certain situations.
- *
- * <p> Its primary use is to enable APK Signing Certificate Rotation.  The Android platform verifies
- * the APK Signer Lineage, and if the current signing certificate for the APK is in the Signer
- * Lineage, and the Lineage contains the certificate the platform associates with the APK, it will
- * allow upgrades to the new certificate.
- *
- * @see <a href="https://source.android.com/security/apksigning/index.html">Application Signing</a>
- */
+
 public class SigningCertificateLineage {
 
     public final static int MAGIC = 0x3eff39d1;

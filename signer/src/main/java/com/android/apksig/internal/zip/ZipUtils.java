@@ -1,20 +1,5 @@
-/*
- * WebIDE - A powerful IDE for Android web development.
- * Copyright (C) 2025  如日中天  <3382198490@qq.com>
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+
+
 
 package com.android.apksig.internal.zip;
 
@@ -28,12 +13,7 @@ import java.nio.ByteOrder;
 import java.util.zip.CRC32;
 import java.util.zip.Deflater;
 
-/**
- * Assorted ZIP format helpers.
- *
- * <p>NOTE: Most helper methods operating on {@code ByteBuffer} instances expect that the byte
- * order of these buffers is little-endian.
- */
+
 public abstract class ZipUtils {
     public static final short COMPRESSION_METHOD_STORED = 0;
     public static final short COMPRESSION_METHOD_DEFLATED = 8;

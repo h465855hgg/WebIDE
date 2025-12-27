@@ -1,20 +1,5 @@
-/*
- * WebIDE - A powerful IDE for Android web development.
- * Copyright (C) 2025  如日中天  <3382198490@qq.com>
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+
+
 
 package com.android.apksig.internal.apk;
 
@@ -26,14 +11,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * XML pull style parser of Android binary XML resources, such as {@code AndroidManifest.xml}.
- *
- * <p>For an input document, the parser outputs an event stream (see {@code EVENT_... constants} via
- * {@link #getEventType()} and {@link #next()} methods. Additional information about the current
- * event can be obtained via an assortment of getters, for example, {@link #getName()} or
- * {@link #getAttributeNameResourceId(int)}.
- */
+
 public class AndroidBinXmlParser {
 
     /**

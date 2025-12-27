@@ -1,20 +1,5 @@
-/*
- * WebIDE - A powerful IDE for Android web development.
- * Copyright (C) 2025  如日中天  <3382198490@qq.com>
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+
+
 
 package com.android.apksig;
 
@@ -32,92 +17,7 @@ import java.security.SignatureException;
 import java.util.List;
 import java.util.Set;
 
-/**
- * APK signing logic which is independent of how input and output APKs are stored, parsed, and
- * generated.
- *
- * <p><h3>Operating Model</h3>
- * <p>
- * The abstract operating model is that there is an input APK which is being signed, thus producing
- * an output APK. In reality, there may be just an output APK being built from scratch, or the input
- * APK and the output APK may be the same file. Because this engine does not deal with reading and
- * writing files, it can handle all of these scenarios.
- *
- * <p>The engine is stateful and thus cannot be used for signing multiple APKs. However, once
- * the engine signed an APK, the engine can be used to re-sign the APK after it has been modified.
- * This may be more efficient than signing the APK using a new instance of the engine. See
- * <a href="#incremental">Incremental Operation</a>.
- *
- * <p>In the engine's operating model, a signed APK is produced as follows.
- * <ol>
- * <li>JAR entries to be signed are output,</li>
- * <li>JAR archive is signed using JAR signing, thus adding the so-called v1 signature to the
- *     output,</li>
- * <li>JAR archive is signed using APK Signature Scheme v2, thus adding the so-called v2 signature
- *     to the output.</li>
- * </ol>
- *
- * <p>The input APK may contain JAR entries which, depending on the engine's configuration, may or
- * may not be output (e.g., existing signatures may need to be preserved or stripped) or which the
- * engine will overwrite as part of signing. The engine thus offers {@link #inputJarEntry(String)}
- * which tells the client whether the input JAR entry needs to be output. This avoids the need for
- * the client to hard-code the aspects of APK signing which determine which parts of input must be
- * ignored. Similarly, the engine offers {@link #inputApkSigningBlock(DataSource)} to help the
- * client avoid dealing with preserving or stripping APK Signature Scheme v2 signature of the input
- * APK.
- *
- * <p>To use the engine to sign an input APK (or a collection of JAR entries), follow these
- * steps:
- * <ol>
- * <li>Obtain a new instance of the engine -- engine instances are stateful and thus cannot be used
- *     for signing multiple APKs.</li>
- * <li>Locate the input APK's APK Signing Block and provide it to
- *     {@link #inputApkSigningBlock(DataSource)}.</li>
- * <li>For each JAR entry in the input APK, invoke {@link #inputJarEntry(String)} to determine
- *     whether this entry should be output. The engine may request to inspect the entry.</li>
- * <li>For each output JAR entry, invoke {@link #outputJarEntry(String)} which may request to
- *     inspect the entry.</li>
- * <li>Once all JAR entries have been output, invoke {@link #outputJarEntries()} which may request
- *     that additional JAR entries are output. These entries comprise the output APK's JAR
- *     signature.</li>
- * <li>Locate the ZIP Central Directory and ZIP End of Central Directory sections in the output and
- *     invoke {@link #outputZipSections2(DataSource, DataSource, DataSource)} which may request that
- *     an APK Signature Block is inserted before the ZIP Central Directory. The block contains the
- *     output APK's APK Signature Scheme v2 signature.</li>
- * <li>Invoke {@link #outputDone()} to signal that the APK was output in full. The engine will
- *     confirm that the output APK is signed.</li>
- * <li>Invoke {@link #close()} to signal that the engine will no longer be used. This lets the
- *     engine free any resources it no longer needs.
- * </ol>
- *
- * <p>Some invocations of the engine may provide the client with a task to perform. The client is
- * expected to perform all requested tasks before proceeding to the next stage of signing. See
- * documentation of each method about the deadlines for performing the tasks requested by the
- * method.
- *
- * <p><h3 id="incremental">Incremental Operation</h3></a>
- * <p>
- * The engine supports incremental operation where a signed APK is produced, then modified and
- * re-signed. This may be useful for IDEs, where an app is frequently re-signed after small changes
- * by the developer. Re-signing may be more efficient than signing from scratch.
- *
- * <p>To use the engine in incremental mode, keep notifying the engine of changes to the APK through
- * {@link #inputApkSigningBlock(DataSource)}, {@link #inputJarEntry(String)},
- * {@link #inputJarEntryRemoved(String)}, {@link #outputJarEntry(String)},
- * and {@link #outputJarEntryRemoved(String)}, perform the tasks requested by the engine through
- * these methods, and, when a new signed APK is desired, run through steps 5 onwards to re-sign the
- * APK.
- *
- * <p><h3>Output-only Operation</h3>
- * <p>
- * The engine's abstract operating model consists of an input APK and an output APK. However, it is
- * possible to use the engine in output-only mode where the engine's {@code input...} methods are
- * not invoked. In this mode, the engine has less control over output because it cannot request that
- * some JAR entries are not output. Nevertheless, the engine will attempt to make the output APK
- * signed and will report an error if cannot do so.
- *
- * @see <a href="https://source.android.com/security/apksigning/index.html">Application Signing</a>
- */
+
 public interface ApkSignerEngine extends Closeable {
 
     default void setExecutor(RunnablesExecutor executor) {

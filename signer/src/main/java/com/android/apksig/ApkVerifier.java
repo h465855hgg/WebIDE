@@ -1,20 +1,5 @@
-/*
- * WebIDE - A powerful IDE for Android web development.
- * Copyright (C) 2025  如日中天  <3382198490@qq.com>
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+
+
 
 package com.android.apksig;
 
@@ -61,17 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * APK signature verifier which mimics the behavior of the Android platform.
- *
- * <p>The verifier is designed to closely mimic the behavior of Android platforms. This is to enable
- * the verifier to be used for checking whether an APK's signatures are expected to verify on
- * Android.
- *
- * <p>Use {@link Builder} to obtain instances of this verifier.
- *
- * @see <a href="https://source.android.com/security/apksigning/index.html">Application Signing</a>
- */
+
 public class ApkVerifier {
 
     private static final Map<Integer, String> SUPPORTED_APK_SIG_SCHEME_NAMES =

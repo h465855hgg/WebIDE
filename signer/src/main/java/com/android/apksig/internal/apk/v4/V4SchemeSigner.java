@@ -1,20 +1,5 @@
-/*
- * WebIDE - A powerful IDE for Android web development.
- * Copyright (C) 2025  如日中天  <3382198490@qq.com>
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+
+
 
 package com.android.apksig.internal.apk.v4;
 
@@ -51,20 +36,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
-/**
- * APK Signature Scheme V4 signer. V4 scheme file contains 2 mandatory fields - used during
- * installation. And optional verity tree - has to be present during session commit.
- * <p>
- * The fields:
- * <p>
- * 1. hashingInfo - verity root hash and hashing info,
- * 2. signingInfo - certificate, public key and signature,
- * For more details see V4Signature.
- * </p>
- * (optional) verityTree: integer size prepended bytes of the verity hash tree.
- * <p>
- * TODO(schfan): Add v4 unit tests
- */
+
 public abstract class V4SchemeSigner {
     /**
      * Hidden constructor to prevent instantiation.

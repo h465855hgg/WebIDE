@@ -1,20 +1,5 @@
-/*
- * WebIDE - A powerful IDE for Android web development.
- * Copyright (C) 2025  如日中天  <3382198490@qq.com>
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+
+
 
 package com.android.apksigner;
 
@@ -37,17 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Retriever of passwords based on password specs supported by {@code apksigner} tool.
- *
- * <p>apksigner supports retrieving multiple passwords from the same source (e.g., file, standard
- * input) which adds the need to keep some sources open across password retrievals. This class
- * addresses the need.
- *
- * <p>To use this retriever, construct a new instance, use {@link #getPasswords(String, String,
- * Charset...)} to retrieve passwords, and then invoke {@link #close()} on the instance when done,
- * enabling the instance to release any held resources.
- */
+
 public class PasswordRetriever implements AutoCloseable {
     public static final String SPEC_STDIN = "stdin";
 
