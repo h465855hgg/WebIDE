@@ -16,6 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+
 package rrzt.web.web_bridge
 
 import android.Manifest
@@ -67,10 +68,7 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 import androidx.core.net.toUri
 
-/**
- * 兼容 WebS API (websApp) 的全功能适配器
- * 已补全大部分常用功能以匹配 webs_api_help.txt
- */
+
 class WebsApiAdapter(
     private val context: Context,
     private val webView: WebView,
