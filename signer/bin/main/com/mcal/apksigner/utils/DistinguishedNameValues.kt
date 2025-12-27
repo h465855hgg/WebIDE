@@ -5,9 +5,7 @@ import org.spongycastle.asn1.x500.style.BCStyle
 import org.spongycastle.jce.X509Principal
 import java.util.Vector
 
-/**
- * Helper class for dealing with the distinguished name RDNs.
- */
+
 class DistinguishedNameValues : LinkedHashMap<ASN1ObjectIdentifier, String>() {
     init {
         put(BCStyle.C, "")
