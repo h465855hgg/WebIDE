@@ -1,3 +1,5 @@
+
+
 /*
  * WebIDE - A powerful IDE for Android web development.
  * Copyright (C) 2025  如日中天  <3382198490@qq.com>
@@ -15,7 +17,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 plugins {
     alias(libs.plugins.aboutlibraries) apply false
