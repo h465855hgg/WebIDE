@@ -16,6 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+
 package com.web.webide.ui.components
 
 import android.annotation.SuppressLint
@@ -271,9 +272,7 @@ fun DirectorySelector(
     }
 }
 
-/**
- * 快速滑动条组件 - Material Design 3 风格
- */
+
 @SuppressLint("UnusedBoxWithConstraintsScope", "FrequentlyChangingValue")
 @Composable
 private fun FastScrollbar(
@@ -410,9 +409,7 @@ private fun FastScrollbar(
     }
 }
 
-/**
- * 新建文件夹对话框
- */
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CreateFolderDialog(
@@ -473,9 +470,7 @@ private fun CreateFolderDialog(
     )
 }
 
-/**
- * 面包屑导航组件
- */
+
 @Composable
 private fun PathBreadcrumbs(
     path: String,

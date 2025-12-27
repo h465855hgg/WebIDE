@@ -1,3 +1,5 @@
+
+
 /*
  * WebIDE - A powerful IDE for Android web development.
  * Copyright (C) 2025  如日中天  <3382198490@qq.com>
@@ -15,7 +17,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 package com.web.webide.build;
 
 import com.web.webide.core.utils.LogCatcher;
@@ -27,10 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Provider 授权替换工具类
- * 专门用于处理 AndroidManifest.xml 中的 ContentProvider 授权冲突
- */
+
 public class ProviderAuthReplacer {
 
     private static final int CHUNK_STRING_POOL = 0x001C0001;

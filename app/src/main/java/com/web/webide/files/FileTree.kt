@@ -16,6 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+
 package com.web.webide.files
 
 import android.widget.Toast
@@ -265,9 +266,7 @@ fun FileTree(
     }
 }
 
-/**
- * 可递归的文件树节点 UI
- */
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun FileNodeItem(

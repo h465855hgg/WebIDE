@@ -16,6 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+
 package com.web.webide.ui.editor
 
 import android.graphics.Color as AndroidColor
@@ -23,10 +24,7 @@ import androidx.compose.ui.graphics.Color
 import io.github.rosemoe.sora.widget.schemes.EditorColorScheme
 import kotlin.math.pow
 
-/**
- * 编辑器配色方案管理器
- * 只同步基础颜色（背景、文本、选择等），保留 TextMate 语法高亮
- */
+
 object EditorColorSchemeManager {
 
     /**

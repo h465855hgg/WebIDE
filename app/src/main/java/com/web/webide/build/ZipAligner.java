@@ -1,3 +1,5 @@
+
+
 /*
  * WebIDE - A powerful IDE for Android web development.
  * Copyright (C) 2025  如日中天  <3382198490@qq.com>
@@ -15,7 +17,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 package com.web.webide.build;
 
 import com.web.webide.core.utils.LogCatcher;
@@ -33,9 +34,7 @@ import java.util.zip.ZipOutputStream;
 import java.io.File;
 import java.io.ByteArrayOutputStream;
 
-/**
- * 终极修正版 ZipAligner (无缓冲，精确计算)
- */
+
 public class ZipAligner {
 
     private static final int ALIGNMENT = 4;

@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?><!--
+   Sample data extraction rules file; uncomment and customize as necessary.
+   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
+   for details.
+-->
+
+<!--
   ~ WebIDE - A powerful IDE for Android web development.
   ~ Copyright (C) 2025  如日中天  <3382198490@qq.com>
   ~
@@ -15,12 +21,6 @@
   ~ You should have received a copy of the GNU General Public License
   ~ along with this program.  If not, see <https://www.gnu.org/licenses/>.
   -->
-
-<!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
--->
 <data-extraction-rules>
     <cloud-backup>
         <!-- TODO: Use <include> and <exclude> to control what is backed up.

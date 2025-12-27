@@ -1,3 +1,7 @@
+
+
+// LogConfigRepository.kt
+
 /*
  * WebIDE - A powerful IDE for Android web development.
  * Copyright (C) 2025  如日中天  <3382198490@qq.com>
@@ -15,9 +19,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
-// LogConfigRepository.kt
-
 // LogConfigRepository.kt
 
 package com.web.webide.core.utils
@@ -104,9 +105,7 @@ class LogConfigRepository(private val context: Context) {
     }
 }
 // LogCatcher 保持不变 ...
-/**
- * 增强的日志捕获器，支持文件输出和开关控制
- */
+
 object LogCatcher {
 
     // ✅ 修复后，类型引用变为更简单的 LogConfigState

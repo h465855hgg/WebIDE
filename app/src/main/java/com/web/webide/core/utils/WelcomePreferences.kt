@@ -16,15 +16,14 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+
 package com.web.webide.core.utils
 
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
 
-/**
- * 管理欢迎页面显示状态的工具类
- */
+
 object WelcomePreferences {
     private const val PREFS_NAME = "welcome_prefs"
     private const val KEY_WELCOME_COMPLETED = "welcome_completed"

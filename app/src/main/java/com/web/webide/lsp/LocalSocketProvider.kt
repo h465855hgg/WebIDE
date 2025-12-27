@@ -16,6 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+
 package com.web.webide.lsp
 
 import android.net.LocalSocket
@@ -24,10 +25,7 @@ import io.github.rosemoe.sora.lsp.client.connection.StreamConnectionProvider
 import java.io.InputStream
 import java.io.OutputStream
 
-/**
- * 自定义的 LocalSocket 连接提供者
- * 用于适配 Android 的 IPC 通信机制
- */
+
 class LocalSocketProvider(private val socketName: String) : StreamConnectionProvider {
     private var socket: LocalSocket? = null
 

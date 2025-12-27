@@ -16,6 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+
 package com.web.webide.ui.editor
 
 import android.content.Context
@@ -761,9 +762,7 @@ fun AnimatedDrawerToggle(
     }
 }
 
-/**
- * 封装的构建逻辑
- */
+
 private suspend fun performBuild(
     context: Context,
     projectPath: String,

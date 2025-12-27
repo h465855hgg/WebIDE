@@ -16,10 +16,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+
 package com.web.webide.ui.editor.viewmodel
 
 import android.content.Context
-import android.content.Intent
 import android.view.ViewGroup
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.getValue
@@ -30,18 +30,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.web.webide.core.utils.LogCatcher
 import com.web.webide.core.utils.PermissionManager
-import com.web.webide.lsp.LocalSocketProvider
-import com.web.webide.lsp.LspService
 import com.web.webide.ui.editor.EditorColorSchemeManager
 import com.web.webide.ui.editor.components.TextMateInitializer
 import io.github.rosemoe.sora.langs.textmate.TextMateColorScheme
 import io.github.rosemoe.sora.langs.textmate.TextMateLanguage
 import io.github.rosemoe.sora.langs.textmate.registry.ThemeRegistry
-import io.github.rosemoe.sora.lsp.client.languageserver.serverdefinition.CustomLanguageServerDefinition
-import io.github.rosemoe.sora.lsp.editor.LspEditor
-import io.github.rosemoe.sora.lsp.editor.LspProject
-import io.github.rosemoe.sora.text.Content
-import io.github.rosemoe.sora.text.ContentListener
 import io.github.rosemoe.sora.widget.CodeEditor
 import io.github.rosemoe.sora.widget.EditorSearcher
 import io.github.rosemoe.sora.widget.component.EditorAutoCompletion
@@ -92,10 +85,11 @@ class EditorViewModel : ViewModel() {
         private set
 
     private val editorInstances = mutableMapOf<String, CodeEditor>()
-    private val lspWrappers = mutableMapOf<String, LspEditor>()
-    private var lspProject: LspProject? = null
 
-    // 🔴 修复 1：将 source.json 加入支持列表
+    // REMOVED: lspWrappers and lspProject are no longer needed for default completion
+    // private val lspWrappers = mutableMapOf<String, LspEditor>()
+    // private var lspProject: LspProject? = null
+
     private val supportedLanguageScopes = setOf(
         "text.html.basic",
         "source.css",
@@ -146,51 +140,24 @@ class EditorViewModel : ViewModel() {
         }
     }
 
-    private fun ensureLspProject(context: Context, projectRoot: String) {
-        if (lspProject != null && currentProjectPath == projectRoot) return
-
-        // 启动服务
-        context.startService(Intent(context, LspService::class.java))
-
-        lspProject?.dispose()
-        lspProject = LspProject(projectRoot)
-
-        // 注册各种后缀都使用同一个 Socket 连接
-        val extensions = listOf("html", "css", "js", "json")
-        extensions.forEach { ext ->
-            val webDefinition = object : CustomLanguageServerDefinition(
-                ext,
-                {
-                    // 这里连接到我们 Service 中开启的 LocalServerSocket
-                    LocalSocketProvider("web-lsp-socket")
-                }
-            ) {}
-            lspProject?.addServerDefinition(webDefinition)
-        }
-        LogCatcher.d("LSP", "LspProject initialized for $projectRoot")
-    }
+    // REMOVED: ensureLspProject is no longer needed
 
     @Synchronized
     fun getOrCreateEditor(context: Context, state: CodeEditorState): CodeEditor {
         val filePath = state.file.absolutePath
 
-        // 1. 确保 LSP Project 环境已准备好
-        currentProjectPath?.let { root ->
-            ensureLspProject(context, root)
-        }
-
-        // 2. 如果 View 缓存里已有，直接复用
+        // 1. If cached, reuse
         editorInstances[filePath]?.let {
             if (it.context == context) return it
             else editorInstances.remove(filePath)
         }
 
-        // 3. 初始化 TextMate 资源
+        // 2. Initialize TextMate resources
         if (!TextMateInitializer.isReady()) {
             TextMateInitializer.initialize(context)
         }
 
-        // 4. 创建编辑器并配置
+        // 3. Create Editor
         val editor = CodeEditor(context).apply {
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -205,62 +172,24 @@ class EditorViewModel : ViewModel() {
             }
 
             try {
-                setEditorLanguage(TextMateLanguage.create(state.languageScopeName, true))
+                // CHANGED: Use default TextMate completion
+                // Passing 'true' enables the default keyword completion based on the grammar
+                val language = TextMateLanguage.create(state.languageScopeName, true)
+                setEditorLanguage(language)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
 
-        // 5. 连接 LSP
-        val project = lspProject
-        if (project != null) {
-            val lspEditor = project.createEditor(filePath)
-            lspEditor.editor = editor
-            lspEditor.wrapperLanguage = TextMateLanguage.create(state.languageScopeName, true)
-
-            viewModelScope.launch(Dispatchers.IO) {
-                try {
-                    LogCatcher.d("LSP_Client", "Connecting to server...")
-
-                    // --- 修正点开始 ---
-                    lspEditor.connectWithTimeout() // 无参数，挂起等待
-
-                    LogCatcher.d("LSP_Client", "Connected successfully!")
-
-                    lspEditor.requestManager?.didOpen(
-                        org.eclipse.lsp4j.DidOpenTextDocumentParams(
-                            org.eclipse.lsp4j.TextDocumentItem(
-                                filePath,
-                                state.languageScopeName,
-                                1,
-                                state.content
-                            )
-                        )
-                    )
-                    // --- 修正点结束 ---
-
-                } catch (e: Exception) {
-                    LogCatcher.e("LSP", "Connection failed", e)
-                }
-            }
-            lspWrappers[filePath] = lspEditor
-        }
+        // REMOVED: LSP Connection logic
 
         editorInstances[filePath] = editor
         return editor
     }
 
-    // ... 其他方法保持不变 (onCleared, loadInitialFile 等) ...
-    // 为了节省篇幅，这里省略了未修改的辅助方法
-    // 请保留 search, save, fileOps 等相关方法的原有代码
     override fun onCleared() {
         super.onCleared()
-        viewModelScope.launch(Dispatchers.IO) {
-            lspWrappers.values.forEach { it.dispose() }
-            lspWrappers.clear()
-            lspProject?.dispose()
-            lspProject = null
-        }
+        // Removed LSP cleanup logic as it's no longer used
         editorInstances.values.forEach {
             try { it.release() } catch (e: Exception) { e.printStackTrace() }
         }
@@ -271,7 +200,7 @@ class EditorViewModel : ViewModel() {
         if (projectPath != currentProjectPath) {
             closeAllFiles()
             currentProjectPath = projectPath
-            ensureLspProject(appContext, projectPath)
+            // Removed ensureLspProject call
 
             val indexFile = File(projectPath, "index.html")
             if (indexFile.exists() && indexFile.isFile && indexFile.canRead()) {
@@ -485,7 +414,7 @@ class EditorViewModel : ViewModel() {
     fun closeAllFiles() {
         openFiles.forEach { state ->
             val path = state.file.absolutePath
-            lspWrappers.remove(path)?.dispose()
+            // Removed lspWrappers cleanup
             editorInstances.remove(path)?.release()
         }
         openFiles = emptyList()
@@ -497,7 +426,7 @@ class EditorViewModel : ViewModel() {
         openFiles.forEachIndexed { index, state ->
             if (index != indexToKeep) {
                 val path = state.file.absolutePath
-                lspWrappers.remove(path)?.dispose()
+                // Removed lspWrappers cleanup
                 editorInstances.remove(path)?.release()
             }
         }
@@ -508,7 +437,7 @@ class EditorViewModel : ViewModel() {
     fun closeFile(indexToClose: Int) {
         if (indexToClose !in openFiles.indices) return
         openFiles.getOrNull(indexToClose)?.file?.absolutePath?.let { path ->
-            lspWrappers.remove(path)?.dispose()
+            // Removed lspWrappers cleanup
             editorInstances.remove(path)?.release()
         }
         openFiles = openFiles.toMutableList().also { it.removeAt(indexToClose) }
@@ -519,12 +448,11 @@ class EditorViewModel : ViewModel() {
         }
     }
 
-    // 🔴 修复 4：修正 Scope 映射
     private fun getLanguageScope(extension: String): String = when (extension.lowercase()) {
         "html", "htm" -> "text.html.basic"
         "css" -> "source.css"
         "js" -> "source.js"
-        "json" -> "source.json" // 使用标准的 source.json
+        "json" -> "source.json"
         else -> "text.plain"
     }
 }
