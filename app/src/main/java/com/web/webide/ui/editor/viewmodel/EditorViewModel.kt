@@ -16,7 +16,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-
 package com.web.webide.ui.editor.viewmodel
 
 import android.content.Context
@@ -35,9 +34,10 @@ import com.web.webide.ui.editor.components.TextMateInitializer
 import io.github.rosemoe.sora.langs.textmate.TextMateColorScheme
 import io.github.rosemoe.sora.langs.textmate.TextMateLanguage
 import io.github.rosemoe.sora.langs.textmate.registry.ThemeRegistry
-import io.github.rosemoe.sora.widget.CodeEditor
+import io.github.rosemoe.sora.text.Content
 import io.github.rosemoe.sora.widget.EditorSearcher
-import io.github.rosemoe.sora.widget.component.EditorAutoCompletion
+import io.github.rosemoe.sora.text.ContentListener
+import io.github.rosemoe.sora.widget.CodeEditor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -60,7 +60,8 @@ data class CodeEditorState(
         savedContent = content
     }
 }
-
+// 1. 定义配置数据类
+// 1. 修改配置数据类，增加 fontPath
 data class EditorConfig(
     val fontSize: Float = 14f,
     val tabWidth: Int = 4,
@@ -68,7 +69,7 @@ data class EditorConfig(
     val wordWrap: Boolean = false,
     val showInvisibles: Boolean = false,
     val showToolbar: Boolean = true,
-    val fontPath: String = "",
+    val fontPath: String = "", // 空字符串代表系统默认，否则填文件名如 "JetBrainsMono-Regular.ttf"
     val customSymbols: String = "Tab,<,>,/,=,\",',!,?,;,:,{,},[,],(,),+,-,*,_,&,|"
 ) {
     fun getSymbolList(): List<String> = customSymbols.split(",").map { it.trim() }.filter { it.isNotEmpty() }
@@ -83,26 +84,15 @@ class EditorViewModel : ViewModel() {
         private set
     var currentProjectPath by mutableStateOf<String?>(null)
         private set
-
     private val editorInstances = mutableMapOf<String, CodeEditor>()
-
-    // REMOVED: lspWrappers and lspProject are no longer needed for default completion
-    // private val lspWrappers = mutableMapOf<String, LspEditor>()
-    // private var lspProject: LspProject? = null
-
-    private val supportedLanguageScopes = setOf(
-        "text.html.basic",
-        "source.css",
-        "source.js",
-        "source.json"
-    )
-
+    private val supportedLanguageScopes = setOf("text.html.basic", "source.css", "source.js")
     var editorConfig by mutableStateOf(EditorConfig())
         private set
-
+    // 权限检查
     private var hasPermissions = false
     private lateinit var appContext: Context
 
+    // 2. 更新加载逻辑
     fun reloadEditorConfig(context: Context) {
         val prefs = context.getSharedPreferences("WebIDE_Editor_Settings", Context.MODE_PRIVATE)
         editorConfig = EditorConfig(
@@ -111,11 +101,10 @@ class EditorViewModel : ViewModel() {
             wordWrap = prefs.getBoolean("editor_word_wrap", false),
             showInvisibles = prefs.getBoolean("editor_show_invisibles", false),
             showToolbar = prefs.getBoolean("editor_show_toolbar", true),
-            fontPath = prefs.getString("editor_font_path", "") ?: "",
+            fontPath = prefs.getString("editor_font_path", "") ?: "", // 加载字体路径
             customSymbols = prefs.getString("editor_custom_symbols", "Tab,<,>,/,=,\",',!,?,;,:,{,},[,],(,),+,-,*,_,&,|") ?: ""
         )
     }
-
     fun initializePermissions(context: Context) {
         appContext = context.applicationContext
         hasPermissions = PermissionManager.hasRequiredPermissions(appContext)
@@ -132,64 +121,96 @@ class EditorViewModel : ViewModel() {
         hasShownInitialLoader = true
     }
 
+    // 🔥 修复 1：更新主题时强制重绘，防止第一个文件光标因颜色加载滞后而不显示
     fun updateEditorTheme(seedColor: Color, isDark: Boolean) {
         editorInstances.values.forEach { editor ->
             val currentScheme = editor.colorScheme
             EditorColorSchemeManager.applyThemeColors(currentScheme, seedColor, isDark)
-            editor.invalidate()
+            editor.invalidate() // 强制重绘
         }
     }
-
-    // REMOVED: ensureLspProject is no longer needed
 
     @Synchronized
     fun getOrCreateEditor(context: Context, state: CodeEditorState): CodeEditor {
         val filePath = state.file.absolutePath
 
-        // 1. If cached, reuse
-        editorInstances[filePath]?.let {
-            if (it.context == context) return it
-            else editorInstances.remove(filePath)
+
+
+        // 检查缓存
+        editorInstances[filePath]?.let { existingEditor ->
+            // 🔥 必须检查：如果 Context 变了（比如屏幕旋转、退出了页面重进），必须销毁重建！
+            // 否则 View 会持有旧 Activity 的引用，导致键盘弹不出来
+            if (existingEditor.context != context) {
+                try {
+                    (existingEditor.parent as? ViewGroup)?.removeView(existingEditor)
+                    existingEditor.release()
+                } catch (e: Exception) { e.printStackTrace() }
+                editorInstances.remove(filePath)
+                // 让代码继续往下走，创建新的实例
+            } else {
+                (existingEditor.parent as? ViewGroup)?.removeView(existingEditor)
+                return existingEditor
+            }
         }
 
-        // 2. Initialize TextMate resources
+        // 2. 确保 TextMate 初始化
         if (!TextMateInitializer.isReady()) {
             TextMateInitializer.initialize(context)
         }
 
-        // 3. Create Editor
+        // 3. 创建新实例
         val editor = CodeEditor(context).apply {
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
+
+
+
+            isFocusable = true
+            isFocusableInTouchMode = true
+            isEnabled = true
+
             setText(state.content)
+
+            // 初始化配色
             colorScheme = TextMateColorScheme.create(ThemeRegistry.getInstance())
 
-            getComponent(EditorAutoCompletion::class.java).apply {
-                isEnabled = true
-                setEnabledAnimation(true)
+            // 初始化语言
+            if (state.languageScopeName in supportedLanguageScopes) {
+                try {
+                    val language = TextMateLanguage.create(state.languageScopeName, true)
+                    setEditorLanguage(language)
+                } catch (e: Exception) {
+                    LogCatcher.e("EditorViewModel", "设置语言失败", e)
+                }
             }
 
-            try {
-                // CHANGED: Use default TextMate completion
-                // Passing 'true' enables the default keyword completion based on the grammar
-                val language = TextMateLanguage.create(state.languageScopeName, true)
-                setEditorLanguage(language)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+            // 初始化光标
+            setSelection(0, 0)
+            ensureSelectionVisible()
+
+            // 监听内容变化
+            text.addContentListener(object : ContentListener {
+                override fun beforeReplace(content: Content) {}
+                override fun afterInsert(content: Content, startLine: Int, startColumn: Int, endLine: Int, endColumn: Int, inserted: CharSequence) {
+                    val newText = content.toString()
+                    if (state.content != newText) state.content = newText
+                }
+                override fun afterDelete(content: Content, startLine: Int, startColumn: Int, endLine: Int, endColumn: Int, deleted: CharSequence) {
+                    val newText = content.toString()
+                    if (state.content != newText) state.content = newText
+                }
+            })
         }
 
-        // REMOVED: LSP Connection logic
-
+        // 存入缓存
         editorInstances[filePath] = editor
         return editor
     }
 
     override fun onCleared() {
         super.onCleared()
-        // Removed LSP cleanup logic as it's no longer used
         editorInstances.values.forEach {
             try { it.release() } catch (e: Exception) { e.printStackTrace() }
         }
@@ -200,8 +221,6 @@ class EditorViewModel : ViewModel() {
         if (projectPath != currentProjectPath) {
             closeAllFiles()
             currentProjectPath = projectPath
-            // Removed ensureLspProject call
-
             val indexFile = File(projectPath, "index.html")
             if (indexFile.exists() && indexFile.isFile && indexFile.canRead()) {
                 openFile(indexFile)
@@ -210,13 +229,11 @@ class EditorViewModel : ViewModel() {
     }
 
     private var lastSearchQuery = ""
-    private var isIgnoreCase = true
-
+    private var isIgnoreCase = true // 默认忽略大小写
     fun getActiveEditor(): CodeEditor? {
         val activeFile = openFiles.getOrNull(activeFileIndex) ?: return null
         return editorInstances[activeFile.file.absolutePath]
     }
-
     fun searchText(query: String, ignoreCase: Boolean = isIgnoreCase) {
         lastSearchQuery = query
         isIgnoreCase = ignoreCase
@@ -228,9 +245,10 @@ class EditorViewModel : ViewModel() {
             editor.searcher.stopSearch()
         }
     }
-
+    // EditorViewModel.kt 中的修改
     fun searchNext() {
         val editor = getActiveEditor() ?: return
+        // 关键：只有在已经有查询词且搜索结果不为空时才跳转
         if (editor.searcher.hasQuery()) {
             try {
                 editor.searcher.gotoNext()
@@ -282,18 +300,21 @@ class EditorViewModel : ViewModel() {
 
         viewModelScope.launch(Dispatchers.Default) {
             val originalCode = editor.text.toString()
+            // 传入当前配置的缩进宽度
             val formattedCode = com.web.webide.core.utils.CodeFormatter.format(originalCode, extension, editorConfig.tabWidth)
 
             if (formattedCode != originalCode) {
                 withContext(Dispatchers.Main) {
                     val text = editor.text
+                    // ...
                     val lastLine = text.lineCount - 1
+                    // 修复 getColumnCount 可能越界的问题
                     val lastColumn = if(lastLine >= 0) text.getColumnCount(lastLine) else 0
                     text.replace(0, 0, lastLine, lastColumn, formattedCode)
                     activeFile.content = formattedCode
                 }
             }
-            isFormatting = false
+            isFormatting = false // 别忘了重置标志位
         }
     }
 
@@ -301,17 +322,24 @@ class EditorViewModel : ViewModel() {
         val line = lineStr.toIntOrNull() ?: return
         val editor = getActiveEditor() ?: return
         val totalLines = editor.text.lineCount
+
+        // 限制范围
         val targetLine = (line - 1).coerceIn(0, totalLines - 1)
+
+        // 执行跳转
         editor.setSelection(targetLine, 0)
         editor.ensureSelectionVisible()
+
     }
 
+    // 2. 插入文本 (用于调色板)
     fun insertText(text: String) {
         val editor = getActiveEditor() ?: return
         val cursor = editor.cursor
         editor.text.insert(cursor.leftLine, cursor.leftColumn, text)
     }
 
+    // 3. 创建文件或文件夹
     fun createNewItem(parentPath: String, name: String, isFile: Boolean, onSuccess: (File) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -334,7 +362,6 @@ class EditorViewModel : ViewModel() {
             }
         }
     }
-
     suspend fun saveAllModifiedFiles(snackbarHostState: SnackbarHostState) {
         withContext(Dispatchers.IO) {
             val modifiedFiles = openFiles.filter { it.isModified }
@@ -393,17 +420,27 @@ class EditorViewModel : ViewModel() {
     }
 
     fun undo() {
-        getActiveEditor()?.undo()
+        openFiles.getOrNull(activeFileIndex)?.let { state ->
+            editorInstances[state.file.absolutePath]?.undo()
+        }
     }
 
     fun redo() {
-        getActiveEditor()?.redo()
+        openFiles.getOrNull(activeFileIndex)?.let { state ->
+            editorInstances[state.file.absolutePath]?.redo()
+        }
     }
 
     fun insertSymbol(symbol: String) {
-        getActiveEditor()?.let { editor ->
-            val processedSymbol = if (symbol == "Tab") "\t" else symbol
-            editor.insertText(processedSymbol, processedSymbol.length)
+        openFiles.getOrNull(activeFileIndex)?.let { state ->
+            editorInstances[state.file.absolutePath]?.let { editor ->
+                val processedSymbol = if (symbol == "Tab") "\t" else symbol
+
+                // 修改点：使用 editor.insertText 而不是 editor.text.insert
+                // 1. 自动处理选中状态：如果有选中内容，会先被替换
+                // 2. 第二个参数是光标移动的偏移量，传入 length 表示光标停在插入符号的后面
+                editor.insertText(processedSymbol, processedSymbol.length)
+            }
         }
     }
 
@@ -412,11 +449,7 @@ class EditorViewModel : ViewModel() {
     }
 
     fun closeAllFiles() {
-        openFiles.forEach { state ->
-            val path = state.file.absolutePath
-            // Removed lspWrappers cleanup
-            editorInstances.remove(path)?.release()
-        }
+        openFiles.forEach { state -> editorInstances.remove(state.file.absolutePath)?.release() }
         openFiles = emptyList()
         activeFileIndex = -1
     }
@@ -424,11 +457,7 @@ class EditorViewModel : ViewModel() {
     fun closeOtherFiles(indexToKeep: Int) {
         if (indexToKeep !in openFiles.indices) return
         openFiles.forEachIndexed { index, state ->
-            if (index != indexToKeep) {
-                val path = state.file.absolutePath
-                // Removed lspWrappers cleanup
-                editorInstances.remove(path)?.release()
-            }
+            if (index != indexToKeep) editorInstances.remove(state.file.absolutePath)?.release()
         }
         openFiles = listOf(openFiles[indexToKeep])
         activeFileIndex = 0
@@ -437,7 +466,6 @@ class EditorViewModel : ViewModel() {
     fun closeFile(indexToClose: Int) {
         if (indexToClose !in openFiles.indices) return
         openFiles.getOrNull(indexToClose)?.file?.absolutePath?.let { path ->
-            // Removed lspWrappers cleanup
             editorInstances.remove(path)?.release()
         }
         openFiles = openFiles.toMutableList().also { it.removeAt(indexToClose) }
@@ -448,11 +476,12 @@ class EditorViewModel : ViewModel() {
         }
     }
 
+
     private fun getLanguageScope(extension: String): String = when (extension.lowercase()) {
-        "html", "htm" -> "text.html.basic"
+        "html", "htm" -> "text.html.basic"  //text.html.basic
         "css" -> "source.css"
         "js" -> "source.js"
-        "json" -> "source.json"
+        "json" , "JSON" -> "source.js"
         else -> "text.plain"
     }
 }
