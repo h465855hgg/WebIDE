@@ -57,6 +57,8 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 import androidx.core.graphics.toColorInt
+import androidx.compose.ui.res.stringResource
+import com.web.webide.R
 
 @Composable
 fun ColorPickerDialog(
@@ -280,10 +282,10 @@ fun ColorPickerDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
                 ) {
-                    TextButton(onClick = onDismiss) { Text("取消") }
+                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(onClick = { onColorSelected(currentColor) }) {
-                        Text("确定")
+                        Text(stringResource(R.string.action_confirm))
                     }
                 }
             }

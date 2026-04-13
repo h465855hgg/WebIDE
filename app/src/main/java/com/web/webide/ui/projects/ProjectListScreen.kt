@@ -52,10 +52,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.annotation.StringRes
 import androidx.navigation.NavController
+import com.web.webide.R
 import com.web.webide.core.utils.WorkspaceManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -77,11 +80,11 @@ data class ProjectItem(
 )
 
 // --- 排序规则枚举 ---
-enum class SortOrder(val displayName: String) {
-    NAME_ASC("名称 (A-Z)"),
-    NAME_DESC("名称 (Z-A)"),
-    DATE_NEWEST("修改时间 (最新)"),
-    DATE_OLDEST("修改时间 (最早)");
+enum class SortOrder(@StringRes val labelRes: Int) {
+    NAME_ASC(R.string.project_sort_name_asc),
+    NAME_DESC(R.string.project_sort_name_desc),
+    DATE_NEWEST(R.string.project_sort_date_newest),
+    DATE_OLDEST(R.string.project_sort_date_oldest);
 
     companion object {
         fun fromOrdinal(ordinal: Int): SortOrder = entries.getOrElse(ordinal) { NAME_ASC }
@@ -217,9 +220,9 @@ fun ProjectListScreen(navController: NavController) {
             withContext(Dispatchers.Main) {
                 if (success) {
                     if (pinnedProjects.contains(folderName)) togglePin(folderName) else refreshList()
-                    snackbarHostState.showSnackbar("项目已删除")
+                    snackbarHostState.showSnackbar(context.getString(R.string.project_deleted))
                 } else {
-                    snackbarHostState.showSnackbar("删除失败，请检查权限")
+                    snackbarHostState.showSnackbar(context.getString(R.string.project_delete_failed))
                 }
             }
         }
@@ -263,7 +266,7 @@ fun ProjectListScreen(navController: NavController) {
                             TextField(
                                 value = searchQuery,
                                 onValueChange = { searchQuery = it },
-                                placeholder = { Text("搜索项目...", style = MaterialTheme.typography.bodyLarge) },
+                                placeholder = { Text(stringResource(R.string.project_search_placeholder), style = MaterialTheme.typography.bodyLarge) },
                                 singleLine = true,
                                 colors = TextFieldDefaults.colors(
                                     focusedContainerColor = Color.Transparent,
@@ -285,13 +288,13 @@ fun ProjectListScreen(navController: NavController) {
                                 isSearchActive = false
                                 searchQuery = ""
                             }) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, "退出搜索")
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.project_exit_search))
                             }
                         },
                         actions = {
                             if (searchQuery.isNotEmpty()) {
                                 IconButton(onClick = { searchQuery = "" }) {
-                                    Icon(Icons.Default.Close, "清除")
+                                    Icon(Icons.Default.Close, stringResource(R.string.project_clear_search))
                                 }
                             }
                         }
@@ -299,17 +302,17 @@ fun ProjectListScreen(navController: NavController) {
                 } else {
                     // --- 常规模式 TopBar ---
                     LargeTopAppBar(
-                        title = { Text("Web Projects") },
+                        title = { Text(stringResource(R.string.project_list_title)) },
                         scrollBehavior = scrollBehavior,
                         actions = {
                             // 搜索按钮
                             IconButton(onClick = { isSearchActive = true }) {
-                                Icon(Icons.Default.Search, "搜索")
+                                Icon(Icons.Default.Search, stringResource(R.string.action_search))
                             }
                             // 排序按钮
                             Box {
                                 IconButton(onClick = { showSortMenu = true }) {
-                                    Icon(Icons.AutoMirrored.Filled.Sort, "排序")
+                                    Icon(Icons.AutoMirrored.Filled.Sort, stringResource(R.string.action_settings))
                                 }
                                 DropdownMenu(
                                     expanded = showSortMenu,
@@ -325,7 +328,7 @@ fun ProjectListScreen(navController: NavController) {
                                                     } else {
                                                         Spacer(Modifier.width(24.dp))
                                                     }
-                                                    Text(order.displayName)
+                                                    Text(stringResource(order.labelRes))
                                                 }
                                             },
                                             onClick = {
@@ -337,7 +340,7 @@ fun ProjectListScreen(navController: NavController) {
                                 }
                             }
                             IconButton(onClick = { navController.safeNavigate("settings") }) {
-                                Icon(Icons.Default.Settings, "设置")
+                                Icon(Icons.Default.Settings, stringResource(R.string.action_settings))
                             }
                         }
                     )
@@ -353,8 +356,8 @@ fun ProjectListScreen(navController: NavController) {
             ) {
                 ExtendedFloatingActionButton(
                     onClick = { navController.safeNavigate("new_project") },
-                    icon = { Icon(Icons.Default.Add, "新建项目") },
-                    text = { Text("新建项目") },
+                    icon = { Icon(Icons.Default.Add, stringResource(R.string.project_new_project)) },
+                    text = { Text(stringResource(R.string.project_new_project)) },
                     expanded = isFabExpanded
                 )
             }
@@ -371,7 +374,7 @@ fun ProjectListScreen(navController: NavController) {
                 if (isHistory) {
                 if (searchHistory.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("暂无搜索记录", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.project_search_history_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 } else {
                     LazyColumn(
@@ -380,7 +383,7 @@ fun ProjectListScreen(navController: NavController) {
                     ) {
                         item {
                             Text(
-                                "搜索历史",
+                                stringResource(R.string.project_search_history_title),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.padding(bottom = 8.dp)
@@ -415,7 +418,7 @@ fun ProjectListScreen(navController: NavController) {
                                 ) {
                                     Icon(
                                         Icons.Default.Close,
-                                        contentDescription = "删除记录",
+                                        contentDescription = stringResource(R.string.project_delete_history_item),
                                         modifier = Modifier.size(16.dp),
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -432,7 +435,7 @@ fun ProjectListScreen(navController: NavController) {
                                 },
                                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                             ) {
-                                Text("清空历史记录", color = MaterialTheme.colorScheme.secondary)
+                                Text(stringResource(R.string.project_clear_history), color = MaterialTheme.colorScheme.secondary)
                             }
                         }
                     }
@@ -443,7 +446,11 @@ fun ProjectListScreen(navController: NavController) {
                 if (displayList.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
-                            text = if (isSearchActive) "没有找到匹配的项目" else "没有找到项目",
+                            text = if (isSearchActive) {
+                                stringResource(R.string.project_no_matching_projects)
+                            } else {
+                                stringResource(R.string.project_no_projects)
+                            },
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -490,8 +497,8 @@ fun ProjectListScreen(navController: NavController) {
         if (showDeleteDialog && projectToDelete != null) {
             AlertDialog(
                 onDismissRequest = { showDeleteDialog = false },
-                title = { Text("删除项目") },
-                text = { Text("确定要删除 \"$projectToDelete\" 吗？此操作无法撤销。") },
+                title = { Text(stringResource(R.string.project_delete_dialog_title)) },
+                text = { Text(stringResource(R.string.project_delete_dialog_message, projectToDelete ?: "")) },
                 confirmButton = {
                     TextButton(
                         onClick = {
@@ -499,10 +506,10 @@ fun ProjectListScreen(navController: NavController) {
                             showDeleteDialog = false
                         },
                         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                    ) { Text("删除") }
+                    ) { Text(stringResource(R.string.action_delete)) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showDeleteDialog = false }) { Text("取消") }
+                    TextButton(onClick = { showDeleteDialog = false }) { Text(stringResource(R.string.action_cancel)) }
                 }
             )
         }
@@ -554,7 +561,7 @@ fun ProjectCard(
 
                 Box {
                     IconButton(onClick = { menuExpanded = true }) {
-                        Icon(Icons.Default.MoreVert, "更多选项")
+                        Icon(Icons.Default.MoreVert, stringResource(R.string.project_more_options))
                     }
 
                     DropdownMenu(
@@ -562,7 +569,15 @@ fun ProjectCard(
                         onDismissRequest = { menuExpanded = false }
                     ) {
                         DropdownMenuItem(
-                            text = { Text(if (isPinned) "取消置顶" else "置顶项目") },
+                            text = {
+                                Text(
+                                    if (isPinned) {
+                                        stringResource(R.string.project_unpin)
+                                    } else {
+                                        stringResource(R.string.project_pin)
+                                    }
+                                )
+                            },
                             leadingIcon = {
                                 Icon(if (isPinned) Icons.Default.PushPin else Icons.Default.VerticalAlignTop, null)
                             },
@@ -573,7 +588,7 @@ fun ProjectCard(
                         )
                         HorizontalDivider()
                         DropdownMenuItem(
-                            text = { Text("删除项目", color = MaterialTheme.colorScheme.error) },
+                            text = { Text(stringResource(R.string.project_delete_dialog_title), color = MaterialTheme.colorScheme.error) },
                             leadingIcon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) },
                             onClick = {
                                 menuExpanded = false
@@ -587,7 +602,7 @@ fun ProjectCard(
             if (isPinned) {
                 Icon(
                     imageVector = Icons.Default.PushPin,
-                    contentDescription = "Pinned",
+                    contentDescription = stringResource(R.string.project_pinned),
                     tint = MaterialTheme.colorScheme.secondary.copy(alpha = 0.8f),
                     modifier = Modifier
                         .align(Alignment.TopEnd)

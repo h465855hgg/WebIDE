@@ -39,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -48,6 +49,8 @@ import kotlinx.coroutines.launch
 import java.io.File
 import androidx.compose.foundation.layout.BoxWithConstraints
 // 或者通配符
+import androidx.compose.ui.res.stringResource
+import com.web.webide.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -121,17 +124,17 @@ fun DirectorySelector(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "选择工作目录",
+                        text = stringResource(R.string.directory_selector_title),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
                     Row {
                         // 新建文件夹按钮
                         IconButton(onClick = { showCreateFolderDialog = true }) {
-                            Icon(Icons.Default.CreateNewFolder, contentDescription = "新建文件夹")
+                            Icon(Icons.Default.CreateNewFolder, contentDescription = stringResource(R.string.directory_selector_new_folder))
                         }
                         IconButton(onClick = onDismissRequest) {
-                            Icon(Icons.Default.Close, contentDescription = "关闭")
+                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.action_close))
                         }
                     }
                 }
@@ -175,12 +178,12 @@ fun DirectorySelector(
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.ArrowUpward,
-                                            contentDescription = "返回上一级",
+                                            contentDescription = stringResource(R.string.directory_selector_go_up),
                                             tint = MaterialTheme.colorScheme.onSecondaryContainer
                                         )
                                         Spacer(Modifier.width(12.dp))
                                         Text(
-                                            text = "返回上一级",
+                                            text = stringResource(R.string.directory_selector_go_up),
                                             style = MaterialTheme.typography.bodyLarge,
                                             fontWeight = FontWeight.Medium,
                                             color = MaterialTheme.colorScheme.onSecondaryContainer
@@ -202,7 +205,7 @@ fun DirectorySelector(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Folder,
-                                        contentDescription = "目录",
+                                        contentDescription = stringResource(R.string.directory_selector_folder),
                                         tint = MaterialTheme.colorScheme.primary
                                     )
                                     Spacer(Modifier.width(12.dp))
@@ -230,7 +233,7 @@ fun DirectorySelector(
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        "此目录为空",
+                                        stringResource(R.string.directory_selector_empty),
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -258,13 +261,13 @@ fun DirectorySelector(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextButton(onClick = onDismissRequest) {
-                        Text("取消")
+                        Text(stringResource(R.string.action_cancel))
                     }
                     Spacer(Modifier.width(8.dp))
                     Button(onClick = { onPathSelected(currentPath) }) {
                         Icon(Icons.Default.Check, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
-                        Text("选择此目录")
+                        Text(stringResource(R.string.directory_selector_select_this))
                     }
                 }
             }
@@ -417,16 +420,17 @@ private fun CreateFolderDialog(
     onDismiss: () -> Unit,
     onFolderCreated: (String) -> Unit
 ) {
+    val context = LocalContext.current
     var folderName by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("新建文件夹") },
+        title = { Text(stringResource(R.string.directory_selector_create_folder)) },
         text = {
             Column {
                 Text(
-                    text = "位置: $currentPath",
+                    text = stringResource(R.string.directory_selector_location, currentPath),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 16.dp)
@@ -437,12 +441,12 @@ private fun CreateFolderDialog(
                         folderName = it
                         errorMessage = when {
                             it.isEmpty() -> null
-                            it.contains('/') || it.contains('\\') -> "文件夹名称不能包含 / 或 \\"
-                            it == "." || it == ".." -> "无效的文件夹名称"
+                            it.contains('/') || it.contains('\\') -> context.getString(R.string.directory_selector_invalid_slash)
+                            it == "." || it == ".." -> context.getString(R.string.directory_selector_invalid_name)
                             else -> null
                         }
                     },
-                    label = { Text("文件夹名称") },
+                    label = { Text(stringResource(R.string.directory_selector_folder_name)) },
                     isError = errorMessage != null,
                     supportingText = errorMessage?.let { { Text(it) } },
                     singleLine = true,
@@ -459,12 +463,12 @@ private fun CreateFolderDialog(
                 },
                 enabled = folderName.isNotEmpty() && errorMessage == null
             ) {
-                Text("创建")
+                Text(stringResource(R.string.action_create))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消")
+                Text(stringResource(R.string.action_cancel))
             }
         }
     )

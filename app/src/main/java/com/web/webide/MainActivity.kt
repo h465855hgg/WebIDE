@@ -19,6 +19,7 @@
 
 package com.web.webide
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -48,7 +49,12 @@ import com.web.webide.ui.welcome.WelcomeScreen
 
 class MainActivity : ComponentActivity() {
 
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(LanguageManager.wrapContext(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        LanguageManager.applySavedLanguage(this)
         super.onCreate(savedInstanceState)
         getExternalFilesDir("logs")
 
