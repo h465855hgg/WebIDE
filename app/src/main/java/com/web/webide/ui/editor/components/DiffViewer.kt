@@ -33,9 +33,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.web.webide.R
 import com.web.webide.ui.editor.EditorColorSchemeManager
 import com.web.webide.ui.editor.viewmodel.DiffEditorState
 import com.web.webide.ui.editor.viewmodel.DiffViewMode
@@ -216,7 +218,7 @@ fun DiffViewer(
         if (diffData == null) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
-                Text("正在计算差异...", modifier = Modifier.padding(top = 48.dp))
+                Text(stringResource(R.string.diff_calculating), modifier = Modifier.padding(top = 48.dp))
             }
         } else {
             val data = diffData!!
@@ -261,19 +263,19 @@ fun DiffToolbar(state: DiffEditorState, data: AlignedDiffResult?) {
             
             IconButton(onClick = { state.viewMode = DiffViewMode.SPLIT }) {
                 Icon(
-                    Icons.Default.ViewColumn, "Side-by-Side",
+                    Icons.Default.ViewColumn, stringResource(R.string.diff_side_by_side),
                     tint = if (state.viewMode == DiffViewMode.SPLIT) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             IconButton(onClick = { state.viewMode = DiffViewMode.SPLIT_VERTICAL }) {
                 Icon(
-                    Icons.Filled.ViewAgenda, "Top-Bottom",
+                    Icons.Filled.ViewAgenda, stringResource(R.string.diff_top_bottom),
                     tint = if (state.viewMode == DiffViewMode.SPLIT_VERTICAL) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             IconButton(onClick = { state.viewMode = DiffViewMode.UNIFIED }) {
                 Icon(
-                    Icons.AutoMirrored.Filled.ViewList, "Unified",
+                    Icons.AutoMirrored.Filled.ViewList, stringResource(R.string.diff_unified),
                     tint = if (state.viewMode == DiffViewMode.UNIFIED) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -309,7 +311,7 @@ fun SplitDiffView(
         // 上下分栏模式
         Column(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxWidth().weight(1f).clipToBounds()) {
-                DiffHeader("HEAD", Color(0xFFD32F2F))
+                DiffHeader(stringResource(R.string.diff_head), Color(0xFFD32F2F))
                 DiffEditorInstance(
                     content = data.leftContent,
                     highlights = data.leftHighlights,
@@ -321,7 +323,7 @@ fun SplitDiffView(
             }
             HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant)
             Column(modifier = Modifier.fillMaxWidth().weight(1f).clipToBounds()) {
-                DiffHeader("Working", Color(0xFF388E3C))
+                DiffHeader(stringResource(R.string.diff_working), Color(0xFF388E3C))
                 DiffEditorInstance(
                     content = data.rightContent,
                     highlights = data.rightHighlights,
@@ -342,7 +344,7 @@ fun SplitDiffView(
         // 左右分栏模式
         Row(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.weight(1f).fillMaxHeight().clipToBounds()) {
-                DiffHeader("HEAD", Color(0xFFD32F2F))
+                DiffHeader(stringResource(R.string.diff_head), Color(0xFFD32F2F))
                 DiffEditorInstance(
                     content = data.leftContent,
                     highlights = data.leftHighlights,
@@ -354,7 +356,7 @@ fun SplitDiffView(
             }
             VerticalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant)
             Column(modifier = Modifier.weight(1f).fillMaxHeight().clipToBounds()) {
-                DiffHeader("Working", Color(0xFF388E3C))
+                DiffHeader(stringResource(R.string.diff_working), Color(0xFF388E3C))
                 DiffEditorInstance(
                     content = data.rightContent,
                     highlights = data.rightHighlights,

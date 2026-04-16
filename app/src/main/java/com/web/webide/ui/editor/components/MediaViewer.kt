@@ -78,6 +78,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
@@ -96,6 +97,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import java.io.File
 import java.text.DecimalFormat
+import com.web.webide.R
 
 enum class MediaType {
     IMAGE, VIDEO, SVG,
@@ -179,7 +181,7 @@ private fun ImageViewer(file: File, type: MediaType) {
                 FilledTonalIconButton(onClick = {
                     scale = (scale / 1.2f).coerceAtLeast(0.1f)
                 }) {
-                    Icon(Icons.Default.Remove, contentDescription = "Zoom Out")
+                    Icon(Icons.Default.Remove, contentDescription = stringResource(R.string.media_zoom_out))
                 }
 
                 // Reset / Fit Screen
@@ -187,14 +189,14 @@ private fun ImageViewer(file: File, type: MediaType) {
                     scale = 1f
                     offset = Offset.Zero
                 }) {
-                    Icon(Icons.Default.FitScreen, contentDescription = "Fit Screen")
+                    Icon(Icons.Default.FitScreen, contentDescription = stringResource(R.string.media_fit_screen))
                 }
 
                 // Zoom In
                 FilledTonalIconButton(onClick = {
                     scale = (scale * 1.2f).coerceAtMost(10f)
                 }) {
-                    Icon(Icons.Default.Add, contentDescription = "Zoom In")
+                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.media_zoom_in))
                 }
             }
         }
@@ -418,22 +420,22 @@ private fun VideoPlayer(file: File) {
                     ) {
                         // Info Button
                         IconButton(onClick = { showInfoDialog = true }) {
-                            Icon(Icons.Default.Info, contentDescription = "Info", tint = Color.White)
+                            Icon(Icons.Default.Info, contentDescription = stringResource(R.string.media_info_title), tint = Color.White)
                         }
 
                         // Resize Mode
                         Box {
                             IconButton(onClick = { showResizeMenu = true }) {
-                                Icon(Icons.Default.AspectRatio, contentDescription = "Aspect Ratio", tint = Color.White)
+                                Icon(Icons.Default.AspectRatio, contentDescription = stringResource(R.string.media_aspect_ratio), tint = Color.White)
                             }
                             DropdownMenu(
                                 expanded = showResizeMenu,
                                 onDismissRequest = { showResizeMenu = false }
                             ) {
-                                DropdownMenuItem(text = { Text("Fit Screen") }, onClick = { resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT; showResizeMenu = false })
-                                DropdownMenuItem(text = { Text("Fill Screen") }, onClick = { resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM; showResizeMenu = false })
-                                DropdownMenuItem(text = { Text("Fixed Height") }, onClick = { resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIXED_HEIGHT; showResizeMenu = false })
-                                DropdownMenuItem(text = { Text("Fixed Width") }, onClick = { resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIXED_WIDTH; showResizeMenu = false })
+                                DropdownMenuItem(text = { Text(stringResource(R.string.media_fit_screen)) }, onClick = { resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT; showResizeMenu = false })
+                                DropdownMenuItem(text = { Text(stringResource(R.string.media_fill_screen)) }, onClick = { resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM; showResizeMenu = false })
+                                DropdownMenuItem(text = { Text(stringResource(R.string.media_fixed_height)) }, onClick = { resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIXED_HEIGHT; showResizeMenu = false })
+                                DropdownMenuItem(text = { Text(stringResource(R.string.media_fixed_width)) }, onClick = { resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIXED_WIDTH; showResizeMenu = false })
                             }
                         }
                     }
@@ -449,7 +451,7 @@ private fun VideoPlayer(file: File) {
                     ) {
                         Icon(
                             imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = if (isPlaying) "Pause" else "Play",
+                            contentDescription = stringResource(if (isPlaying) R.string.action_pause else R.string.action_play),
                             tint = Color.White,
                             modifier = Modifier.size(64.dp)
                         )
@@ -462,7 +464,7 @@ private fun VideoPlayer(file: File) {
                             shape = CircleShape
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(8.dp)) {
-                                Icon(Icons.Default.FastForward, "Fast Forward", tint = Color.White)
+                                Icon(Icons.Default.FastForward, stringResource(R.string.media_fast_forward), tint = Color.White)
                                 Spacer(Modifier.width(4.dp))
                                 Text("2.0x", color = Color.White)
                             }
@@ -492,13 +494,13 @@ private fun VideoPlayer(file: File) {
                         // Extra Controls (Speed, Loop)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                              // Loop
-                             IconButton(onClick = {
-                                 isLooping = !isLooping
-                                 exoPlayer.repeatMode = if (isLooping) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
-                             }) {
+                                 IconButton(onClick = {
+                                     isLooping = !isLooping
+                                     exoPlayer.repeatMode = if (isLooping) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+                                 }) {
                                  Icon(
                                      Icons.Default.Loop, 
-                                     contentDescription = "Loop",
+                                     contentDescription = stringResource(R.string.media_loop),
                                      tint = if (isLooping) MaterialTheme.colorScheme.primary else Color.White
                                  )
                              }
@@ -506,7 +508,7 @@ private fun VideoPlayer(file: File) {
                              // Speed
                              Box {
                                  IconButton(onClick = { showSpeedMenu = true }) {
-                                     Icon(Icons.Default.Speed, contentDescription = "Speed", tint = Color.White)
+                                     Icon(Icons.Default.Speed, contentDescription = stringResource(R.string.media_speed), tint = Color.White)
                                  }
                                  DropdownMenu(
                                      expanded = showSpeedMenu,
@@ -558,19 +560,19 @@ private fun VideoPlayer(file: File) {
         if (showInfoDialog) {
             AlertDialog(
                 onDismissRequest = { showInfoDialog = false },
-                title = { Text("Media Info") },
+                title = { Text(stringResource(R.string.media_info_title)) },
                 text = {
                     Column {
-                        Text("File: ${file.name}")
-                        Text("Size: ${DecimalFormat("#.##").format(file.length() / 1024.0 / 1024.0)} MB")
+                        Text(stringResource(R.string.media_file_format, file.name))
+                        Text(stringResource(R.string.media_size_format, DecimalFormat("#.##").format(file.length() / 1024.0 / 1024.0)))
                         if (videoSize != null) {
                             Spacer(Modifier.padding(4.dp))
-                            Text("Resolution: ${videoSize?.width} x ${videoSize?.height}")
+                            Text(stringResource(R.string.media_resolution_format, videoSize!!.width, videoSize!!.height))
                         }
                     }
                 },
                 confirmButton = {
-                    TextButton(onClick = { showInfoDialog = false }) { Text("Close") }
+                    TextButton(onClick = { showInfoDialog = false }) { Text(stringResource(R.string.action_close)) }
                 }
             )
         }

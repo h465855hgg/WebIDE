@@ -28,10 +28,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.web.webide.R
 import com.web.webide.core.utils.LogConfigRepository
 import com.web.webide.core.utils.PermissionManager
 import com.web.webide.core.utils.WorkspaceManager
@@ -74,7 +76,7 @@ fun WorkspaceSelectionScreen(navController: NavController) {
     // 只有在未配置时才渲染 UI 内容，避免跳转时的闪烁（可选优化）
     if (!WorkspaceManager.isWorkspaceConfigured(context)) {
         Scaffold(
-            topBar = { TopAppBar(title = { Text("WebIDE") }) }
+            topBar = { TopAppBar(title = { Text(stringResource(R.string.app_name)) }) }
         ) { innerPadding ->
             Column(
                 modifier = Modifier
@@ -92,20 +94,20 @@ fun WorkspaceSelectionScreen(navController: NavController) {
                 )
                 Spacer(modifier = Modifier.height(24.dp))
                 Text(
-                    "选择工作目录",
+                    stringResource(R.string.workspace_select_title),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    "所有项目文件将存储在此目录中。",
+                    stringResource(R.string.workspace_select_description),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 if (selectedWorkspace.contains("Android/data")) {
                     Text(
-                        "使用App私有目录 (推荐)",
+                        stringResource(R.string.workspace_private_recommended),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(top = 8.dp)
@@ -119,7 +121,9 @@ fun WorkspaceSelectionScreen(navController: NavController) {
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Icon(Icons.Default.FolderOpen, null); Spacer(Modifier.width(8.dp)); Text("更改目录")
+                    Icon(Icons.Default.FolderOpen, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.workspace_change_directory))
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -129,7 +133,7 @@ fun WorkspaceSelectionScreen(navController: NavController) {
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                 ) {
                     Column(Modifier.padding(16.dp)) {
-                        Text("当前:", style = MaterialTheme.typography.bodySmall)
+                        Text(stringResource(R.string.label_current), style = MaterialTheme.typography.bodySmall)
                         Text(
                             selectedWorkspace,
                             style = MaterialTheme.typography.bodyMedium,
@@ -155,7 +159,9 @@ fun WorkspaceSelectionScreen(navController: NavController) {
                     },
                     modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)
                 ) {
-                    Icon(Icons.Default.Check, null); Spacer(Modifier.width(8.dp)); Text("确认并继续")
+                    Icon(Icons.Default.Check, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.workspace_confirm_continue))
                 }
             }
         }

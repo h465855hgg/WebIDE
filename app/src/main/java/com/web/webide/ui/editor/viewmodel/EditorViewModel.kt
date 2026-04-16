@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.luminance
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.web.webide.R
 import com.itsaky.androidide.treesitter.TSLanguage
 import com.itsaky.androidide.treesitter.json.TSLanguageJson
 import com.web.webide.core.utils.BackupUtils
@@ -548,7 +549,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    suspend fun saveAllModifiedFiles(snackbarHostState: SnackbarHostState): Boolean {
+    suspend fun saveAllModifiedFiles(context: Context, snackbarHostState: SnackbarHostState): Boolean {
         return withContext(Dispatchers.IO) {
             val modifiedFiles = openFiles.filterIsInstance<CodeEditorState>().filter { it.isModified }
             if (modifiedFiles.isEmpty()) return@withContext true
@@ -570,9 +571,9 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             }
 
             val message = if (failCount == 0) {
-                "已保存 $successCount 个文件"
+                context.getString(R.string.editor_saved_files, successCount)
             } else {
-                "保存完成: $successCount 成功, $failCount 失败\n最后错误: $lastError"
+                context.getString(R.string.editor_save_all_result, successCount, failCount, lastError)
             }
 
             withContext(Dispatchers.Main) {

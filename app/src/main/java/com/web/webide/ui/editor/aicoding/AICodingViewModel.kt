@@ -19,12 +19,14 @@ package com.web.webide.ui.editor.aicoding
 
 import android.app.Application
 import android.content.Context
+import androidx.annotation.StringRes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.web.webide.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -60,8 +62,38 @@ data class ChatSession(
 )
 
 class AICodingViewModel(application: Application) : AndroidViewModel(application) {
+    companion object {
+        const val DEFAULT_CHAT_TITLE_MARKER = "__ai_default_chat_title__"
+        const val INITIAL_ASSISTANT_MESSAGE_MARKER = "__ai_initial_assistant_message__"
+        const val LEGACY_DEFAULT_CHAT_TITLE = "New Chat"
+        const val LEGACY_INITIAL_ASSISTANT_MESSAGE =
+            "Hello! I am your AI coding assistant. Please configure your API Key in settings to start."
+    }
+
+    private class AiLocalizedException(val localizedContent: String) : IOException(localizedContent)
+
     private val prefs = application.getSharedPreferences("ai_coding_settings", Context.MODE_PRIVATE)
     private val sessionsFile = File(application.filesDir, "ai_chat_sessions.json")
+    private fun string(@androidx.annotation.StringRes resId: Int, vararg args: Any): String {
+        return getApplication<Application>().getString(resId, *args)
+    }
+
+    private fun localizedContent(@StringRes resId: Int, vararg args: Any): String {
+        return AICodingLocalizedText.encode(getApplication<Application>(), resId, *args)
+    }
+
+    private fun localizedMessage(
+        role: String,
+        @StringRes resId: Int,
+        vararg args: Any,
+        isError: Boolean = false
+    ): ChatMessage {
+        return ChatMessage(role = role, content = localizedContent(resId, *args), isError = isError)
+    }
+
+    private fun resolveContent(content: String): String {
+        return AICodingLocalizedText.resolve(getApplication<Application>(), content) ?: content
+    }
 
     var apiKey by mutableStateOf(prefs.getString("api_key", "") ?: "")
     var baseUrl by mutableStateOf(prefs.getString("base_url", "https://api.openai.com/v1") ?: "https://api.openai.com/v1")
@@ -72,21 +104,25 @@ class AICodingViewModel(application: Application) : AndroidViewModel(application
     var currentSessionId by mutableStateOf<String?>(null)
 
     // Provider Logic
-    enum class ApiProvider(val displayName: String, val defaultBaseUrl: String, val defaultModel: String) {
-        OPENAI("OpenAI", "https://api.openai.com/v1", "gpt-4o"),
-        DEEPSEEK("DeepSeek", "https://api.deepseek.com", "deepseek-chat"),
-        ANTHROPIC("Anthropic", "https://api.anthropic.com/v1", "claude-3-opus-20240229"),
-        GOOGLE("Google Gemini", "https://generativelanguage.googleapis.com/v1beta", "gemini-2.0-flash"),
-        ZHIPU("Zhipu AI (GLM)", "https://open.bigmodel.cn/api/paas/v4", "glm-4.5"),
-        MOONSHOT("Moonshot (Kimi)", "https://api.moonshot.cn/v1", "moonshot-v1-128k"),
-        ALIYUN("Aliyun (Qwen)", "https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen-max"),
-        BAIDU("Baidu (Ernie)", "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop", "ernie-bot-4"),
-        DOUBAO("Doubao", "https://ark.cn-beijing.volces.com/api/v3", "Doubao-pro-4k"),
-        MISTRAL("Mistral", "https://codestral.mistral.ai/v1", "codestral-latest"),
-        SILICONFLOW("SiliconFlow", "https://api.siliconflow.cn/v1", "yi-1.5-34b"),
-        OPENROUTER("OpenRouter", "https://openrouter.ai/api/v1", "google/gemini-pro"),
-        LMSTUDIO("LM Studio (Local)", "http://localhost:1234/v1", "meta-llama-3.1-8b-instruct"),
-        CUSTOM("Custom / Other", "", "");
+    enum class ApiProvider(
+        @StringRes val displayNameRes: Int,
+        val defaultBaseUrl: String,
+        val defaultModel: String
+    ) {
+        OPENAI(R.string.ai_provider_openai, "https://api.openai.com/v1", "gpt-4o"),
+        DEEPSEEK(R.string.ai_provider_deepseek, "https://api.deepseek.com", "deepseek-chat"),
+        ANTHROPIC(R.string.ai_provider_anthropic, "https://api.anthropic.com/v1", "claude-3-opus-20240229"),
+        GOOGLE(R.string.ai_provider_google, "https://generativelanguage.googleapis.com/v1beta", "gemini-2.0-flash"),
+        ZHIPU(R.string.ai_provider_zhipu, "https://open.bigmodel.cn/api/paas/v4", "glm-4.5"),
+        MOONSHOT(R.string.ai_provider_moonshot, "https://api.moonshot.cn/v1", "moonshot-v1-128k"),
+        ALIYUN(R.string.ai_provider_aliyun, "https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen-max"),
+        BAIDU(R.string.ai_provider_baidu, "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop", "ernie-bot-4"),
+        DOUBAO(R.string.ai_provider_doubao, "https://ark.cn-beijing.volces.com/api/v3", "Doubao-pro-4k"),
+        MISTRAL(R.string.ai_provider_mistral, "https://codestral.mistral.ai/v1", "codestral-latest"),
+        SILICONFLOW(R.string.ai_provider_siliconflow, "https://api.siliconflow.cn/v1", "yi-1.5-34b"),
+        OPENROUTER(R.string.ai_provider_openrouter, "https://openrouter.ai/api/v1", "google/gemini-pro"),
+        LMSTUDIO(R.string.ai_provider_lmstudio, "http://localhost:1234/v1", "meta-llama-3.1-8b-instruct"),
+        CUSTOM(R.string.ai_provider_custom, "", "");
 
         companion object {
             fun fromUrl(url: String): ApiProvider {
@@ -119,12 +155,27 @@ class AICodingViewModel(application: Application) : AndroidViewModel(application
     
     // --- Session Management ---
 
+    private fun isDefaultChatTitle(title: String): Boolean {
+        return title == DEFAULT_CHAT_TITLE_MARKER || title == LEGACY_DEFAULT_CHAT_TITLE
+    }
+
+    private fun isLegacyInitialAssistantMessage(content: String): Boolean {
+        return content == LEGACY_INITIAL_ASSISTANT_MESSAGE
+    }
+
+    private fun shouldIncludeInChatHistory(message: ChatMessage): Boolean {
+        return !message.isError &&
+            message.role != "system" &&
+            message.content != INITIAL_ASSISTANT_MESSAGE_MARKER &&
+            !AICodingLocalizedText.isEncoded(message.content)
+    }
+
     fun createNewSession() {
         val newSession = ChatSession(
             id = UUID.randomUUID().toString(),
-            title = "New Chat",
+            title = DEFAULT_CHAT_TITLE_MARKER,
             messages = listOf(
-                ChatMessage("assistant", "Hello! I am your AI coding assistant. Please configure your API Key in settings to start.")
+                ChatMessage("assistant", INITIAL_ASSISTANT_MESSAGE_MARKER)
             ),
             timestamp = System.currentTimeMillis()
         )
@@ -164,8 +215,8 @@ class AICodingViewModel(application: Application) : AndroidViewModel(application
                 messages = messages.toList(),
                 timestamp = System.currentTimeMillis()
             )
-            // Auto-title based on first user message if title is "New Chat"
-            if (updatedSession.title == "New Chat") {
+            // Auto-title based on first user message if title is still the default one.
+            if (isDefaultChatTitle(updatedSession.title)) {
                 val firstUserMsg = messages.firstOrNull { it.role == "user" }
                 if (firstUserMsg != null) {
                     updatedSession.title = firstUserMsg.content.take(30) + if (firstUserMsg.content.length > 30) "..." else ""
@@ -187,6 +238,7 @@ class AICodingViewModel(application: Application) : AndroidViewModel(application
             val jsonArray = JSONArray(jsonStr)
             
             val loadedSessions = mutableListOf<ChatSession>()
+            var migrated = false
             for (i in 0 until jsonArray.length()) {
                 val sessionObj = jsonArray.getJSONObject(i)
                 val id = sessionObj.getString("id")
@@ -198,19 +250,38 @@ class AICodingViewModel(application: Application) : AndroidViewModel(application
                 for (j in 0 until msgsArray.length()) {
                     val msgObj = msgsArray.getJSONObject(j)
                     val msgId = if (msgObj.has("id")) msgObj.getString("id") else UUID.randomUUID().toString()
+                    val role = msgObj.getString("role")
+                    val content = msgObj.getString("content")
+                    val normalizedContent = when {
+                        role == "assistant" && isLegacyInitialAssistantMessage(content) -> INITIAL_ASSISTANT_MESSAGE_MARKER
+                        else -> AICodingLocalizedText.migrate(getApplication<Application>(), content)
+                    }
+                    if (normalizedContent != content) {
+                        migrated = true
+                    }
                     msgs.add(ChatMessage(
-                        role = msgObj.getString("role"),
-                        content = msgObj.getString("content"),
+                        role = role,
+                        content = normalizedContent,
                         reasoningContent = if (msgObj.has("reasoningContent")) msgObj.getString("reasoningContent") else null,
                         isError = msgObj.optBoolean("isError", false),
                         id = msgId
                     ))
                 }
-                loadedSessions.add(ChatSession(id, title, msgs, timestamp))
+                loadedSessions.add(
+                    ChatSession(
+                        id,
+                        if (isDefaultChatTitle(title)) DEFAULT_CHAT_TITLE_MARKER else title,
+                        msgs,
+                        timestamp
+                    )
+                )
             }
             
             sessions.clear()
             sessions.addAll(loadedSessions.sortedByDescending { it.timestamp })
+            if (migrated) {
+                saveSessions()
+            }
             
         } catch (e: Exception) {
             e.printStackTrace()
@@ -261,12 +332,12 @@ class AICodingViewModel(application: Application) : AndroidViewModel(application
                 .putString("model", model)
         }
             
-        messages.add(ChatMessage("system", "Settings updated."))
+        messages.add(localizedMessage("system", R.string.ai_status_settings_updated))
     }
 
     fun fetchModels() {
         if (apiKey.isBlank()) {
-             messages.add(ChatMessage("assistant", "Please set your API Key first before fetching models.", isError = true))
+             messages.add(localizedMessage("assistant", R.string.ai_error_set_api_key_before_fetch, isError = true))
              return
         }
         
@@ -297,7 +368,7 @@ class AICodingViewModel(application: Application) : AndroidViewModel(application
             for (endpoint in candidates) {
                 try {
                     withContext(Dispatchers.Main) {
-                        messages.add(ChatMessage("system", "Trying to fetch models from: $endpoint"))
+                        messages.add(localizedMessage("system", R.string.ai_status_try_fetch_models_from, endpoint))
                     }
 
                     val request = Request.Builder()
@@ -315,7 +386,7 @@ class AICodingViewModel(application: Application) : AndroidViewModel(application
                     if (!response.isSuccessful) {
                         val errorMsg = response.body.string()
                         response.close()
-                        throw IOException("Failed to fetch models: ${response.code} - $errorMsg")
+                        throw AiLocalizedException(localizedContent(R.string.ai_error_failed_fetch_models_http, response.code, errorMsg))
                     }
                     
                     val responseBody = response.body.string()
@@ -334,17 +405,17 @@ class AICodingViewModel(application: Application) : AndroidViewModel(application
                         if (fetchedModels.isNotEmpty()) {
                             availableModels.clear()
                             availableModels.addAll(fetchedModels)
-                            messages.add(ChatMessage("system", "Successfully fetched ${fetchedModels.size} models."))
+                            messages.add(localizedMessage("system", R.string.ai_status_models_fetched, fetchedModels.size))
                             
                             // Update Base URL if we found a better one (e.g. added /v1)
                             if (endpoint.contains("/v1/models") && !baseUrl.endsWith("/v1")) {
                                 val newBaseUrl = "$currentBaseUrl/v1"
                                 baseUrl = newBaseUrl
                                 prefs.edit { putString("base_url", newBaseUrl) }
-                                messages.add(ChatMessage("system", "Auto-corrected Base URL to: $newBaseUrl"))
+                                messages.add(localizedMessage("system", R.string.ai_status_base_url_autocorrected, newBaseUrl))
                             }
                         } else {
-                             messages.add(ChatMessage("system", "No models found in response."))
+                             messages.add(localizedMessage("system", R.string.ai_status_no_models_in_response))
                         }
                         isFetchingModels = false
                     }
@@ -356,7 +427,13 @@ class AICodingViewModel(application: Application) : AndroidViewModel(application
                     if (endpoint == candidates.last()) {
                         e.printStackTrace()
                         withContext(Dispatchers.Main) {
-                             messages.add(ChatMessage("assistant", "Error fetching models: ${e.message}", isError = true))
+                             messages.add(
+                                 if (e is AiLocalizedException) {
+                                     ChatMessage("assistant", e.localizedContent, isError = true)
+                                 } else {
+                                     localizedMessage("assistant", R.string.ai_error_fetch_models, e.message.orEmpty(), isError = true)
+                                 }
+                             )
                              isFetchingModels = false
                         }
                     }
@@ -367,7 +444,7 @@ class AICodingViewModel(application: Application) : AndroidViewModel(application
                  // Already handled in catch block for the last item, but if loop finished without success (e.g. all 404s)
                  withContext(Dispatchers.Main) {
                      if (availableModels.isEmpty()) {
-                        messages.add(ChatMessage("assistant", "Could not fetch models. Verified endpoints returned 404.", isError = true))
+                        messages.add(localizedMessage("assistant", R.string.ai_error_fetch_models_404, isError = true))
                         isFetchingModels = false
                      }
                  }
@@ -378,7 +455,7 @@ class AICodingViewModel(application: Application) : AndroidViewModel(application
     fun sendMessage(text: String) {
         if (text.isBlank()) return
         if (apiKey.isBlank()) {
-            messages.add(ChatMessage("assistant", "Please set your API Key first.", isError = true))
+            messages.add(localizedMessage("assistant", R.string.ai_error_set_api_key_first, isError = true))
             return
         }
 
@@ -397,7 +474,13 @@ class AICodingViewModel(application: Application) : AndroidViewModel(application
             } catch (e: Exception) {
                 e.printStackTrace()
                 withContext(Dispatchers.Main) {
-                    messages.add(ChatMessage("assistant", "Error: ${e.message}", isError = true))
+                    messages.add(
+                        if (e is AiLocalizedException) {
+                            ChatMessage("assistant", e.localizedContent, isError = true)
+                        } else {
+                            localizedMessage("assistant", R.string.ai_error_chat, e.message.orEmpty(), isError = true)
+                        }
+                    )
                     isLoading = false
                     updateCurrentSession()
                 }
@@ -407,7 +490,7 @@ class AICodingViewModel(application: Application) : AndroidViewModel(application
     
     fun clearChat() {
         messages.clear()
-        messages.add(ChatMessage("assistant", "Chat history cleared."))
+        messages.add(localizedMessage("assistant", R.string.ai_status_chat_history_cleared))
         updateCurrentSession()
     }
 
@@ -419,15 +502,15 @@ class AICodingViewModel(application: Application) : AndroidViewModel(application
         // Add system prompt
         val systemMessage = JSONObject()
         systemMessage.put("role", "system")
-        systemMessage.put("content", "You are a helpful expert coding assistant inside an Android IDE. Be concise and provide code snippets when asked.")
+        systemMessage.put("content", string(R.string.ai_system_prompt))
         messagesArray.put(systemMessage)
 
         // Add history (limit to last 10 messages to save tokens/context)
-        val historyToInclude = messages.takeLast(10).filter { !it.isError && it.role != "system" }
+        val historyToInclude = messages.takeLast(10).filter(::shouldIncludeInChatHistory)
         for (msg in historyToInclude) {
             val msgObj = JSONObject()
             msgObj.put("role", msg.role)
-            msgObj.put("content", msg.content)
+            msgObj.put("content", resolveContent(msg.content))
             messagesArray.put(msgObj)
         }
         
@@ -467,7 +550,7 @@ class AICodingViewModel(application: Application) : AndroidViewModel(application
                 response.use { 
                     if (!it.isSuccessful) {
                         val errorBody = it.body.string()
-                        throw IOException("API Call failed: ${it.code} - $errorBody")
+                        throw AiLocalizedException(localizedContent(R.string.ai_error_api_call_failed, it.code, errorBody))
                     }
 
                     val responseBody = it.body.string()
@@ -493,7 +576,7 @@ class AICodingViewModel(application: Application) : AndroidViewModel(application
                         
                         return Pair(content, if (reasoning.isNullOrBlank()) null else reasoning)
                     }
-                    return Pair("No response content.", null)
+                    return Pair(localizedContent(R.string.ai_error_no_response_content), null)
                 }
             } catch (e: Exception) {
                 lastError = e
@@ -503,6 +586,6 @@ class AICodingViewModel(application: Application) : AndroidViewModel(application
             }
         }
         
-        throw lastError ?: IOException("Failed to connect to API")
+        throw lastError ?: AiLocalizedException(localizedContent(R.string.ai_error_failed_connect_api))
     }
 }

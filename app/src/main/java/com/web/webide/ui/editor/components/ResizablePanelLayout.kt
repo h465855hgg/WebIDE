@@ -28,6 +28,7 @@ package com.web.webide.ui.editor.components
 
 import android.annotation.SuppressLint
 import android.content.Context
+import androidx.annotation.StringRes
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
@@ -60,6 +61,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.lazy.LazyColumn
@@ -73,12 +75,13 @@ import java.util.Locale
 import com.web.webide.ui.editor.viewmodel.CodeEditorState
 import com.web.webide.ui.editor.viewmodel.EditorViewModel
 import com.web.webide.ui.editor.viewmodel.MediaEditorState
+import com.web.webide.R
 import org.eclipse.lsp4j.Diagnostic
 import org.eclipse.lsp4j.DiagnosticSeverity
 
-enum class PanelPage(val title: String) {
-    BUILD_LOG("构建"),
-    DIAGNOSTICS("问题"),
+enum class PanelPage(@StringRes val titleRes: Int) {
+    BUILD_LOG(R.string.panel_build),
+    DIAGNOSTICS(R.string.panel_diagnostics),
 }
 
 @SuppressLint("FrequentlyChangingValue")
@@ -176,7 +179,7 @@ fun EditorPanelLayout(
                     divider = { },
                     tabs = {
                         tabs.forEachIndexed { index, page ->
-                            Tab(selected = selectedTabIndex == index, onClick = { selectedTabIndex = index }, text = { Text(page.title) }, enabled = contentAlpha > 0.5f)
+                            Tab(selected = selectedTabIndex == index, onClick = { selectedTabIndex = index }, text = { Text(stringResource(page.titleRes)) }, enabled = contentAlpha > 0.5f)
                         }
                     }
                 )
@@ -199,7 +202,7 @@ fun DiagnosticsPanel(viewModel: EditorViewModel) {
 
     if (diagnostics.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("暂无问题", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.panel_no_diagnostics), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     } else {
         LazyColumn(
@@ -283,7 +286,11 @@ private fun PanelTopBar(
                 val lspConnected = if (activeTab is CodeEditorState) activeTab.lspEditor != null else false
 
                 Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(if (lspConnected) Color(0xFF4CAF50) else Color(0xFFF44336)))
-                Text(text = if (lspConnected) "LSP Success" else "LSP Error", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    text = stringResource(if (lspConnected) R.string.panel_lsp_success else R.string.panel_lsp_error),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
 
@@ -302,7 +309,11 @@ private fun PanelTopBar(
                     kotlinx.coroutines.delay(100)
                 }
             }
-            Text(text = "Ln ${cursorPosition.first}, Col ${cursorPosition.second}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                text = stringResource(R.string.panel_cursor_position, cursorPosition.first, cursorPosition.second),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
@@ -355,7 +366,7 @@ fun BuildLogPanel() {
 
     if (logs.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("暂无构建日志", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.panel_no_build_logs), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     } else {
         LazyColumn(

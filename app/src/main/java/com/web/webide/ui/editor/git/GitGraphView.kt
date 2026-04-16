@@ -20,6 +20,7 @@ package com.web.webide.ui.editor.git
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import com.web.webide.R
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -43,7 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import java.text.SimpleDateFormat
+import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.max
@@ -217,7 +218,7 @@ fun GitLogItemAligned(commit: GitCommitUI) {
                 Spacer(Modifier.width(4.dp))
 
                 Text(
-                    text = getRelativeTimeShort(commit.time),
+                    text = getRelativeTimeShort(context, commit.time),
                     style = MaterialTheme.typography.labelSmall,
                     fontSize = 10.sp,
                     color = MaterialTheme.colorScheme.outline
@@ -231,7 +232,7 @@ fun GitLogItemAligned(commit: GitCommitUI) {
                         Icons.Default.ContentCopy, null,
                         Modifier.size(12.dp).clickable {
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            val clip = ClipData.newPlainText("Hash", commit.hash)
+                            val clip = ClipData.newPlainText(context.getString(R.string.git_clipboard_hash_label), commit.hash)
                             clipboard.setPrimaryClip(clip)
                         },
                         tint = MaterialTheme.colorScheme.outline
@@ -277,7 +278,7 @@ fun GitRefChipNano(ref: GitRefUI) {
     }
 }
 
-fun getRelativeTimeShort(timeMs: Long): String {
+private fun getRelativeTimeShort(context: Context, timeMs: Long): String {
     val now = System.currentTimeMillis()
     val diff = now - timeMs
     val minutes = diff / 60000
@@ -285,10 +286,10 @@ fun getRelativeTimeShort(timeMs: Long): String {
     val days = hours / 24
 
     return when {
-        minutes < 1 -> "now"
-        minutes < 60 -> "${minutes}m"
-        hours < 24 -> "${hours}h"
-        days < 30 -> "${days}d"
-        else -> SimpleDateFormat("MM/dd", Locale.getDefault()).format(Date(timeMs))
+        minutes < 1 -> context.getString(R.string.git_time_now)
+        minutes < 60 -> context.getString(R.string.git_time_minutes_short, minutes)
+        hours < 24 -> context.getString(R.string.git_time_hours_short, hours)
+        days < 30 -> context.getString(R.string.git_time_days_short, days)
+        else -> DateFormat.getDateInstance(DateFormat.SHORT, Locale.getDefault()).format(Date(timeMs))
     }
 }

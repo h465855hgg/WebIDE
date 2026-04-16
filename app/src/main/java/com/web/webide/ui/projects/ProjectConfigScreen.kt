@@ -45,6 +45,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -60,6 +61,7 @@ import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
 import androidx.core.net.toUri
+import com.web.webide.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -275,10 +277,10 @@ fun ProjectConfigScreen(
                         navController.popBackStack()
                     }
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                        e.printStackTrace()
                     withContext(Dispatchers.Main) {
                         isLoading = false
-                        snackbarHostState.showSnackbar("保存失败: ${e.message}")
+                        snackbarHostState.showSnackbar(context.getString(R.string.project_config_save_failed, e.message))
                     }
                 }
             }
@@ -306,10 +308,10 @@ fun ProjectConfigScreen(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("项目配置", fontSize = 18.sp, fontWeight = FontWeight.Medium) },
+                title = { Text(stringResource(R.string.project_config_title), fontSize = 18.sp, fontWeight = FontWeight.Medium) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back))
                     }
                 },
                 actions = {
@@ -317,7 +319,7 @@ fun ProjectConfigScreen(
                         if (isLoading) {
                             CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                         } else {
-                            Icon(Icons.Default.Save, "保存")
+                            Icon(Icons.Default.Save, stringResource(R.string.action_save))
                         }
                     }
                 },
@@ -337,36 +339,36 @@ fun ProjectConfigScreen(
             Spacer(modifier = Modifier.height(10.dp))
             
             // --- Basic Info ---
-            ConfigSectionTitle("App Info")
-            CleanTextField(appName, { appName = it }, "应用名称 (App Name)",
+            ConfigSectionTitle(stringResource(R.string.new_project_app_info))
+            CleanTextField(appName, { appName = it }, stringResource(R.string.project_config_app_name),
                 Icons.AutoMirrored.Outlined.Label
             )
             Spacer(Modifier.height(16.dp))
-            CleanTextField(packageName, { packageName = it }, "包名 (Package)", Icons.Outlined.Info, keyboardType = KeyboardType.Ascii)
+            CleanTextField(packageName, { packageName = it }, stringResource(R.string.new_project_package_name), Icons.Outlined.Info, keyboardType = KeyboardType.Ascii)
             Spacer(Modifier.height(16.dp))
             
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                CleanTextField(versionName, { versionName = it }, "Ver Name", null, isSmall = true, modifier = Modifier.weight(1f))
-                CleanTextField(versionCode, { versionCode = it }, "Ver Code", null, isSmall = true, modifier = Modifier.weight(1f), keyboardType = KeyboardType.Number)
+                CleanTextField(versionName, { versionName = it }, stringResource(R.string.new_project_version_name), null, isSmall = true, modifier = Modifier.weight(1f))
+                CleanTextField(versionCode, { versionCode = it }, stringResource(R.string.new_project_version_code), null, isSmall = true, modifier = Modifier.weight(1f), keyboardType = KeyboardType.Number)
             }
             
             Spacer(Modifier.height(16.dp))
-            CleanTextField(targetUrl, { targetUrl = it }, "目标 URL", Icons.Outlined.Link, keyboardType = KeyboardType.Uri)
+            CleanTextField(targetUrl, { targetUrl = it }, stringResource(R.string.project_config_target_url), Icons.Outlined.Link, keyboardType = KeyboardType.Uri)
             
             Spacer(Modifier.height(16.dp))
-            FileSelectorRow("应用图标", iconPath, { iconPickerLauncher.launch("image/*") }, icon = Icons.Outlined.Image)
+            FileSelectorRow(stringResource(R.string.new_project_app_icon), iconPath, { iconPickerLauncher.launch("image/*") }, icon = Icons.Outlined.Image)
             
             Spacer(Modifier.height(8.dp))
-            SwitchRow("资源加密 (HTML/JS/CSS)", encryptionEnabled) { encryptionEnabled = it }
+            SwitchRow(stringResource(R.string.new_project_resource_encryption), encryptionEnabled) { encryptionEnabled = it }
 
             // --- Display ---
-            ConfigSectionTitle("Display & Theme")
+            ConfigSectionTitle(stringResource(R.string.new_project_display_theme))
             
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
             ) {
-                Text("屏幕方向", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.new_project_screen_orientation), style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.width(16.dp))
                 Box(Modifier.weight(1f)) {
                     AnimatedOrientationSelector(
@@ -377,15 +379,15 @@ fun ProjectConfigScreen(
             }
             
             Spacer(Modifier.height(4.dp))
-            SwitchRow("全屏模式", isFullscreen) { isFullscreen = it }
-            SwitchRow("Webview 缩放", zoomEnabled) { zoomEnabled = it }
+            SwitchRow(stringResource(R.string.new_project_fullscreen), isFullscreen) { isFullscreen = it }
+            SwitchRow(stringResource(R.string.new_project_webview_zoom), zoomEnabled) { zoomEnabled = it }
             
             Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CleanTextField(
                     value = statusBarColor,
                     onValueChange = { statusBarColor = it },
-                    placeholder = "状态栏颜色 (#Hex)",
+                    placeholder = stringResource(R.string.new_project_status_bar_color),
                     icon = Icons.Outlined.Palette,
                     isSmall = true,
                     modifier = Modifier.weight(1f)
@@ -402,11 +404,11 @@ fun ProjectConfigScreen(
             }
             
             Spacer(Modifier.height(8.dp))
-            SwitchRow("深色状态栏文字", isDarkStatusText) { isDarkStatusText = it }
+            SwitchRow(stringResource(R.string.new_project_dark_status_bar_text), isDarkStatusText) { isDarkStatusText = it }
 
             // --- Signing ---
-            ConfigSectionTitle("Signing")
-            SwitchRow("启用自定义签名", enableSigning) { enableSigning = it }
+            ConfigSectionTitle(stringResource(R.string.new_project_signing))
+            SwitchRow(stringResource(R.string.new_project_enable_signing), enableSigning) { enableSigning = it }
 
             AnimatedVisibility(
                 visible = enableSigning,
@@ -415,13 +417,13 @@ fun ProjectConfigScreen(
             ) {
                 Column {
                     Spacer(Modifier.height(8.dp))
-                    FileSelectorRow("Keystore 文件", keystorePath, { keystorePickerLauncher.launch("*/*") })
+                    FileSelectorRow(stringResource(R.string.new_project_keystore_file), keystorePath, { keystorePickerLauncher.launch("*/*") })
                     Spacer(Modifier.height(16.dp))
-                    CleanTextField(keystoreAlias, { keystoreAlias = it }, "Alias", Icons.Outlined.Badge, isSmall = true)
+                    CleanTextField(keystoreAlias, { keystoreAlias = it }, stringResource(R.string.new_project_alias), Icons.Outlined.Badge, isSmall = true)
                     Spacer(Modifier.height(16.dp))
-                    CleanTextField(storePassword, { storePassword = it }, "Store Password", Icons.Outlined.Lock, isSmall = true, isPassword = true)
+                    CleanTextField(storePassword, { storePassword = it }, stringResource(R.string.new_project_store_password), Icons.Outlined.Lock, isSmall = true, isPassword = true)
                     Spacer(Modifier.height(16.dp))
-                    CleanTextField(keyPassword, { keyPassword = it }, "Key Password", Icons.Outlined.VpnKey, isSmall = true, isPassword = true)
+                    CleanTextField(keyPassword, { keyPassword = it }, stringResource(R.string.new_project_key_password), Icons.Outlined.VpnKey, isSmall = true, isPassword = true)
                 }
             }
             

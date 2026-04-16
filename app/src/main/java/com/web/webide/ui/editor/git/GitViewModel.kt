@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.web.webide.R
 import kotlinx.coroutines.launch
 import org.eclipse.jgit.revwalk.RevCommit
 import androidx.core.content.edit
@@ -45,6 +46,7 @@ class GitViewModel(application: Application) : AndroidViewModel(application) {
 
     private var gitManager: GitManager? = null
     var testConnectionResult by mutableStateOf<String?>(null)
+    var testConnectionSuccess by mutableStateOf<Boolean?>(null)
     var isTestingConnection by mutableStateOf(false)
     private val laneColors = listOf(
         Color(0xFFFF5252), Color(0xFF40C4FF), Color(0xFFE040FB),
@@ -67,14 +69,30 @@ class GitViewModel(application: Application) : AndroidViewModel(application) {
     ) {
         viewModelScope.launch {
             isTestingConnection = true
-            testConnectionResult = "正在连接..."
+            testConnectionSuccess = null
+            testConnectionResult = getApplication<Application>().getString(R.string.status_connecting)
 
             val tempAuth = GitAuth(authType, username, token, privateKey, passphrase)
             // 如果 manager 为空，临时创建一个（针对还没 init 的情况）
             val manager = gitManager ?: GitManager(getApplication<Application>().filesDir.absolutePath)
 
             val result = manager.testConnectivity(url, tempAuth)
-            testConnectionResult = result
+            testConnectionSuccess = result.isSuccess
+            testConnectionResult = if (result.isSuccess) {
+                getApplication<Application>().getString(R.string.git_test_success_refs, result.refsCount)
+            } else {
+                when (result.error) {
+                    GitConnectivityError.AUTH_FAILED -> getApplication<Application>().getString(R.string.git_auth_failed_token)
+                    GitConnectivityError.REPO_NOT_FOUND -> getApplication<Application>().getString(R.string.git_repo_not_found)
+                    GitConnectivityError.TIMEOUT -> getApplication<Application>().getString(R.string.git_connection_timeout)
+                    GitConnectivityError.UNKNOWN_HOST -> getApplication<Application>().getString(R.string.git_connection_unknown_host)
+                    GitConnectivityError.SSH_ENV_FAILED -> getApplication<Application>().getString(R.string.git_connection_ssh_env_failed)
+                    else -> getApplication<Application>().getString(
+                        R.string.git_connection_failed,
+                        result.rawMessage.orEmpty()
+                    )
+                }
+            }
             isTestingConnection = false
         }
     }
@@ -129,7 +147,7 @@ class GitViewModel(application: Application) : AndroidViewModel(application) {
                 putString("private_key", privateKey)
                 putString("passphrase", passphrase)
             }
-            statusMessage = "配置已保存"
+            statusMessage = getApplication<Application>().getString(R.string.git_status_config_saved)
         }
     }
 
@@ -242,10 +260,10 @@ class GitViewModel(application: Application) : AndroidViewModel(application) {
                 val author = savedAuth?.username?.ifEmpty { "AndroidUser" } ?: "AndroidUser"
                 val email = userEmail.ifEmpty { "user@ide.com" }
                 gitManager?.commitAll(msg, author, email)
-                if (pushAfter) push() else statusMessage = "提交成功"
+                if (pushAfter) push() else statusMessage = getApplication<Application>().getString(R.string.git_status_commit_success)
                 refreshAll()
             } catch (e: Exception) {
-                statusMessage = "操作失败: ${e.message}"
+                statusMessage = getApplication<Application>().getString(R.string.git_status_operation_failed, e.message)
             } finally { isLoading = false }
         }
     }
@@ -254,11 +272,11 @@ class GitViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             isLoading = true
             try {
-                val auth = savedAuth ?: throw Exception("未配置账号")
+                val auth = savedAuth ?: throw Exception(getApplication<Application>().getString(R.string.git_error_account_not_configured))
                 gitManager?.push(auth)
-                statusMessage = "推送成功"
+                statusMessage = getApplication<Application>().getString(R.string.git_status_push_success)
             } catch (e: Exception) {
-                statusMessage = "推送失败: ${e.message}"
+                statusMessage = getApplication<Application>().getString(R.string.git_status_push_failed, e.message)
                 e.printStackTrace()
             } finally { isLoading = false }
         }
@@ -270,12 +288,12 @@ class GitViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             isLoading = true
             try {
-                val auth = savedAuth ?: throw Exception("未配置账号")
+                val auth = savedAuth ?: throw Exception(getApplication<Application>().getString(R.string.git_error_account_not_configured))
                 if (rebase) gitManager?.pullRebase(auth) else gitManager?.pull(auth)
-                statusMessage = "更新成功"
+                statusMessage = getApplication<Application>().getString(R.string.git_status_update_success)
                 refreshAll()
             } catch (e: Exception) {
-                statusMessage = "更新失败: ${e.message}"
+                statusMessage = getApplication<Application>().getString(R.string.git_status_update_failed, e.message)
             } finally { isLoading = false }
         }
     }
@@ -285,9 +303,9 @@ class GitViewModel(application: Application) : AndroidViewModel(application) {
             isLoading = true
             try {
                 gitManager?.createBranch(name)
-                statusMessage = "分支 $name 创建并切换成功"
+                statusMessage = getApplication<Application>().getString(R.string.git_status_branch_created, name)
                 refreshAll()
-            } catch (e: Exception) { statusMessage = "创建分支失败: ${e.message}" }
+            } catch (e: Exception) { statusMessage = getApplication<Application>().getString(R.string.git_status_branch_create_failed, e.message) }
             finally { isLoading = false }
         }
     }
@@ -297,9 +315,9 @@ class GitViewModel(application: Application) : AndroidViewModel(application) {
             isLoading = true
             try {
                 gitManager?.createTag(name, msg)
-                statusMessage = "标签 $name 创建成功"
+                statusMessage = getApplication<Application>().getString(R.string.git_status_tag_created, name)
                 refreshAll()
-            } catch (e: Exception) { statusMessage = "创建标签失败: ${e.message}" }
+            } catch (e: Exception) { statusMessage = getApplication<Application>().getString(R.string.git_status_tag_create_failed, e.message) }
             finally { isLoading = false }
         }
     }
@@ -309,9 +327,9 @@ class GitViewModel(application: Application) : AndroidViewModel(application) {
             isLoading = true
             try {
                 gitManager?.checkout(name)
-                statusMessage = "切换到 $name"
+                statusMessage = getApplication<Application>().getString(R.string.git_status_checked_out, name)
                 refreshAll()
-            } catch (e: Exception) { statusMessage = "切换失败: ${e.message}" }
+            } catch (e: Exception) { statusMessage = getApplication<Application>().getString(R.string.git_status_checkout_failed, e.message) }
             finally { isLoading = false }
         }
     }

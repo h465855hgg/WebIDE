@@ -29,9 +29,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.web.webide.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,7 +65,7 @@ fun JumpLinePanel(
                     }
                 },
                 modifier = Modifier.weight(1f),
-                placeholder = { Text("输入行号...", style = MaterialTheme.typography.bodyMedium) },
+                placeholder = { Text(stringResource(R.string.jump_line_placeholder), style = MaterialTheme.typography.bodyMedium) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Number,
@@ -82,7 +84,7 @@ fun JumpLinePanel(
             )
 
             IconButton(onClick = onClose) {
-                Icon(Icons.Default.Close, "关闭", modifier = Modifier.size(20.dp))
+                Icon(Icons.Default.Close, stringResource(R.string.action_close), modifier = Modifier.size(20.dp))
             }
         }
     }

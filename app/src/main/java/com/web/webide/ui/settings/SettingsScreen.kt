@@ -22,6 +22,7 @@ package com.web.webide.ui.settings
 import android.content.Context
 import android.os.Build
 import android.widget.Toast
+import androidx.annotation.StringRes
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
@@ -48,12 +49,16 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
 import androidx.navigation.NavController
+import com.web.webide.R
+import com.web.webide.core.utils.AppLanguageManager
+import com.web.webide.core.utils.AppLanguageOption
 import com.web.webide.core.utils.LogConfigState
 import com.web.webide.core.utils.ThemeState
 import com.web.webide.core.utils.WorkspaceManager
@@ -63,12 +68,12 @@ import com.web.webide.ui.components.ColorPickerDialog
 import com.web.webide.ui.welcome.themeColors
 
 // 自动保存选项枚举
-enum class AutoSaveOption(val label: String, val interval: Long) {
-    OFF("关闭", 0L),
-    SEC_30("每 30 秒", 30_000L),
-    MIN_1("每 1 分钟", 60_000L),
-    MIN_5("每 5 分钟", 300_000L),
-    MIN_10("每 10 分钟", 600_000L)
+enum class AutoSaveOption(@StringRes val labelRes: Int, val interval: Long) {
+    OFF(R.string.auto_save_off, 0L),
+    SEC_30(R.string.auto_save_30_seconds, 30_000L),
+    MIN_1(R.string.auto_save_1_minute, 60_000L),
+    MIN_5(R.string.auto_save_5_minutes, 300_000L),
+    MIN_10(R.string.auto_save_10_minutes, 600_000L)
 }
 
 // 扩展函数解决 luminance 报错
@@ -76,13 +81,7 @@ fun Color.luminance(): Float {
     return 0.2126f * this.red + 0.7152f * this.green + 0.0722f * this.blue
 }
 
-private val PRESET_FONTS = listOf(
-    "默认字体" to "",
-    "JetBrains Mono" to "ttf/JetBrainsMono-Regular.ttf",
-    "Roboto Mono" to "ttf/RobotoMono-Regular.ttf",
-    "Source Code Pro" to "ttf/SourceCodePro-Regular.ttf",
-    "Comic Sans" to "ttf/Comic-Sans-MS-Regular-2.ttf"
-)
+private data class FontPresetOption(val label: String, val file: String)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -144,14 +143,16 @@ fun SettingsScreen(
     var showFileSelector by remember { mutableStateOf(false) }
     var showLogPathSelector by remember { mutableStateOf(false) }
     var showColorPicker by remember { mutableStateOf(false) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
+    val currentLanguageOption by AppLanguageManager.currentOption.collectAsState()
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("设置", fontWeight = FontWeight.SemiBold) },
+                title = { Text(stringResource(R.string.settings_title), fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -202,7 +203,7 @@ fun SettingsScreen(
 
             item {
                 Text(
-                    text = "常规",
+                    text = stringResource(R.string.settings_general),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(start = 4.dp, top = 8.dp)
@@ -210,18 +211,31 @@ fun SettingsScreen(
             }
             // 🔥 新增：自动保存设置入口
             item {
+                SimpleSettingsCard(
+                    icon = Icons.Outlined.Language,
+                    title = stringResource(R.string.settings_language_title),
+                    subtitle = stringResource(currentLanguageOption.labelRes),
+                    onClick = { showLanguageDialog = true }
+                )
+            }
+            item {
                 val currentOption = AutoSaveOption.entries.find { it.interval == autoSaveInterval } ?: AutoSaveOption.OFF
+                val currentOptionLabel = stringResource(currentOption.labelRes)
                 SimpleSettingsCard(
                     icon = Icons.Outlined.SaveAs, // 需要确保有此图标，如果没有可以使用 Icons.Default.Save
-                    title = "自动保存与备份",
-                    subtitle = if (currentOption == AutoSaveOption.OFF) "已关闭" else "频率: ${currentOption.label}",
+                    title = stringResource(R.string.settings_auto_save_backup_title),
+                    subtitle = if (currentOption == AutoSaveOption.OFF) {
+                        stringResource(R.string.status_disabled)
+                    } else {
+                        stringResource(R.string.settings_auto_save_frequency, currentOptionLabel)
+                    },
                     onClick = { showAutoSaveDialog = true }
                 )
             }
             item {
                 SimpleSettingsCard(
                     icon = Icons.Outlined.Folder,
-                    title = "工作目录",
+                    title = stringResource(R.string.settings_workspace_title),
                     subtitle = selectedWorkspace,
                     onClick = { showFileSelector = true }
                 )
@@ -238,8 +252,8 @@ fun SettingsScreen(
             item {
                 SimpleSettingsCard(
                     icon = Icons.Outlined.WavingHand,
-                    title = "欢迎页",
-                    subtitle = "查看功能介绍",
+                    title = stringResource(R.string.settings_welcome_title),
+                    subtitle = stringResource(R.string.settings_welcome_subtitle),
                     onClick = { navController.safeNavigate("welcome") }
                 )
             }
@@ -247,8 +261,8 @@ fun SettingsScreen(
             item {
                 SimpleSettingsCard(
                     icon = Icons.Outlined.Info,
-                    title = "关于",
-                    subtitle = "版本信息与介绍",
+                    title = stringResource(R.string.about_title),
+                    subtitle = stringResource(R.string.settings_about_subtitle),
                     onClick = { navController.safeNavigate("about") }
                 )
             }
@@ -265,7 +279,7 @@ fun SettingsScreen(
                 selectedWorkspace = path
                 WorkspaceManager.saveWorkspacePath(context, path)
                 showFileSelector = false
-                Toast.makeText(context, "工作目录已更新", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.toast_workspace_updated), Toast.LENGTH_SHORT).show()
             },
             onDismissRequest = { showFileSelector = false }
         )
@@ -277,53 +291,64 @@ fun SettingsScreen(
             onPathSelected = { path ->
                 onLogConfigChange(logConfigState.isLogEnabled, path)
                 showLogPathSelector = false
-                Toast.makeText(context, "日志路径已更新", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.toast_log_path_updated), Toast.LENGTH_SHORT).show()
             },
             onDismissRequest = { showLogPathSelector = false }
         )
     }
     if (showAutoSaveDialog) {
+        AutoSaveDialog(
+            selectedInterval = autoSaveInterval,
+            onDismiss = { showAutoSaveDialog = false },
+            onOptionSelected = { option, toastMessage ->
+                autoSaveInterval = option.interval
+                generalPrefs.edit { putLong("auto_save_interval", option.interval) }
+                showAutoSaveDialog = false
+                Toast.makeText(context, toastMessage, Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    if (showLanguageDialog) {
         AlertDialog(
-            onDismissRequest = { showAutoSaveDialog = false },
-            title = { Text("自动保存频率") },
+            onDismissRequest = { showLanguageDialog = false },
+            title = { Text(stringResource(R.string.settings_language_dialog_title)) },
             text = {
                 Column {
                     Text(
-                        "开启后，系统将定时保存所有打开的文件，并在后台将项目打包备份至私有目录（保留最近5份）。",
+                        text = stringResource(R.string.settings_language_dialog_description),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(16.dp))
-                    AutoSaveOption.entries.forEach { option ->
+                    AppLanguageOption.entries.forEach { option ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    // 1. 更新状态
-                                    autoSaveInterval = option.interval
-                                    // 2. 写入 SharedPreferences
-                                    generalPrefs.edit { putLong("auto_save_interval", option.interval) }
-                                    // 3. 关闭弹窗
-                                    showAutoSaveDialog = false
-                                    // 4. 提示
-                                    val msg = if (option == AutoSaveOption.OFF) "自动保存已关闭" else "已设为 ${option.label} 自动保存"
-                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                    showLanguageDialog = false
+                                    AppLanguageManager.updateLanguage(context, option)
                                 }
                                 .padding(vertical = 12.dp)
                         ) {
                             RadioButton(
-                                selected = (option.interval == autoSaveInterval),
-                                onClick = null // 点击 Row 触发
+                                selected = option == currentLanguageOption,
+                                onClick = null
                             )
                             Spacer(Modifier.width(8.dp))
-                            Text(option.label, style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                text = stringResource(option.labelRes),
+                                style = MaterialTheme.typography.bodyLarge
+                            )
                         }
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showAutoSaveDialog = false }) { Text("取消") }
+                TextButton(onClick = { showLanguageDialog = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
             }
         )
     }
@@ -341,6 +366,69 @@ fun SettingsScreen(
 }
 
 // ================= 编辑器设置组件 (重构优化版) =================
+@Composable
+private fun AutoSaveDialog(
+    selectedInterval: Long,
+    onDismiss: () -> Unit,
+    onOptionSelected: (AutoSaveOption, String) -> Unit
+) {
+    val optionLabels = mapOf(
+        AutoSaveOption.OFF to stringResource(R.string.auto_save_off),
+        AutoSaveOption.SEC_30 to stringResource(R.string.auto_save_30_seconds),
+        AutoSaveOption.MIN_1 to stringResource(R.string.auto_save_1_minute),
+        AutoSaveOption.MIN_5 to stringResource(R.string.auto_save_5_minutes),
+        AutoSaveOption.MIN_10 to stringResource(R.string.auto_save_10_minutes)
+    )
+    val optionToastMessages = mapOf(
+        AutoSaveOption.OFF to stringResource(R.string.toast_auto_save_disabled),
+        AutoSaveOption.SEC_30 to stringResource(R.string.toast_auto_save_set, optionLabels.getValue(AutoSaveOption.SEC_30)),
+        AutoSaveOption.MIN_1 to stringResource(R.string.toast_auto_save_set, optionLabels.getValue(AutoSaveOption.MIN_1)),
+        AutoSaveOption.MIN_5 to stringResource(R.string.toast_auto_save_set, optionLabels.getValue(AutoSaveOption.MIN_5)),
+        AutoSaveOption.MIN_10 to stringResource(R.string.toast_auto_save_set, optionLabels.getValue(AutoSaveOption.MIN_10))
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.settings_auto_save_dialog_title)) },
+        text = {
+            Column {
+                Text(
+                    text = stringResource(R.string.settings_auto_save_dialog_description),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(16.dp))
+                AutoSaveOption.entries.forEach { option ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                onOptionSelected(option, optionToastMessages.getValue(option))
+                            }
+                            .padding(vertical = 12.dp)
+                    ) {
+                        RadioButton(
+                            selected = option.interval == selectedInterval,
+                            onClick = null
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = optionLabels.getValue(option),
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        }
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditorSettingsItem(
@@ -371,6 +459,13 @@ fun EditorSettingsItem(
     val snappyEasing = LinearOutSlowInEasing
 
     var isFontDropdownExpanded by remember { mutableStateOf(false) }
+    val fontPresetOptions = listOf(
+        FontPresetOption(stringResource(R.string.font_default), ""),
+        FontPresetOption(stringResource(R.string.font_jetbrains_mono), "ttf/JetBrainsMono-Regular.ttf"),
+        FontPresetOption(stringResource(R.string.font_roboto_mono), "ttf/RobotoMono-Regular.ttf"),
+        FontPresetOption(stringResource(R.string.font_source_code_pro), "ttf/SourceCodePro-Regular.ttf"),
+        FontPresetOption(stringResource(R.string.font_comic_sans), "ttf/Comic-Sans-MS-Regular-2.ttf")
+    )
 
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
@@ -397,7 +492,7 @@ fun EditorSettingsItem(
                 Spacer(modifier = Modifier.width(16.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "编辑器配置",
+                        text = stringResource(R.string.settings_editor_title),
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                     )
                     AnimatedVisibility(
@@ -405,9 +500,13 @@ fun EditorSettingsItem(
                         enter = fadeIn(tween(textFadeDuration)) + expandVertically(tween(textFadeDuration), expandFrom = Alignment.Top),
                         exit = fadeOut(tween(textFadeDuration)) + shrinkVertically(tween(textFadeDuration), shrinkTowards = Alignment.Top)
                     ) {
-                        val displayFont = if(fontPath.isBlank()) "系统默认" else fontPath.substringAfterLast("/")
+                        val displayFont = if (fontPath.isBlank()) {
+                            stringResource(R.string.font_system_default)
+                        } else {
+                            fontPath.substringAfterLast("/")
+                        }
                         Text(
-                            text = "${tabWidth}空格缩进 · $displayFont",
+                            text = stringResource(R.string.settings_editor_summary, tabWidth, displayFont),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 2.dp),
@@ -438,13 +537,13 @@ fun EditorSettingsItem(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    Text("智能辅助", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                    CompactSwitchRow("AI 编程助手", isAiEnabled, onIsAiEnabledChange)
-                    CompactSwitchRow("LSP 代码补全", lspEnabled, onLspEnabledChange)
+                    Text(stringResource(R.string.settings_assistance), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    CompactSwitchRow(stringResource(R.string.settings_ai_assistant), isAiEnabled, onIsAiEnabledChange)
+                    CompactSwitchRow(stringResource(R.string.settings_lsp_completion), lspEnabled, onLspEnabledChange)
                     Spacer(modifier = Modifier.height(24.dp))
 
                     // === 1. 缩进设置 (Segmented Style) ===
-                    Text("缩进宽度", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.settings_indent_width), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Row(
@@ -478,7 +577,7 @@ fun EditorSettingsItem(
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Text(
-                                        text = "$option 空格",
+                                        text = stringResource(R.string.settings_spaces_format, option),
                                         style = MaterialTheme.typography.labelMedium, // 使用较小的字号
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                     )
@@ -490,7 +589,7 @@ fun EditorSettingsItem(
                     Spacer(modifier = Modifier.height(24.dp))
 
                     // === 2. 字体设置 (Combo Box 模式) ===
-                    Text("编辑器字体", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.settings_editor_font), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.height(8.dp))
 
                     // Box 容器用于定位 DropdownMenu
@@ -499,11 +598,11 @@ fun EditorSettingsItem(
                             value = fontPath,
                             onValueChange = onFontPathChange, // 允许直接输入
                             modifier = Modifier.fillMaxWidth(), // 不使用 menuAnchor，防止输入框点击触发 Menu
-                            label = { Text("请输入...") },
+                            label = { Text(stringResource(R.string.settings_input_hint)) },
                             singleLine = true,
                             trailingIcon = {
                                 IconButton(onClick = { isFontDropdownExpanded = !isFontDropdownExpanded }) {
-                                    Icon(Icons.Filled.ArrowDropDown, "选择预设")
+                                    Icon(Icons.Filled.ArrowDropDown, stringResource(R.string.settings_select_preset))
                                 }
                             }
                         )
@@ -515,18 +614,18 @@ fun EditorSettingsItem(
                             offset = DpOffset(0.dp, 0.dp),
                             modifier = Modifier.fillMaxWidth(0.9f) // 稍微调整宽度适应
                         ) {
-                            PRESET_FONTS.forEach { (name, file) ->
+                            fontPresetOptions.forEach { preset ->
                                 DropdownMenuItem(
                                     text = {
                                         Column {
-                                            Text(name, style = MaterialTheme.typography.bodyLarge)
-                                            if (file.isNotEmpty()) {
-                                                Text(file, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                                            Text(preset.label, style = MaterialTheme.typography.bodyLarge)
+                                            if (preset.file.isNotEmpty()) {
+                                                Text(preset.file, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
                                             }
                                         }
                                     },
                                     onClick = {
-                                        onFontPathChange(file)
+                                        onFontPathChange(preset.file)
                                         isFontDropdownExpanded = false
                                     }
                                 )
@@ -537,17 +636,17 @@ fun EditorSettingsItem(
                     Spacer(modifier = Modifier.height(24.dp))
 
                     // === 3. 行为开关 ===
-                    Text("行为", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                    CompactSwitchRow("显示工具栏", showToolbar, onShowToolbarChange)
-                    CompactSwitchRow("历史标签页", showHistory, onShowHistoryChange)
-                    CompactSwitchRow("自动换行", wordWrap, onWordWrapChange)
-                    CompactSwitchRow("显示空白符", showInvisibles, onShowInvisiblesChange)
-                    CompactSwitchRow("代码折叠", codeFolding, onCodeFoldingChange)
+                    Text(stringResource(R.string.settings_behavior), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    CompactSwitchRow(stringResource(R.string.settings_show_toolbar), showToolbar, onShowToolbarChange)
+                    CompactSwitchRow(stringResource(R.string.settings_show_history_tabs), showHistory, onShowHistoryChange)
+                    CompactSwitchRow(stringResource(R.string.settings_word_wrap), wordWrap, onWordWrapChange)
+                    CompactSwitchRow(stringResource(R.string.settings_show_whitespace), showInvisibles, onShowInvisiblesChange)
+                    CompactSwitchRow(stringResource(R.string.settings_code_folding), codeFolding, onCodeFoldingChange)
 
                     HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), thickness = 0.5.dp)
 
                     // === 4. 符号栏 ===
-                    Text("自定义符号", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.settings_custom_symbols), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = customSymbols,
@@ -555,7 +654,7 @@ fun EditorSettingsItem(
                         modifier = Modifier.fillMaxWidth(),
                         textStyle = MaterialTheme.typography.bodyMedium,
                         maxLines = 2,
-                        placeholder = { Text("Tab, <, >, ...") }
+                        placeholder = { Text(stringResource(R.string.settings_symbols_placeholder)) }
                     )
                 }
             }
@@ -620,7 +719,7 @@ fun ThemeSettingsItem(
                 Spacer(modifier = Modifier.width(16.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "外观与主题",
+                        text = stringResource(R.string.settings_theme_title),
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                     )
                     AnimatedVisibility(
@@ -629,7 +728,11 @@ fun ThemeSettingsItem(
                         exit = fadeOut(tween(textFadeDuration)) + shrinkVertically(tween(textFadeDuration), shrinkTowards = Alignment.Top)
                     ) {
                         Text(
-                            text = if (currentThemeState.isMonetEnabled) "动态色彩" else "自定义外观",
+                            text = if (currentThemeState.isMonetEnabled) {
+                                stringResource(R.string.settings_dynamic_color)
+                            } else {
+                                stringResource(R.string.settings_custom_appearance)
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 2.dp)
@@ -666,7 +769,7 @@ fun ThemeSettingsItem(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("动态色彩", style = MaterialTheme.typography.bodyMedium)
+                                Text(stringResource(R.string.settings_dynamic_color), style = MaterialTheme.typography.bodyMedium)
                             }
                             Switch(
                                 checked = currentThemeState.isMonetEnabled,
@@ -681,7 +784,7 @@ fun ThemeSettingsItem(
 
                     AnimatedVisibility(visible = !currentThemeState.isMonetEnabled) {
                         Column {
-                            Text("主题色", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                            Text(stringResource(R.string.settings_theme_color), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                             LazyRow(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp)
@@ -708,12 +811,16 @@ fun ThemeSettingsItem(
                         }
                     }
 
-                    Text("显示模式", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.settings_display_mode), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        val modes = listOf("跟随系统", "浅色", "深色")
+                        val modes = listOf(
+                            stringResource(R.string.action_follow_system),
+                            stringResource(R.string.action_light),
+                            stringResource(R.string.action_dark)
+                        )
                         modes.forEachIndexed { index, label ->
                             SmoothFilterChip(
                                 selected = currentThemeState.selectedModeIndex == index,
@@ -765,7 +872,7 @@ fun LogSettingsItem(
                 Icon(Icons.Outlined.BugReport, null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.width(16.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("启用日志", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.settings_enable_log), style = MaterialTheme.typography.titleMedium)
                 }
                 Switch(checked = logConfigState.isLogEnabled, onCheckedChange = { onLogConfigChange(it, logConfigState.logFilePath) })
             }
@@ -846,10 +953,10 @@ fun CustomColorButton(isSelected: Boolean, customColor: Color, onClick: () -> Un
                 Box(Modifier.fillMaxSize().background(customColor))
                 Icon(Icons.Default.Edit, null, tint = if (customColor.luminance() > 0.5f) Color.Black else Color.White, modifier = Modifier.size(20.dp))
             } else {
-                Icon(Icons.Default.Add, "Custom", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Default.Add, stringResource(R.string.settings_custom), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         Spacer(modifier = Modifier.height(4.dp))
-        Text("自定义", style = MaterialTheme.typography.labelSmall, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(stringResource(R.string.settings_custom), style = MaterialTheme.typography.labelSmall, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

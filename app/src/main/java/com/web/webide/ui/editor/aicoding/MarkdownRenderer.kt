@@ -45,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -60,6 +61,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.key
+import com.web.webide.R
 
 sealed class MarkdownNode {
     data class Text(val content: String) : MarkdownNode()
@@ -195,7 +197,7 @@ fun CodeBlockView(language: String, code: String) {
                 // Collapse/Expand Icon
                 Icon(
                     imageVector = if (isExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
-                    contentDescription = if (isExpanded) "Collapse" else "Expand",
+                    contentDescription = stringResource(if (isExpanded) R.string.content_desc_collapse else R.string.content_desc_expand),
                     tint = Color(0xFFAAAAAA),
                     modifier = Modifier.size(16.dp)
                 )
@@ -203,7 +205,7 @@ fun CodeBlockView(language: String, code: String) {
                 Spacer(modifier = Modifier.size(8.dp))
                 
                 Text(
-                    text = language.ifBlank { "Code" },
+                    text = language.ifBlank { stringResource(R.string.markdown_code_default) },
                     style = MaterialTheme.typography.labelSmall,
                     color = Color(0xFFAAAAAA),
                     fontWeight = FontWeight.Bold
@@ -222,13 +224,13 @@ fun CodeBlockView(language: String, code: String) {
                 ) {
                     Icon(
                         imageVector = Icons.Default.ContentCopy,
-                        contentDescription = "Copy",
+                        contentDescription = stringResource(R.string.action_copy),
                         tint = Color(0xFFAAAAAA),
                         modifier = Modifier.size(14.dp)
                     )
                     Spacer(modifier = Modifier.size(4.dp))
                     Text(
-                        text = "Copy",
+                        text = stringResource(R.string.action_copy),
                         style = MaterialTheme.typography.labelSmall,
                         color = Color(0xFFAAAAAA)
                     )
@@ -252,7 +254,7 @@ fun CodeBlockView(language: String, code: String) {
             } else {
                 // Collapsed state hint
                 Text(
-                    text = "${code.lines().size} lines hidden",
+                    text = stringResource(R.string.markdown_lines_hidden, code.lines().size),
                     style = MaterialTheme.typography.labelSmall,
                     color = Color(0xFF666666),
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
@@ -264,7 +266,7 @@ fun CodeBlockView(language: String, code: String) {
 
 fun copyToClipboard(context: Context, text: String) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    val clip = ClipData.newPlainText("Copied Code", text)
+    val clip = ClipData.newPlainText(context.getString(R.string.markdown_copied_code), text)
     clipboard.setPrimaryClip(clip)
-    Toast.makeText(context, "Code copied to clipboard", Toast.LENGTH_SHORT).show()
+    Toast.makeText(context, context.getString(R.string.markdown_code_copied_toast), Toast.LENGTH_SHORT).show()
 }

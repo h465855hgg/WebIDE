@@ -27,8 +27,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.web.webide.R
 
 @Composable
 fun EditorToolbar(
@@ -52,16 +54,16 @@ fun EditorToolbar(
                 .padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            ToolbarItem("保存", onSave)
-            ToolbarItem("新建", onCreate)
-            ToolbarItem("搜索", onSearch)
-            ToolbarItem("跳转指定", onJump)
-            ToolbarItem( "格式化", onFormat)
-            ToolbarItem("配色", onPalette)
+            ToolbarItem(stringResource(R.string.action_save), onSave)
+            ToolbarItem(stringResource(R.string.action_new), onCreate)
+            ToolbarItem(stringResource(R.string.action_search), onSearch)
+            ToolbarItem(stringResource(R.string.toolbar_jump_to), onJump)
+            ToolbarItem(stringResource(R.string.toolbar_format), onFormat)
+            ToolbarItem(stringResource(R.string.toolbar_color_scheme), onPalette)
 
             if (hasWebAppConfig) {
                  ToolbarItem(
-                    label = if (isBuilding) "构建中..." else "构建APK",
+                    label = if (isBuilding) stringResource(R.string.toolbar_building) else stringResource(R.string.toolbar_build_apk),
                     onClick = onBuild,
                     enabled = !isBuilding,
                     colors = if (isBuilding) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary

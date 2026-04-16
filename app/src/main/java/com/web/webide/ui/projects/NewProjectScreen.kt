@@ -52,6 +52,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -73,6 +74,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.Locale
 import androidx.core.graphics.toColorInt
+import com.web.webide.R
 
 // --- 数据结构 ---
 enum class ProjectType { NORMAL, WEBAPP, WEBSITE }
@@ -248,10 +250,21 @@ fun NewProjectScreen(navController: NavController) {
     val keystoreLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { if(it!=null) { keystorePath=it.toString(); syncJsonFromUi() } }
 
     fun handleCreate() {
-        if (projectName.isBlank()) { scope.launch { snackbarHostState.showSnackbar("请输入项目名称") }; return }
+        if (projectName.isBlank()) {
+            scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.new_project_enter_name_error)) }
+            return
+        }
         if (selectedType != ProjectType.NORMAL) {
-            if (jsonError != null) { selectedTab = 1; scope.launch { snackbarHostState.showSnackbar("JSON 语法错误") }; return }
-            if (enableSigning && keystorePath.isBlank()) { selectedTab = 0; scope.launch { snackbarHostState.showSnackbar("请选择 Keystore 文件") }; return }
+            if (jsonError != null) {
+                selectedTab = 1
+                scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.new_project_json_syntax_error)) }
+                return
+            }
+            if (enableSigning && keystorePath.isBlank()) {
+                selectedTab = 0
+                scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.new_project_select_keystore_error)) }
+                return
+            }
         }
 
         isLoading = true
@@ -269,7 +282,7 @@ fun NewProjectScreen(navController: NavController) {
             onSuccess = { dir ->
                 isLoading = false
                 scope.launch {
-                    snackbarHostState.showSnackbar("创建成功: ${dir.name}")
+                    snackbarHostState.showSnackbar(context.getString(R.string.new_project_created, dir.name))
                     delay(800)
                     navController.popBackStack()
                 }
@@ -304,8 +317,8 @@ fun NewProjectScreen(navController: NavController) {
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("新建项目", fontSize = 18.sp, fontWeight = FontWeight.Medium) },
-                navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") } },
+                title = { Text(stringResource(R.string.new_project_title), fontSize = 18.sp, fontWeight = FontWeight.Medium) },
+                navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back)) } },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
         },
@@ -322,7 +335,7 @@ fun NewProjectScreen(navController: NavController) {
                         modifier = Modifier.fillMaxWidth().padding(20.dp).navigationBarsPadding().height(54.dp)
                     ) {
                         if (isLoading) CircularProgressIndicator(Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
-                        else Text("立即创建", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        else Text(stringResource(R.string.new_project_create_now), fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -346,12 +359,12 @@ fun NewProjectScreen(navController: NavController) {
                 Spacer(modifier = Modifier.height(10.dp))
 
                 // 类型选择
-                Text("项目类型", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
+                Text(stringResource(R.string.new_project_type_title), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
                 Spacer(modifier = Modifier.height(16.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    MinimalTypeCard("Web", Icons.Default.Html, selectedType == ProjectType.NORMAL, Modifier.weight(1f)) { selectedType = ProjectType.NORMAL }
-                    MinimalTypeCard("WebApp", Icons.Default.Android, selectedType == ProjectType.WEBAPP, Modifier.weight(1f)) { selectedType = ProjectType.WEBAPP }
-                    MinimalTypeCard("套壳", Icons.Default.Link, selectedType == ProjectType.WEBSITE, Modifier.weight(1f)) { selectedType = ProjectType.WEBSITE }
+                    MinimalTypeCard(stringResource(R.string.new_project_type_web), Icons.Default.Html, selectedType == ProjectType.NORMAL, Modifier.weight(1f)) { selectedType = ProjectType.NORMAL }
+                    MinimalTypeCard(stringResource(R.string.new_project_type_webapp), Icons.Default.Android, selectedType == ProjectType.WEBAPP, Modifier.weight(1f)) { selectedType = ProjectType.WEBAPP }
+                    MinimalTypeCard(stringResource(R.string.new_project_type_wrapper), Icons.Default.Link, selectedType == ProjectType.WEBSITE, Modifier.weight(1f)) { selectedType = ProjectType.WEBSITE }
                 }
                 Spacer(modifier = Modifier.height(24.dp))
 
@@ -369,7 +382,7 @@ fun NewProjectScreen(navController: NavController) {
                             syncJsonFromUi()
                         }
                     },
-                    placeholder = "项目名称", icon = Icons.Outlined.Edit
+                    placeholder = stringResource(R.string.new_project_name), icon = Icons.Outlined.Edit
                 )
 
                 AnimatedVisibility(
@@ -379,7 +392,7 @@ fun NewProjectScreen(navController: NavController) {
                 ) {
                     Column {
                         Spacer(modifier = Modifier.height(16.dp))
-                        SwitchRow("创建 index.php", createIndexPhp) { createIndexPhp = it }
+                        SwitchRow(stringResource(R.string.new_project_create_index_php), createIndexPhp) { createIndexPhp = it }
                     }
                 }
 
@@ -391,7 +404,7 @@ fun NewProjectScreen(navController: NavController) {
                 ) {
                     Column {
                         Spacer(modifier = Modifier.height(16.dp))
-                        CleanTextField(targetUrl, { targetUrl = it; syncJsonFromUi() }, "目标网址 (URL)", Icons.Outlined.Link, KeyboardType.Uri)
+                        CleanTextField(targetUrl, { targetUrl = it; syncJsonFromUi() }, stringResource(R.string.new_project_target_url), Icons.Outlined.Link, KeyboardType.Uri)
                     }
                 }
                 Spacer(modifier = Modifier.height(24.dp))
@@ -428,12 +441,12 @@ fun NewProjectScreen(navController: NavController) {
                                 Tab(
                                     selected = selectedTab == 0,
                                     onClick = { selectedTab = 0 },
-                                    text = { Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Outlined.Tune, null, Modifier.size(16.dp)); Spacer(Modifier.width(8.dp)); Text("配置") } }
+                                    text = { Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Outlined.Tune, null, Modifier.size(16.dp)); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.new_project_tab_config)) } }
                                 )
                                 Tab(
                                     selected = selectedTab == 1,
                                     onClick = { selectedTab = 1 },
-                                    text = { Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Outlined.Code, null, Modifier.size(16.dp)); Spacer(Modifier.width(8.dp)); Text("源码") } }
+                                    text = { Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Outlined.Code, null, Modifier.size(16.dp)); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.new_project_tab_source)) } }
                                 )
                             }
                         )
@@ -453,26 +466,26 @@ fun NewProjectScreen(navController: NavController) {
                         ) { tab ->
                             if (tab == 0) {
                                 Column(Modifier.padding(horizontal = 8.dp)) {
-                                    ConfigSectionTitle("App Info")
-                                    CleanTextField(packageName, { packageName = it; syncJsonFromUi() }, "包名 (Package)", icon = null, isSmall = true, keyboardType = KeyboardType.Ascii)
+                                    ConfigSectionTitle(stringResource(R.string.new_project_app_info))
+                                    CleanTextField(packageName, { packageName = it; syncJsonFromUi() }, stringResource(R.string.new_project_package_name), icon = null, isSmall = true, keyboardType = KeyboardType.Ascii)
                                     Spacer(Modifier.height(8.dp))
                                     Row {
-                                        CleanTextField(versionName, { versionName = it; syncJsonFromUi() }, "Version Name", icon = null, isSmall = true, modifier = Modifier.weight(1f))
+                                        CleanTextField(versionName, { versionName = it; syncJsonFromUi() }, stringResource(R.string.new_project_version_name), icon = null, isSmall = true, modifier = Modifier.weight(1f))
                                         Spacer(Modifier.width(8.dp))
-                                        CleanTextField(versionCode, { versionCode = it; syncJsonFromUi() }, "Version Code", icon = null, isSmall = true, modifier = Modifier.weight(1f), keyboardType = KeyboardType.Number)
+                                        CleanTextField(versionCode, { versionCode = it; syncJsonFromUi() }, stringResource(R.string.new_project_version_code), icon = null, isSmall = true, modifier = Modifier.weight(1f), keyboardType = KeyboardType.Number)
                                     }
                                     Spacer(Modifier.height(8.dp))
-                                    FileSelectorRow("应用图标", iconPath, { imageLauncher.launch("image/*") }, icon = Icons.Outlined.Image)
+                                    FileSelectorRow(stringResource(R.string.new_project_app_icon), iconPath, { imageLauncher.launch("image/*") }, icon = Icons.Outlined.Image)
                                     Spacer(Modifier.height(4.dp))
-                                    SwitchRow("资源加密 (HTML/JS/CSS)", encryptionEnabled) { encryptionEnabled = it; syncJsonFromUi() }
+                                    SwitchRow(stringResource(R.string.new_project_resource_encryption), encryptionEnabled) { encryptionEnabled = it; syncJsonFromUi() }
 
-                                    ConfigSectionTitle("Display & Theme")
+                                    ConfigSectionTitle(stringResource(R.string.new_project_display_theme))
 
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
                                         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
                                     ) {
-                                        Text("屏幕方向", style = MaterialTheme.typography.bodyMedium)
+                                        Text(stringResource(R.string.new_project_screen_orientation), style = MaterialTheme.typography.bodyMedium)
                                         Spacer(Modifier.width(16.dp))
                                         Box(Modifier.weight(1f)) {
                                             AnimatedOrientationSelector(
@@ -483,8 +496,8 @@ fun NewProjectScreen(navController: NavController) {
                                     }
 
                                     Spacer(Modifier.height(4.dp))
-                                    SwitchRow("全屏模式", isFullscreen) { isFullscreen = it; syncJsonFromUi() }
-                                    SwitchRow("Webview 缩放", zoomEnabled) { zoomEnabled = it; syncJsonFromUi() }
+                                    SwitchRow(stringResource(R.string.new_project_fullscreen), isFullscreen) { isFullscreen = it; syncJsonFromUi() }
+                                    SwitchRow(stringResource(R.string.new_project_webview_zoom), zoomEnabled) { zoomEnabled = it; syncJsonFromUi() }
 
                                     Spacer(Modifier.height(8.dp))
 
@@ -492,7 +505,7 @@ fun NewProjectScreen(navController: NavController) {
                                         CleanTextField(
                                             value = statusBarColor,
                                             onValueChange = { statusBarColor = it; syncJsonFromUi() },
-                                            placeholder = "状态栏颜色 (#Hex)",
+                                            placeholder = stringResource(R.string.new_project_status_bar_color),
                                             icon = Icons.Outlined.Palette,
                                             isSmall = true,
                                             modifier = Modifier.weight(1f)
@@ -509,10 +522,10 @@ fun NewProjectScreen(navController: NavController) {
                                     }
 
                                     Spacer(Modifier.height(8.dp))
-                                    SwitchRow("深色状态栏文字", isDarkStatusText) { isDarkStatusText = it; syncJsonFromUi() }
+                                    SwitchRow(stringResource(R.string.new_project_dark_status_bar_text), isDarkStatusText) { isDarkStatusText = it; syncJsonFromUi() }
 
-                                    ConfigSectionTitle("Signing")
-                                    SwitchRow("启用自定义签名", enableSigning) { enableSigning = it; syncJsonFromUi() }
+                                    ConfigSectionTitle(stringResource(R.string.new_project_signing))
+                                    SwitchRow(stringResource(R.string.new_project_enable_signing), enableSigning) { enableSigning = it; syncJsonFromUi() }
 
                                     // === 动画：展开/收起签名配置 ===
                                     AnimatedVisibility(
@@ -522,13 +535,13 @@ fun NewProjectScreen(navController: NavController) {
                                     ) {
                                         Column {
                                             Spacer(Modifier.height(8.dp))
-                                            FileSelectorRow("Keystore 文件", keystorePath, { keystoreLauncher.launch("*/*") })
+                                            FileSelectorRow(stringResource(R.string.new_project_keystore_file), keystorePath, { keystoreLauncher.launch("*/*") })
                                             Spacer(Modifier.height(8.dp))
-                                            CleanTextField(keystoreAlias, { keystoreAlias = it; syncJsonFromUi() }, "Alias", Icons.Outlined.Badge, isSmall = true)
+                                            CleanTextField(keystoreAlias, { keystoreAlias = it; syncJsonFromUi() }, stringResource(R.string.new_project_alias), Icons.Outlined.Badge, isSmall = true)
                                             Spacer(Modifier.height(8.dp))
-                                            CleanTextField(storePassword, { storePassword = it; syncJsonFromUi() }, "Store Pwd", Icons.Outlined.Lock, isSmall = true, isPassword = true)
+                                            CleanTextField(storePassword, { storePassword = it; syncJsonFromUi() }, stringResource(R.string.new_project_store_password), Icons.Outlined.Lock, isSmall = true, isPassword = true)
                                             Spacer(Modifier.height(8.dp))
-                                            CleanTextField(keyPassword, { keyPassword = it; syncJsonFromUi() }, "Key Pwd", Icons.Outlined.VpnKey, isSmall = true, isPassword = true)
+                                            CleanTextField(keyPassword, { keyPassword = it; syncJsonFromUi() }, stringResource(R.string.new_project_key_password), Icons.Outlined.VpnKey, isSmall = true, isPassword = true)
                                         }
                                     }
                                     Spacer(Modifier.height(16.dp))
@@ -546,7 +559,11 @@ fun NewProjectScreen(navController: NavController) {
                                         )
                                     )
                                     Text(
-                                        text = if (jsonError != null) "JSON 格式错误: $jsonError" else "配置已同步",
+                                        text = if (jsonError != null) {
+                                            stringResource(R.string.new_project_json_format_error, jsonError!!)
+                                        } else {
+                                            stringResource(R.string.status_config_synced)
+                                        },
                                         color = if (jsonError != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                                         style = MaterialTheme.typography.labelSmall,
                                         modifier = Modifier.padding(top = 4.dp)
@@ -591,7 +608,11 @@ fun AnimatedOrientationSelector(
     currentValue: String,
     onValueChange: (String) -> Unit
 ) {
-    val options = listOf("Portrait" to "portrait", "Landscape" to "landscape", "Auto" to "auto")
+    val options = listOf(
+        stringResource(R.string.orientation_portrait) to "portrait",
+        stringResource(R.string.orientation_landscape) to "landscape",
+        stringResource(R.string.orientation_auto) to "auto"
+    )
     val selectedIndex = options.indexOfFirst { it.second == currentValue }.coerceAtLeast(0)
 
     BoxWithConstraints(
@@ -735,7 +756,7 @@ private fun createNewProject(
         try {
             val parentDir = if (wsPath.contains("/Android/data/$appPkg")) context.getExternalFilesDir(null)!! else File(wsPath)
             val projectDir = File(parentDir, name)
-            if (projectDir.exists()) { withContext(Dispatchers.Main) { onError("项目已存在") }; return@launch }
+            if (projectDir.exists()) { withContext(Dispatchers.Main) { onError(context.getString(R.string.new_project_exists)) }; return@launch }
             projectDir.mkdirs()
 
             fun copyFile(uriString: String, destName: String): String {
@@ -771,7 +792,7 @@ private fun createNewProject(
             withContext(Dispatchers.Main) { onSuccess(projectDir) }
         } catch (e: Exception) {
             e.printStackTrace()
-            withContext(Dispatchers.Main) { onError(e.message ?: "未知错误") }
+            withContext(Dispatchers.Main) { onError(e.message ?: context.getString(R.string.new_project_unknown_error)) }
         }
     }
 }

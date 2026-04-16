@@ -18,6 +18,7 @@
 package com.web.webide.core.utils
 
 import android.content.Context
+import com.web.webide.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -38,7 +39,7 @@ object BackupUtils {
      */
     suspend fun backupProject(context: Context, projectPath: String): String = withContext(Dispatchers.IO) {
         val projectDir = File(projectPath)
-        if (!projectDir.exists()) return@withContext "项目不存在"
+        if (!projectDir.exists()) return@withContext context.getString(R.string.backup_project_not_exists)
 
         val folderName = projectDir.name
         // 私有目录: /data/data/包名/files/project_backups/项目名/
@@ -59,7 +60,7 @@ object BackupUtils {
             return@withContext backupFile.absolutePath
         } catch (e: Exception) {
             e.printStackTrace()
-            return@withContext "Fail: ${e.message}"
+            return@withContext context.getString(R.string.backup_failed, e.message)
         }
     }
 

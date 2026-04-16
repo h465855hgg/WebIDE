@@ -58,9 +58,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import com.web.webide.R
 import com.web.webide.ui.editor.viewmodel.EditorViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -93,7 +95,7 @@ fun SearchPanel(
                     modifier = Modifier
                         .weight(1f)
                         .defaultMinSize(minHeight = 40.dp),
-                    placeholder = { Text("搜索...", style = MaterialTheme.typography.bodyMedium) },
+                    placeholder = { Text(stringResource(R.string.search_placeholder), style = MaterialTheme.typography.bodyMedium) },
                     leadingIcon = {
                         // 大小写切换按钮放在左侧，节省空间
                         CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
@@ -134,18 +136,18 @@ fun SearchPanel(
                 )
 
                 // 紧凑的控制组
-                CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                         IconButton(onClick = { viewModel.searchPrev() }, modifier = Modifier.padding(horizontal = 4.dp)) {
-                            Icon(Icons.Default.KeyboardArrowUp, "上一个")
+                            Icon(Icons.Default.KeyboardArrowUp, stringResource(R.string.action_previous))
                         }
                         IconButton(onClick = { viewModel.searchNext() }, modifier = Modifier.padding(horizontal = 4.dp)) {
-                            Icon(Icons.Default.KeyboardArrowDown, "下一个")
+                            Icon(Icons.Default.KeyboardArrowDown, stringResource(R.string.action_next))
                         }
                         IconButton(onClick = { isReplaceVisible = !isReplaceVisible }, modifier = Modifier.padding(horizontal = 4.dp)) {
                             Icon(
                                 Icons.Default.FindReplace,
-                                contentDescription = "替换",
+                                contentDescription = stringResource(R.string.action_replace),
                                 tint = if (isReplaceVisible) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                             )
                         }
@@ -153,7 +155,7 @@ fun SearchPanel(
                             viewModel.stopSearch()
                             onClose()
                         }, modifier = Modifier.padding(start = 4.dp)) {
-                            Icon(Icons.Default.Close, "关闭")
+                            Icon(Icons.Default.Close, stringResource(R.string.action_close))
                         }
                     }
                 }
@@ -172,7 +174,7 @@ fun SearchPanel(
                         value = replaceText,
                         onValueChange = { replaceText = it },
                         modifier = Modifier.weight(1f),
-                        placeholder = { Text("替换...", style = MaterialTheme.typography.bodyMedium) },
+                        placeholder = { Text(stringResource(R.string.replace_placeholder), style = MaterialTheme.typography.bodyMedium) },
                         singleLine = true,
                         textStyle = MaterialTheme.typography.bodyMedium,
                         colors = TextFieldDefaults.colors(
@@ -188,7 +190,7 @@ fun SearchPanel(
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                         shape = RoundedCornerShape(4.dp)
                     ) {
-                        Text("替换", style = MaterialTheme.typography.labelMedium)
+                        Text(stringResource(R.string.action_replace), style = MaterialTheme.typography.labelMedium)
                     }
 
                     Spacer(modifier = Modifier.width(4.dp))
@@ -199,7 +201,7 @@ fun SearchPanel(
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                         shape = RoundedCornerShape(4.dp)
                     ) {
-                        Text("全部", style = MaterialTheme.typography.labelMedium)
+                        Text(stringResource(R.string.replace_all), style = MaterialTheme.typography.labelMedium)
                     }
                 }
             }

@@ -56,6 +56,7 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -75,6 +76,7 @@ import kotlinx.coroutines.withContext
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.web.webide.BuildConfig
+import com.web.webide.R
 import com.web.webide.ui.components.WebIDE_Icon
 
 // --- 1. 数据模型定义 ---
@@ -145,43 +147,39 @@ fun AboutScreen(navController: NavController) {
     // --- 数据源 ---
 
     // 1. 开发团队
-    val teamMembers = remember {
-        listOf(
-            Developer("h465855hgg", "Lead", "Maintainer", Color(0xFF009688), "https://github.com/h465855hgg"),
-            Developer("Akimlc", "Theme", "", Color(0xFF009688), "https://github.com/Akimlc"),
-            Developer("wuxianggujun", "TsLanguage", "", Color(0xFF009688), "https://github.com/wuxianggujun"),
-            Developer("Claude", "UI", "Design", Color(0xFFD97757)),
-            Developer("Gemini", "Arch", "Core", Color(0xFF4E8CFF)),
-            Developer("DeepSeek", "Logic", "Editor", Color(0xFF6C5CE7))
-        )
-    }
+    val teamMembers = listOf(
+        Developer("h465855hgg", stringResource(R.string.about_developer_role_lead), stringResource(R.string.about_developer_desc_maintainer), Color(0xFF009688), "https://github.com/h465855hgg"),
+        Developer("Akimlc", stringResource(R.string.about_developer_role_theme), "", Color(0xFF009688), "https://github.com/Akimlc"),
+        Developer("wuxianggujun", stringResource(R.string.about_developer_role_ts_language), "", Color(0xFF009688), "https://github.com/wuxianggujun"),
+        Developer("Claude", stringResource(R.string.about_developer_role_ui), stringResource(R.string.about_developer_desc_design), Color(0xFFD97757)),
+        Developer("Gemini", stringResource(R.string.about_developer_role_arch), stringResource(R.string.about_developer_desc_core), Color(0xFF4E8CFF)),
+        Developer("DeepSeek", stringResource(R.string.about_developer_role_logic), stringResource(R.string.about_developer_desc_editor), Color(0xFF6C5CE7))
+    )
 
     // 2. 感谢名单
-    val thanksList = remember {
-        listOf(
-            SpecialThanks(
-                qq = "2547601734",
-                name = "逸尘",
-                title = "Designer",
-                message = "Designed the application icon.",
-               // url = "https://user.qzone.qq.com/2547601734"
-            ),
-            SpecialThanks(
-                qq = "2084019782",
-                name = "问心",
-                title = "Special Thanks",
-                message = "感谢WebS的api文档 命名规则.",// 或者是 "Provided naming conventions for WebS API docs."
-              // url = "https://user.qzone.qq.com/2084019782"
-            ),
-            SpecialThanks(
-                qq = "2957148920",
-                name = "氚-Tritium",
-                title = "吉祥物",
-                message = "issue提供者"
-                // url = "https://user.qzone.qq.com/2957148920"
-            )
+    val thanksList = listOf(
+        SpecialThanks(
+            qq = "2547601734",
+            name = "逸尘",
+            title = stringResource(R.string.about_thanks_title_designer),
+            message = stringResource(R.string.about_thanks_message_icon),
+           // url = "https://user.qzone.qq.com/2547601734"
+        ),
+        SpecialThanks(
+            qq = "2084019782",
+            name = "问心",
+            title = stringResource(R.string.about_thanks_title_special),
+            message = stringResource(R.string.about_thanks_message_webs_docs),
+          // url = "https://user.qzone.qq.com/2084019782"
+        ),
+        SpecialThanks(
+            qq = "2957148920",
+            name = "氚-Tritium",
+            title = stringResource(R.string.about_thanks_title_mascot),
+            message = stringResource(R.string.about_thanks_message_issue_provider)
+            // url = "https://user.qzone.qq.com/2957148920"
         )
-    }
+    )
 
     // 3. 捐赠名单
     val donorList = remember {
@@ -200,10 +198,10 @@ Donor("676743748", "doro", "¥ 0.01","2026.02.07.21:09")
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             LargeTopAppBar(
-                title = { Text("关于", fontWeight = FontWeight.SemiBold) },
+                title = { Text(stringResource(R.string.about_title), fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back))
                     }
                 },
                 scrollBehavior = scrollBehavior,
@@ -226,7 +224,7 @@ Donor("676743748", "doro", "¥ 0.01","2026.02.07.21:09")
 
             // 2. 开发团队 (Chip 风格)
             item {
-                SectionTitle("WebIDE Team")
+                SectionTitle(stringResource(R.string.about_team_title))
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 24.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -251,7 +249,7 @@ Donor("676743748", "doro", "¥ 0.01","2026.02.07.21:09")
 
             item {
                 Spacer(modifier = Modifier.height(24.dp))
-                SectionTitle("Special Thanks")
+                SectionTitle(stringResource(R.string.about_special_thanks_title))
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 24.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -264,7 +262,7 @@ Donor("676743748", "doro", "¥ 0.01","2026.02.07.21:09")
             // 4. 捐赠名单
             item {
                 Spacer(modifier = Modifier.height(24.dp))
-                SectionTitle("Donors")
+                SectionTitle(stringResource(R.string.about_donors_title))
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 24.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp), // 间距适中
@@ -277,7 +275,7 @@ Donor("676743748", "doro", "¥ 0.01","2026.02.07.21:09")
             // 5. 开源协议
             item {
                 Spacer(modifier = Modifier.height(24.dp))
-                SectionTitle("Licenses")
+                SectionTitle(stringResource(R.string.about_licenses_title))
             }
 
             // 6. 库列表
@@ -289,7 +287,7 @@ Donor("676743748", "doro", "¥ 0.01","2026.02.07.21:09")
                 }
             } else if (libraries.isEmpty()) {
                 item {
-                    Text("暂无信息", modifier = Modifier.padding(16.dp), color = MaterialTheme.colorScheme.outline)
+                    Text(stringResource(R.string.status_no_information), modifier = Modifier.padding(16.dp), color = MaterialTheme.colorScheme.outline)
                 }
             } else {
                 itemsIndexed(
@@ -327,7 +325,7 @@ Donor("676743748", "doro", "¥ 0.01","2026.02.07.21:09")
             item {
                 Spacer(modifier = Modifier.height(32.dp))
                 Text(
-                    text = "Copyright © 2025 WebIDE",
+                    text = stringResource(R.string.about_copyright),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.outline
                 )
@@ -515,7 +513,7 @@ private fun AuthorNoteCard(onClose: () -> Unit) {
                 Icon(Icons.Outlined.Info, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp).padding(top = 2.dp))
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
-                    "本项目由人类开发者与 AI 协作开发，探索代码生成的无限可能。",
+                    stringResource(R.string.about_author_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f)
@@ -523,7 +521,7 @@ private fun AuthorNoteCard(onClose: () -> Unit) {
                 Spacer(modifier = Modifier.width(8.dp))
                 Icon(
                     imageVector = Icons.Default.Close,
-                    contentDescription = "Close",
+                    contentDescription = stringResource(R.string.action_close),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp).clickable { onClose() }
                 )
@@ -566,7 +564,7 @@ private fun AppHeaderSection() {
                         modifier = Modifier.padding(top = 8.dp)
                     ) {
                         Text(
-                            text = "v${BuildConfig.VERSION_NAME}",
+                            text = stringResource(R.string.about_library_version_format, BuildConfig.VERSION_NAME),
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -680,7 +678,7 @@ private fun ImprovedLibraryListItem(lib: Library, onClick: () -> Unit) {
                     shape = RoundedCornerShape(6.dp)
                 ) {
                     Text(
-                        text = "v${lib.artifactVersion}",
+                        text = stringResource(R.string.about_library_version_format, lib.artifactVersion!!),
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                         style = MaterialTheme.typography.labelSmall,
                         fontSize = 10.sp,
@@ -705,14 +703,16 @@ fun LibraryDetailDialog(lib: Library, onDismiss: () -> Unit) {
     val context = LocalContext.current
     @Suppress("DEPRECATION")
     val clipboardManager = LocalClipboardManager.current
-    val licenseText = remember(lib) {
+    val licenseFallback = context.getString(R.string.about_see_project_website)
+    val noLicenseInfo = context.getString(R.string.about_no_license_info)
+    val licenseText = remember(lib, licenseFallback, noLicenseInfo) {
         if (lib.licenses.isNotEmpty()) {
             lib.licenses.joinToString("\n\n") { license ->
-                val content = license.licenseContent ?: license.url ?: "See project website for license."
+                val content = license.licenseContent ?: license.url ?: licenseFallback
                 content
             }
         } else {
-            "No license info."
+            noLicenseInfo
         }
     }
     Dialog(
@@ -747,7 +747,7 @@ fun LibraryDetailDialog(lib: Library, onDismiss: () -> Unit) {
                             .align(Alignment.TopEnd)
                             .padding(8.dp)
                     ) {
-                        Text("✕", style = MaterialTheme.typography.titleMedium)
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.action_close))
                     }
                 }
                 Column(
@@ -784,7 +784,7 @@ fun LibraryDetailDialog(lib: Library, onDismiss: () -> Unit) {
                             modifier = Modifier.padding(top = 8.dp)
                         ) {
                             Text(
-                                text = "v$version",
+                                text = stringResource(R.string.about_library_version_format, version),
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -805,7 +805,7 @@ fun LibraryDetailDialog(lib: Library, onDismiss: () -> Unit) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "License",
+                            text = stringResource(R.string.about_license_title),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -815,7 +815,7 @@ fun LibraryDetailDialog(lib: Library, onDismiss: () -> Unit) {
                         ) {
                             Icon(
                                 Icons.Default.ContentCopy,
-                                contentDescription = "Copy",
+                                contentDescription = stringResource(R.string.action_copy),
                                 modifier = Modifier.size(16.dp),
                                 tint = MaterialTheme.colorScheme.primary
                             )
@@ -859,7 +859,7 @@ fun LibraryDetailDialog(lib: Library, onDismiss: () -> Unit) {
                         ) {
                             Icon(Icons.AutoMirrored.Filled.OpenInNew, null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Visit Website")
+                            Text(stringResource(R.string.action_visit_website))
                         }
                     }
                 } else {

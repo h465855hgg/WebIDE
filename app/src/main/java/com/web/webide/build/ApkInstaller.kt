@@ -26,6 +26,7 @@ import android.os.Build
 import android.provider.Settings
 import android.widget.Toast
 import androidx.core.content.FileProvider
+import com.web.webide.R
 import java.io.File
 
 object ApkInstaller {
@@ -37,7 +38,7 @@ object ApkInstaller {
      */
     fun install(context: Context, apkFile: File) {
         if (!apkFile.exists()) {
-            Toast.makeText(context, "安装文件不存在", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.apk_install_file_missing), Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -49,7 +50,7 @@ object ApkInstaller {
                     data = Uri.parse("package:${context.packageName}")
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
-                Toast.makeText(context, "请先授予安装未知应用权限", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, context.getString(R.string.apk_install_permission_required), Toast.LENGTH_LONG).show()
                 context.startActivity(intent)
                 return
             }
@@ -80,7 +81,7 @@ object ApkInstaller {
 
         } catch (e: Exception) {
             e.printStackTrace()
-            Toast.makeText(context, "调起安装器失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.apk_install_launch_failed, e.message), Toast.LENGTH_SHORT).show()
         }
     }
 }

@@ -62,6 +62,8 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -124,6 +126,23 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.HorizontalDivider
 
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.res.stringResource
+import com.web.webide.R
+import java.text.DateFormat
+
+@Composable
+private fun resolveAICodingMessageContent(
+    rawContent: String,
+    initialAssistantMessageText: String
+): String {
+    LocalConfiguration.current
+    val context = LocalContext.current
+    return when {
+        rawContent == AICodingViewModel.INITIAL_ASSISTANT_MESSAGE_MARKER ||
+            rawContent == AICodingViewModel.LEGACY_INITIAL_ASSISTANT_MESSAGE -> initialAssistantMessageText
+        else -> AICodingLocalizedText.resolve(context, rawContent) ?: rawContent
+    }
+}
 
 @Composable
 fun AICodingPanel(
@@ -135,16 +154,50 @@ fun AICodingPanel(
     var showSettings by remember { mutableStateOf(false) }
     var showHistory by remember { mutableStateOf(false) }
     var inputText by remember { mutableStateOf("") }
+    val defaultChatTitleText = stringResource(R.string.ai_default_chat_title)
+    val initialAssistantMessageText = stringResource(R.string.ai_initial_assistant_message)
 
     if (showSettings) {
         var newApiKey by remember { mutableStateOf(viewModel.apiKey) }
         var newBaseUrl by remember { mutableStateOf(viewModel.baseUrl) }
         var newModel by remember { mutableStateOf(viewModel.model) }
         var selectedProvider by remember { mutableStateOf(AICodingViewModel.ApiProvider.fromUrl(viewModel.baseUrl)) }
+        val aiSettingsTitleText = stringResource(R.string.ai_settings_title)
+        val providerPresetText = stringResource(R.string.ai_provider_preset)
+        val apiKeyText = stringResource(R.string.ai_api_key)
+        val baseUrlText = stringResource(R.string.ai_base_url)
+        val baseUrlPlaceholderText = stringResource(R.string.ai_base_url_placeholder)
+        val modelText = stringResource(R.string.ai_model)
+        val modelPlaceholderText = stringResource(R.string.ai_model_placeholder)
+        val noModelsText = stringResource(R.string.ai_no_models)
+        val clearChatHistoryText = stringResource(R.string.ai_clear_chat_history)
+        val saveText = stringResource(R.string.action_save)
+        val cancelText = stringResource(R.string.action_cancel)
+        val selectProviderContentDescription = stringResource(R.string.content_desc_select_provider)
+        val selectModelContentDescription = stringResource(R.string.content_desc_select_model)
+        val fetchModelsContentDescription = stringResource(R.string.content_desc_fetch_models)
+        val providerOptions = listOf(
+            AICodingViewModel.ApiProvider.OPENAI to stringResource(R.string.ai_provider_openai),
+            AICodingViewModel.ApiProvider.DEEPSEEK to stringResource(R.string.ai_provider_deepseek),
+            AICodingViewModel.ApiProvider.ANTHROPIC to stringResource(R.string.ai_provider_anthropic),
+            AICodingViewModel.ApiProvider.GOOGLE to stringResource(R.string.ai_provider_google),
+            AICodingViewModel.ApiProvider.ZHIPU to stringResource(R.string.ai_provider_zhipu),
+            AICodingViewModel.ApiProvider.MOONSHOT to stringResource(R.string.ai_provider_moonshot),
+            AICodingViewModel.ApiProvider.ALIYUN to stringResource(R.string.ai_provider_aliyun),
+            AICodingViewModel.ApiProvider.BAIDU to stringResource(R.string.ai_provider_baidu),
+            AICodingViewModel.ApiProvider.DOUBAO to stringResource(R.string.ai_provider_doubao),
+            AICodingViewModel.ApiProvider.MISTRAL to stringResource(R.string.ai_provider_mistral),
+            AICodingViewModel.ApiProvider.SILICONFLOW to stringResource(R.string.ai_provider_siliconflow),
+            AICodingViewModel.ApiProvider.OPENROUTER to stringResource(R.string.ai_provider_openrouter),
+            AICodingViewModel.ApiProvider.LMSTUDIO to stringResource(R.string.ai_provider_lmstudio),
+            AICodingViewModel.ApiProvider.CUSTOM to stringResource(R.string.ai_provider_custom)
+        )
+        val providerLabels = providerOptions.toMap()
+        val selectedProviderLabel = providerLabels[selectedProvider].orEmpty()
 
         AlertDialog(
             onDismissRequest = { showSettings = false },
-            title = { Text("AI Assistant Settings") },
+            title = { Text(aiSettingsTitleText) },
             text = {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
@@ -154,13 +207,13 @@ fun AICodingPanel(
                     Box(modifier = Modifier.fillMaxWidth()) {
                         var expanded by remember { mutableStateOf(false) }
                         OutlinedTextField(
-                            value = selectedProvider.displayName,
+                            value = selectedProviderLabel,
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("Provider (Preset)") },
+                            label = { Text(providerPresetText) },
                             trailingIcon = {
                                 IconButton(onClick = { expanded = !expanded }) {
-                                    Icon(Icons.Default.ArrowDropDown, "Select Provider")
+                                    Icon(Icons.Default.ArrowDropDown, selectProviderContentDescription)
                                 }
                             },
                             modifier = Modifier.fillMaxWidth()
@@ -178,9 +231,9 @@ fun AICodingPanel(
                             onDismissRequest = { expanded = false },
                             modifier = Modifier.heightIn(max = 300.dp)
                         ) {
-                            AICodingViewModel.ApiProvider.entries.forEach { provider ->
+                            providerOptions.forEach { (provider, providerLabel) ->
                                 DropdownMenuItem(
-                                    text = { Text(provider.displayName) },
+                                    text = { Text(providerLabel) },
                                     onClick = {
                                         selectedProvider = provider
                                         expanded = false
@@ -197,7 +250,7 @@ fun AICodingPanel(
                     OutlinedTextField(
                         value = newApiKey,
                         onValueChange = { newApiKey = it },
-                        label = { Text("API Key") },
+                        label = { Text(apiKeyText) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
@@ -213,8 +266,8 @@ fun AICodingPanel(
                                 AICodingViewModel.ApiProvider.CUSTOM
                             }
                         },
-                        label = { Text("Base URL") },
-                        placeholder = { Text("https://api.openai.com/v1") },
+                        label = { Text(baseUrlText) },
+                        placeholder = { Text(baseUrlPlaceholderText) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
@@ -230,13 +283,13 @@ fun AICodingPanel(
                             OutlinedTextField(
                                 value = newModel,
                                 onValueChange = { newModel = it },
-                                label = { Text("Model") },
-                                placeholder = { Text("gpt-3.5-turbo") },
+                                label = { Text(modelText) },
+                                placeholder = { Text(modelPlaceholderText) },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true,
                                 trailingIcon = {
                                     IconButton(onClick = { expanded = true }) {
-                                        Icon(Icons.Default.ArrowDropDown, contentDescription = "Select Model")
+                                        Icon(Icons.Default.ArrowDropDown, contentDescription = selectModelContentDescription)
                                     }
                                 }
                             )
@@ -248,7 +301,7 @@ fun AICodingPanel(
                             ) {
                                 if (viewModel.availableModels.isEmpty()) {
                                     DropdownMenuItem(
-                                        text = { Text("No models found. Click Refresh (🔄)") },
+                                        text = { Text(noModelsText) },
                                         onClick = { expanded = false }
                                     )
                                 } else {
@@ -274,7 +327,7 @@ fun AICodingPanel(
                             if (viewModel.isFetchingModels) {
                                 CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                             } else {
-                                Icon(Icons.Default.Refresh, contentDescription = "Fetch Models")
+                                Icon(Icons.Default.Refresh, contentDescription = fetchModelsContentDescription)
                             }
                         }
                     }
@@ -286,7 +339,7 @@ fun AICodingPanel(
                         ),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                         Text("Clear Chat History")
+                         Text(clearChatHistoryText)
                     }
                 }
             },
@@ -297,12 +350,12 @@ fun AICodingPanel(
                         showSettings = false
                     }
                 ) {
-                    Text("Save")
+                    Text(saveText)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showSettings = false }) {
-                    Text("Cancel")
+                    Text(cancelText)
                 }
             }
         )
@@ -671,7 +724,7 @@ fun AICodingPanel(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Ai-Coding",
+                                text = stringResource(R.string.ai_panel_title),
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
@@ -685,7 +738,7 @@ fun AICodingPanel(
                             ) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.List,
-                                    contentDescription = "History",
+                                    contentDescription = stringResource(R.string.content_desc_history),
                                     tint = if (showHistory) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(20.dp)
                                 )
@@ -698,7 +751,7 @@ fun AICodingPanel(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Settings,
-                                    contentDescription = "Settings",
+                                    contentDescription = stringResource(R.string.action_settings),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(20.dp)
                                 )
@@ -723,7 +776,7 @@ fun AICodingPanel(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.CropSquare,
-                                    contentDescription = "Maximize",
+                                    contentDescription = stringResource(R.string.content_desc_maximize),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(20.dp)
                                 )
@@ -733,7 +786,7 @@ fun AICodingPanel(
                             IconButton(onClick = { state.isExpanded = false }, modifier = Modifier.size(32.dp)) {
                                 Icon(
                                     imageVector = Icons.Default.KeyboardArrowDown,
-                                    contentDescription = "Minimize",
+                                    contentDescription = stringResource(R.string.content_desc_minimize),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(20.dp)
                                 )
@@ -765,6 +818,10 @@ fun AICodingPanel(
                                 ) { message ->
                                     val isUser = message.role == "user"
                                     val isError = message.role == "error"
+                                    val messageContent = resolveAICodingMessageContent(
+                                        rawContent = message.content,
+                                        initialAssistantMessageText = initialAssistantMessageText
+                                    )
                                     
                                     // Animation for new messages
                                     val alphaAnim = remember { Animatable(0f) }
@@ -819,7 +876,7 @@ fun AICodingPanel(
                                                                 verticalAlignment = Alignment.CenterVertically
                                                             ) {
                                                                 Text(
-                                                                    text = "Thinking Process",
+                                                                    text = stringResource(R.string.ai_thinking_process),
                                                                     style = MaterialTheme.typography.labelSmall,
                                                                     color = MaterialTheme.colorScheme.secondary,
                                                                     fontWeight = FontWeight.Bold
@@ -827,7 +884,7 @@ fun AICodingPanel(
                                                                 Spacer(modifier = Modifier.weight(1f))
                                                                 Icon(
                                                                     imageVector = if (isReasoningExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                                                    contentDescription = "Toggle Reasoning",
+                                                                    contentDescription = stringResource(R.string.content_desc_toggle_reasoning),
                                                                     modifier = Modifier.size(16.dp),
                                                                     tint = MaterialTheme.colorScheme.secondary
                                                                 )
@@ -848,7 +905,7 @@ fun AICodingPanel(
                                                     
                                                     // Main Content
                                                     MarkdownText(
-                                                        markdown = message.content,
+                                                        markdown = messageContent,
                                                         color = when {
                                                             isError -> MaterialTheme.colorScheme.onErrorContainer
                                                             isUser -> MaterialTheme.colorScheme.onPrimaryContainer
@@ -873,7 +930,7 @@ fun AICodingPanel(
                                     value = inputText,
                                     onValueChange = { inputText = it },
                                     modifier = Modifier.weight(1f),
-                                    placeholder = { Text("Ask anything...") },
+                                    placeholder = { Text(stringResource(R.string.ai_ask_placeholder)) },
                                     singleLine = false,
                                     maxLines = 3,
                                     shape = RoundedCornerShape(24.dp)
@@ -909,7 +966,7 @@ fun AICodingPanel(
                                     } else {
                                         Icon(
                                             imageVector = Icons.AutoMirrored.Filled.Send,
-                                            contentDescription = "Send",
+                                            contentDescription = stringResource(R.string.content_desc_send),
                                             tint = MaterialTheme.colorScheme.onPrimary
                                         )
                                     }
@@ -940,7 +997,7 @@ fun AICodingPanel(
                                 ) {
                                     Icon(Icons.Default.Add, contentDescription = null)
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("New Chat")
+                                    Text(stringResource(R.string.ai_new_chat))
                                 }
                                 
                                 HorizontalDivider()
@@ -951,18 +1008,29 @@ fun AICodingPanel(
                                         key = { it.id }
                                     ) { session ->
                                         val isSelected = session.id == viewModel.currentSessionId
+                                        val sessionTitle = if (
+                                            session.title == AICodingViewModel.DEFAULT_CHAT_TITLE_MARKER ||
+                                            session.title == AICodingViewModel.LEGACY_DEFAULT_CHAT_TITLE
+                                        ) {
+                                            defaultChatTitleText
+                                        } else {
+                                            session.title
+                                        }
                                         ListItem(
                                             headlineContent = { 
                                                 Text(
-                                                    session.title, 
+                                                    sessionTitle,
                                                     maxLines = 1, 
                                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                                 ) 
                                             },
                                             supportingContent = { 
                                                 Text(
-                                                    java.text.SimpleDateFormat("MM/dd HH:mm", java.util.Locale.getDefault())
-                                                        .format(java.util.Date(session.timestamp)),
+                                                    DateFormat.getDateTimeInstance(
+                                                        DateFormat.SHORT,
+                                                        DateFormat.SHORT,
+                                                        java.util.Locale.getDefault()
+                                                    ).format(java.util.Date(session.timestamp)),
                                                     style = MaterialTheme.typography.bodySmall
                                                 ) 
                                             },
@@ -976,7 +1044,7 @@ fun AICodingPanel(
                                                 IconButton(onClick = { viewModel.deleteSession(session.id) }) {
                                                     Icon(
                                                         Icons.Default.Delete, 
-                                                        contentDescription = "Delete",
+                                                        contentDescription = stringResource(R.string.content_desc_delete),
                                                         tint = MaterialTheme.colorScheme.error
                                                     )
                                                 }
@@ -1034,7 +1102,7 @@ fun AICodingPanel(
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                            contentDescription = "Expand",
+                            contentDescription = stringResource(R.string.content_desc_expand),
                             tint = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.rotate(arrowRotation)
                         )

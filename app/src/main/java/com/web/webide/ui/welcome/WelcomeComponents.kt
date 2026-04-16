@@ -47,9 +47,11 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.web.webide.R
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -195,7 +197,7 @@ internal fun PermissionCard(
             if (isGranted) {
                 Icon(
                     Icons.Default.CheckCircle,
-                    contentDescription = "Granted",
+                    contentDescription = stringResource(R.string.content_desc_permission_granted),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(24.dp)
                 )
@@ -209,7 +211,7 @@ internal fun PermissionCard(
                         contentColor = MaterialTheme.colorScheme.onPrimary
                     )
                 ) {
-                    Text("开启", fontSize = 13.sp)
+                    Text(stringResource(R.string.action_enable), fontSize = 13.sp)
                 }
             }
         }
@@ -349,7 +351,7 @@ internal fun CustomThemeCard(isSelected: Boolean, onClick: () -> Unit) {
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "自定义",
+            text = stringResource(R.string.welcome_custom_theme),
             style = MaterialTheme.typography.labelMedium,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
         )
@@ -384,7 +386,7 @@ internal fun WelcomeBottomBar(
             if (pagerState.currentPage > 0) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
+                    contentDescription = stringResource(R.string.action_back),
                     tint = iconColor
                 )
             }
@@ -415,7 +417,7 @@ internal fun WelcomeBottomBar(
         ) {
             Icon(
                 imageVector = if (isLastPage) Icons.Default.Check else Icons.AutoMirrored.Filled.ArrowForward,
-                contentDescription = "Next",
+                contentDescription = stringResource(R.string.action_next),
                 tint = activeColor
             )
         }

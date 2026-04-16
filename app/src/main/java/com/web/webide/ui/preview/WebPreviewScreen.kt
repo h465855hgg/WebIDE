@@ -46,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -69,6 +70,7 @@ import kotlin.concurrent.thread
 import android.webkit.URLUtil
 import android.widget.Toast
 import rrzt.web.web_bridge.WebsApiAdapter
+import com.web.webide.R
 
 class TinyWebServer(private val rootDir: File) {
     private var serverSocket: ServerSocket? = null
@@ -443,10 +445,16 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             if (!isUserFullScreen) {
+                val userAgentOptions = listOf(
+                    UserAgents.DEFAULT to stringResource(R.string.preview_default_mobile),
+                    UserAgents.PC to stringResource(R.string.preview_ua_pc_desktop),
+                    UserAgents.IPHONE to stringResource(R.string.preview_ua_ios),
+                    UserAgents.ANDROID to stringResource(R.string.preview_ua_android)
+                )
                 TopAppBar(
                     title = {
                         Column {
-                            Text("App 预览")
+                            Text(stringResource(R.string.preview_title))
                             if (serverPort != 0) Text(
                                 ":$serverPort",
                                 style = MaterialTheme.typography.labelSmall,
@@ -458,7 +466,7 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
                         IconButton(onClick = { navController.popBackStack() }) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
-                                "返回"
+                                stringResource(R.string.action_back)
                             )
                         }
                     },
@@ -467,25 +475,20 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
                             IconButton(onClick = { showUAMenu = true }) {
                                 Icon(
                                     Icons.Default.Devices,
-                                    "UA",
+                                    stringResource(R.string.content_desc_user_agent),
                                     tint = if (currentUAType != UserAgents.DEFAULT) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                             DropdownMenu(
                                 expanded = showUAMenu,
                                 onDismissRequest = { showUAMenu = false }) {
-                                listOf(
-                                    UserAgents.DEFAULT to "默认 (Mobile)",
-                                    UserAgents.PC to "PC / Desktop",
-                                    UserAgents.IPHONE to "iOS",
-                                    UserAgents.ANDROID to "Android"
-                                ).forEach { (ua, name) ->
+                                userAgentOptions.forEach { (ua, name) ->
                                     DropdownMenuItem(text = { Text(name) }, onClick = {
                                         currentUAType = ua
                                         prefs.edit().putString("ua_type_$folderName", ua).apply()
                                         showUAMenu = false
                                         configRefreshTrigger = System.currentTimeMillis()
-                                        scope.launch { snackbarHostState.showSnackbar("UA: $name") }
+                                        scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.preview_ua_selected, name)) }
                                     })
                                 }
                             }
@@ -498,19 +501,19 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
                         }) {
                             Icon(
                                 Icons.Default.BugReport,
-                                "调试",
+                                stringResource(R.string.content_desc_debug),
                                 tint = if (isDebugEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         IconButton(onClick = { webViewRef?.reload() }) {
                             Icon(
                                 Icons.Default.Refresh,
-                                "刷新"
+                                stringResource(R.string.content_desc_refresh)
                             )
                         }
                         IconButton(onClick = {
                             isUserFullScreen = true
-                        }) { Icon(Icons.Default.Fullscreen, "全屏") }
+                        }) { Icon(Icons.Default.Fullscreen, stringResource(R.string.content_desc_fullscreen)) }
                     }
                 )
             }
@@ -566,7 +569,7 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
                         .padding(16.dp)
                         .background(Color.Black.copy(0.3f), CircleShape)
                 ) {
-                    Icon(Icons.Default.FullscreenExit, "退出", tint = Color.White)
+                    Icon(Icons.Default.FullscreenExit, stringResource(R.string.content_desc_exit_fullscreen), tint = Color.White)
                 }
             }
         }
@@ -683,7 +686,7 @@ private fun configureFullWebView(
             val cookies = CookieManager.getInstance().getCookie(url)
             request.addRequestHeader("Cookie", cookies)
             request.addRequestHeader("User-Agent", userAgent)
-            request.setDescription("Downloading file...")
+            request.setDescription(context.getString(R.string.preview_downloading, filename))
             request.setTitle(filename)
             request.setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             request.setDestinationInExternalPublicDir(
@@ -694,13 +697,13 @@ private fun configureFullWebView(
             val dm =
                 context.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
             dm.enqueue(request)
-            Toast.makeText(context, "正在下载: $filename", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.preview_downloading, filename), Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
             // 如果 DownloadManager 失败，尝试用浏览器打开
             try {
                 context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
             } catch (e2: Exception) {
-                Toast.makeText(context, "无法下载文件", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.preview_download_failed), Toast.LENGTH_SHORT).show()
             }
         }
     }

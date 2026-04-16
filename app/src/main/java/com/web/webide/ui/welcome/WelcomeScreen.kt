@@ -39,11 +39,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.web.webide.R
 import com.web.webide.core.utils.PermissionManager
 import com.web.webide.ui.ThemeViewModel
 import com.web.webide.ui.components.ColorPickerDialog
@@ -248,7 +250,7 @@ private fun IntroContent() {
             Box(modifier = Modifier.size(250.dp)) { WebIDE_Icon() }
            // Spacer(Modifier.height(20.dp))
             Text(
-                "WebIDE",
+                stringResource(R.string.app_name),
                 style = MaterialTheme.typography.displayMedium.copy(
                     fontWeight = FontWeight.ExtraBold,
                     letterSpacing = 2.sp
@@ -256,7 +258,7 @@ private fun IntroContent() {
             )
             Spacer(Modifier.height(16.dp))
             Text(
-                "Build Future on Android",
+                stringResource(R.string.welcome_tagline),
                 style = MaterialTheme.typography.titleMedium,
                 color = LocalContentColor.current.copy(alpha = 0.8f)
             )
@@ -280,12 +282,12 @@ private fun PermissionsContent(
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            "必要权限",
+            stringResource(R.string.welcome_permissions_title),
             style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            "WebIDE 需要以下权限来读写代码和运行应用。",
+            stringResource(R.string.welcome_permissions_description),
             style = MaterialTheme.typography.bodyMedium,
             color = LocalContentColor.current.copy(alpha = 0.8f)
         )
@@ -294,16 +296,16 @@ private fun PermissionsContent(
 
         PermissionCard(
             Icons.Default.Folder,
-            "存储空间",
-            "用于访问和保存项目文件",
+            stringResource(R.string.welcome_permission_storage_title),
+            stringResource(R.string.welcome_permission_storage_description),
             storageGranted,
             onRequestStoragePermission
         )
         Spacer(Modifier.height(12.dp))
         PermissionCard(
             Icons.Default.Download,
-            "应用安装",
-            "安装构建好的 APK 文件",
+            stringResource(R.string.welcome_permission_install_title),
+            stringResource(R.string.welcome_permission_install_description),
             installGranted,
             onRequestInstallPermission
         )
@@ -323,7 +325,11 @@ private fun ThemeSetupContent(
     onThemeSelected: (Int) -> Unit,
     onCustomColorClick: () -> Unit
 ) {
-    val modeOptions = listOf("跟随系统", "浅色", "深色")
+    val modeOptions = listOf(
+        stringResource(R.string.action_follow_system),
+        stringResource(R.string.action_light),
+        stringResource(R.string.action_dark)
+    )
 
     // 1. 父容器去掉 padding，只保留垂直滚动
     Column(
@@ -334,7 +340,7 @@ private fun ThemeSetupContent(
     ) {
         // 2. 给内部元素单独加 Padding
         Text(
-            "外观风格",
+            stringResource(R.string.welcome_appearance_title),
             style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
             modifier = Modifier.padding(horizontal = 24.dp) // <--- 这里加
         )
@@ -365,7 +371,7 @@ private fun ThemeSetupContent(
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             ListItem(
-                headlineContent = { Text("动态取色 (Monet)") },
+                headlineContent = { Text(stringResource(R.string.welcome_dynamic_color)) },
                 trailingContent = { Switch(checked = isMonetEnabled, onCheckedChange = onMonetToggle) },
                 colors = ListItemDefaults.colors(
                     containerColor = Color.Transparent,

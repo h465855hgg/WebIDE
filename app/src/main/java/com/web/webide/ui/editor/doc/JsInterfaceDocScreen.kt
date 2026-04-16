@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -50,6 +51,7 @@ import com.mikepenz.markdown.model.rememberMarkdownState
 import dev.snipme.highlights.Highlights
 import dev.snipme.highlights.model.SyntaxThemes
 import kotlinx.coroutines.launch
+import com.web.webide.R
 import java.io.BufferedReader
 import java.io.InputStreamReader
 
@@ -92,7 +94,7 @@ fun JsInterfaceDocScreen(navController: NavController) {
                 val reader = BufferedReader(InputStreamReader(inputStream))
                 docContent = reader.use { it.readText() }
             } catch (e: Exception) {
-                docContent = "# Error loading documentation\n\n${e.message}"
+                docContent = context.getString(R.string.doc_load_error, e.message ?: "")
             }
         }
     }
@@ -106,7 +108,9 @@ fun JsInterfaceDocScreen(navController: NavController) {
             val parts = docContent.split(regex).filter { it.isNotBlank() }
             parts.mapIndexed { index, part ->
                 val firstLine = part.lines().firstOrNull { it.isNotBlank() } ?: ""
-                val title = firstLine.trimStart('#').trim().ifEmpty { "Section ${index + 1}" }
+                val title = firstLine.trimStart('#').trim().ifEmpty {
+                    context.getString(R.string.doc_section_fallback, index + 1)
+                }
                 DocSection(index, title, part)
             }
         }
@@ -130,7 +134,7 @@ fun JsInterfaceDocScreen(navController: NavController) {
                             TextField(
                                 value = searchQuery,
                                 onValueChange = { searchQuery = it },
-                                placeholder = { Text("Search...") },
+                                placeholder = { Text(stringResource(R.string.search_placeholder)) },
                                 singleLine = true,
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -144,7 +148,7 @@ fun JsInterfaceDocScreen(navController: NavController) {
                                 trailingIcon = {
                                     if (searchQuery.isNotEmpty()) {
                                         IconButton(onClick = { searchQuery = "" }) {
-                                            Icon(Icons.Default.Close, "Clear")
+                                            Icon(Icons.Default.Close, stringResource(R.string.action_clear))
                                         }
                                     }
                                 }
@@ -153,7 +157,7 @@ fun JsInterfaceDocScreen(navController: NavController) {
                                 focusRequester.requestFocus()
                             }
                         } else {
-                            Text("接口文档")
+                            Text(stringResource(R.string.js_interface_docs_title))
                         }
                     },
                     navigationIcon = {
@@ -165,13 +169,13 @@ fun JsInterfaceDocScreen(navController: NavController) {
                                 navController.popBackStack()
                             }
                         }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                         }
                     },
                     actions = {
                         if (!isSearchActive) {
                             IconButton(onClick = { isSearchActive = true }) {
-                                Icon(Icons.Default.Search, contentDescription = "Search")
+                                Icon(Icons.Default.Search, contentDescription = stringResource(R.string.action_search))
                             }
                         }
                     }

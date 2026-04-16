@@ -38,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -54,6 +55,7 @@ import com.rk.terminal.ui.screens.terminal.virtualkeys.VirtualKeysView
 import com.web.webide.ui.terminal.TerminalConfig.VIRTUAL_KEYS_JSON
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.web.webide.R
 
 // 🔥 全局 VirtualKeysView 引用，用于 TerminalBackEnd 读取 Ctrl/Alt 按键状态
 var virtualKeysView: WeakReference<VirtualKeysView>? = null
@@ -109,7 +111,7 @@ fun TerminalScreen(navController: NavController) {
                 TopAppBar(
                     title = {
                         Text(
-                            "Terminal",
+                            stringResource(R.string.terminal_title),
                             fontSize = 18.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -119,7 +121,7 @@ fun TerminalScreen(navController: NavController) {
                         IconButton(onClick = { navController.popBackStack() }) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back"
+                                contentDescription = stringResource(R.string.action_back)
                             )
                         }
                     },
@@ -183,7 +185,7 @@ fun TerminalScreen(navController: NavController) {
                                             Spacer(modifier = Modifier.width(6.dp))
                                             Icon(
                                                 imageVector = Icons.Default.Close,
-                                                contentDescription = "Close",
+                                                contentDescription = stringResource(R.string.action_close),
                                                 modifier = Modifier
                                                     .size(14.dp)
                                                     .clickable {
@@ -221,7 +223,7 @@ fun TerminalScreen(navController: NavController) {
                     ) {
                         Icon(
                             imageVector = Icons.Default.Add,
-                            contentDescription = "New Session",
+                            contentDescription = stringResource(R.string.terminal_new_session),
                             tint = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.size(24.dp)
                         )
@@ -297,7 +299,7 @@ fun TerminalScreen(navController: NavController) {
                                         EditText(ctx).apply {
                                             maxLines = 1; isSingleLine = true; imeOptions =
                                             EditorInfo.IME_ACTION_DONE
-                                            background = null; hint = "Type command..."
+                                            background = null; hint = context.getString(R.string.terminal_input_hint)
                                             setHintTextColor(if (isSystemDark) 0xFF888888.toInt() else 0xFFAAAAAA.toInt())
                                             setTextColor(if (isSystemDark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt())
                                             doOnTextChanged { t, _, _, _ ->

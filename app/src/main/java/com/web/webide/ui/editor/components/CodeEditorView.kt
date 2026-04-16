@@ -128,7 +128,7 @@ fun CodeEditorView(
         val textActionWindow = editor.getComponent(EditorTextActionWindow::class.java)
         val provider = object : EditorTextActionWindow.ExtraButtonProvider {
             override fun getIconResource(): Int = R.drawable.ic_command // 使用 Command 图标
-            override fun getContentDescription(): String = "命令"
+            override fun getContentDescription(): String = context.getString(R.string.content_desc_command)
             override fun shouldShowButton(editor: CodeEditor): Boolean = true
             override fun onButtonClick(editor: CodeEditor) {
                 showCommandDialog = true
@@ -225,11 +225,11 @@ fun CodeEditorView(
 
                         val actions = remember {
                             listOf(
-                                Triple("剪切", Icons.Filled.ContentCut) { editor.cutText() },
-                                Triple("复制", Icons.Filled.ContentCopy) { editor.copyText() },
-                                Triple("粘贴", Icons.Filled.ContentPaste) { editor.pasteText() },
-                                Triple("全选", Icons.Filled.SelectAll) { editor.selectAll() },
-                                Triple("选择单行", Icons.AutoMirrored.Filled.Segment) {
+                                Triple(context.getString(R.string.toolbar_cut), Icons.Filled.ContentCut) { editor.cutText() },
+                                Triple(context.getString(R.string.toolbar_copy), Icons.Filled.ContentCopy) { editor.copyText() },
+                                Triple(context.getString(R.string.toolbar_paste), Icons.Filled.ContentPaste) { editor.pasteText() },
+                                Triple(context.getString(R.string.toolbar_select_all), Icons.Filled.SelectAll) { editor.selectAll() },
+                                Triple(context.getString(R.string.toolbar_select_line), Icons.AutoMirrored.Filled.Segment) {
                                     val cursor = editor.cursor
                                     val line = cursor.leftLine
                                     if (line < editor.text.lineCount) {
@@ -240,33 +240,33 @@ fun CodeEditorView(
                                         }
                                     }
                                 },
-                                Triple("保存", Icons.Filled.Save) {
+                                Triple(context.getString(R.string.action_save), Icons.Filled.Save) {
                                     viewModel.onContentChanged(state.file, editor.text.toString(), saveToFile = true)
                                     state.onContentSaved()
                                 },
-                                Triple("保存全部", Icons.Filled.Save) {
+                                Triple(context.getString(R.string.action_save_all), Icons.Filled.Save) {
                                 viewModel.openFiles.filterIsInstance<CodeEditorState>().filter { it.isModified }.forEach { s ->
                                     viewModel.onContentChanged(s.file, s.content, saveToFile = true)
                                     s.onContentSaved()
                                 }
                             },
-                            Triple("撤销", Icons.AutoMirrored.Filled.Undo) { editor.undo() },
-                            Triple("重做", Icons.AutoMirrored.Filled.Redo) { editor.redo() },
-                            Triple("跳转行", Icons.Filled.SwapVert) { onShowJumpLine() },
-                            Triple("格式化", Icons.Filled.Menu) { viewModel.formatCode() },
-                            Triple("新建", Icons.Filled.Add) { onShowCreate() },
-                            Triple("调色板", Icons.Filled.ColorLens) { onShowColorPicker() },
-                            Triple("终端", Icons.Filled.Dns) { onNavigateToTerminal() },
-                            Triple("运行", Icons.Filled.PlayArrow) {
+                            Triple(context.getString(R.string.editor_undo), Icons.AutoMirrored.Filled.Undo) { editor.undo() },
+                            Triple(context.getString(R.string.editor_redo), Icons.AutoMirrored.Filled.Redo) { editor.redo() },
+                            Triple(context.getString(R.string.toolbar_jump_line), Icons.Filled.SwapVert) { onShowJumpLine() },
+                            Triple(context.getString(R.string.toolbar_format), Icons.Filled.Menu) { viewModel.formatCode() },
+                            Triple(context.getString(R.string.action_new), Icons.Filled.Add) { onShowCreate() },
+                            Triple(context.getString(R.string.toolbar_palette), Icons.Filled.ColorLens) { onShowColorPicker() },
+                            Triple(context.getString(R.string.action_terminal), Icons.Filled.Dns) { onNavigateToTerminal() },
+                            Triple(context.getString(R.string.action_run), Icons.Filled.PlayArrow) {
                                 onRun()
                             },
-                                Triple("只读模式", Icons.Filled.Lock) {
+                                Triple(context.getString(R.string.toolbar_readonly), Icons.Filled.Lock) {
                                     editor.isEditable = !editor.isEditable
                                 },
-                                Triple("搜索替换", Icons.Filled.Search) {
+                                Triple(context.getString(R.string.toolbar_search_replace), Icons.Filled.Search) {
                                     onShowSearch()
                                 },
-                                Triple("重载", Icons.Filled.Refresh) {
+                                Triple(context.getString(R.string.toolbar_reload), Icons.Filled.Refresh) {
                                     viewModel.reloadAllEditors(context)
                                 }
                             )

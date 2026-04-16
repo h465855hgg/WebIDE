@@ -45,6 +45,22 @@ import org.eclipse.jgit.treewalk.filter.PathFilter
 
 // 日志标签，Logcat 搜索 "WebIDE_Git"
 private const val TAG = "WebIDE_Git"
+enum class GitConnectivityError {
+    AUTH_FAILED,
+    REPO_NOT_FOUND,
+    TIMEOUT,
+    UNKNOWN_HOST,
+    SSH_ENV_FAILED,
+    UNKNOWN,
+}
+
+data class GitConnectivityResult(
+    val isSuccess: Boolean,
+    val refsCount: Int = 0,
+    val error: GitConnectivityError? = null,
+    val rawMessage: String? = null,
+)
+
 private val DEFAULT_GITIGNORE = """
     # --- WebIDE Security (绝对不能上传) ---
     .git_ssh_config/
@@ -246,7 +262,7 @@ class GitManager(projectPath: String) {
     /**
      * 测试连接 (ls-remote)
      */
-    suspend fun testConnectivity(url: String, auth: GitAuth): String = withContext(Dispatchers.IO) {
+    suspend fun testConnectivity(url: String, auth: GitAuth): GitConnectivityResult = withContext(Dispatchers.IO) {
         Log.i(TAG, ">>> 开始测试连接: $url")
         try {
             val cmd = Git.lsRemoteRepository()
@@ -262,18 +278,21 @@ class GitManager(projectPath: String) {
 
             val result = cmd.callAsMap()
             Log.i(TAG, "✅ 连接成功! 发现 ${result.size} 个引用")
-            return@withContext "连接成功 (发现 ${result.size} 个引用)"
+            return@withContext GitConnectivityResult(
+                isSuccess = true,
+                refsCount = result.size
+            )
 
         } catch (e: Exception) {
             Log.e(TAG, "❌ 连接测试失败", e)
             val msg = e.message ?: e.toString()
             return@withContext when {
-                msg.contains("401") -> "认证失败: Token 无效或过期"
-                msg.contains("not found") -> "仓库不存在"
-                msg.contains("timeout") || msg.contains("abort") -> "网络连接超时/中断"
-                msg.contains("UnknownHost") -> "无法解析域名 (检查网络)"
-                msg.contains("No user home") -> "SSH环境初始化失败 (PathUtils未设置)"
-                else -> "连接失败: $msg"
+                msg.contains("401") -> GitConnectivityResult(false, error = GitConnectivityError.AUTH_FAILED)
+                msg.contains("not found") -> GitConnectivityResult(false, error = GitConnectivityError.REPO_NOT_FOUND)
+                msg.contains("timeout") || msg.contains("abort") -> GitConnectivityResult(false, error = GitConnectivityError.TIMEOUT)
+                msg.contains("UnknownHost") -> GitConnectivityResult(false, error = GitConnectivityError.UNKNOWN_HOST)
+                msg.contains("No user home") -> GitConnectivityResult(false, error = GitConnectivityError.SSH_ENV_FAILED)
+                else -> GitConnectivityResult(false, error = GitConnectivityError.UNKNOWN, rawMessage = msg)
             }
         }
     }
