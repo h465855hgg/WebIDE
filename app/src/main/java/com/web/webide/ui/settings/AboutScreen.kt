@@ -151,6 +151,7 @@ fun AboutScreen(navController: NavController) {
         Developer("h465855hgg", stringResource(R.string.about_developer_role_lead), stringResource(R.string.about_developer_desc_maintainer), Color(0xFF009688), "https://github.com/h465855hgg"),
         Developer("Akimlc", stringResource(R.string.about_developer_role_theme), "", Color(0xFF009688), "https://github.com/Akimlc"),
         Developer("wuxianggujun", stringResource(R.string.about_developer_role_ts_language), "", Color(0xFF009688), "https://github.com/wuxianggujun"),
+        Developer("yzjdev", stringResource(R.string.about_developer_role_localization), stringResource(R.string.about_developer_desc_language), Color(0xFF009688), "https://github.com/yzjdev"),
         Developer("Claude", stringResource(R.string.about_developer_role_ui), stringResource(R.string.about_developer_desc_design), Color(0xFFD97757)),
         Developer("Gemini", stringResource(R.string.about_developer_role_arch), stringResource(R.string.about_developer_desc_core), Color(0xFF4E8CFF)),
         Developer("DeepSeek", stringResource(R.string.about_developer_role_logic), stringResource(R.string.about_developer_desc_editor), Color(0xFF6C5CE7))
@@ -190,7 +191,7 @@ fun AboutScreen(navController: NavController) {
             Donor("3658267351","黑桃信息科技","¥ 3.00","2026.01.09.12:41"),
             Donor("162145003", "陌璃与鱼","¥ 0.52","2026.02.06.16:52"),
             Donor("2736472509", "李架大王","¥ 3.50","2026.02.06.16:53"),
-Donor("676743748", "doro", "¥ 0.01","2026.02.07.21:09")
+            Donor("676743748", "doro", "¥ 0.01","2026.02.07.21:09")
         )
     }
 
@@ -703,8 +704,8 @@ fun LibraryDetailDialog(lib: Library, onDismiss: () -> Unit) {
     val context = LocalContext.current
     @Suppress("DEPRECATION")
     val clipboardManager = LocalClipboardManager.current
-    val licenseFallback = context.getString(R.string.about_see_project_website)
-    val noLicenseInfo = context.getString(R.string.about_no_license_info)
+    val licenseFallback = stringResource(R.string.about_see_project_website)
+    val noLicenseInfo = stringResource(R.string.about_no_license_info)
     val licenseText = remember(lib, licenseFallback, noLicenseInfo) {
         if (lib.licenses.isNotEmpty()) {
             lib.licenses.joinToString("\n\n") { license ->
