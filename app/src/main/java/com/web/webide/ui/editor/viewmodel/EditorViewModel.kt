@@ -26,7 +26,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.graphics.luminance
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.web.webide.R
@@ -63,12 +62,7 @@ import io.github.rosemoe.sora.editor.ts.JavaScriptLanguage
 // TextMate
 import io.github.rosemoe.sora.langs.textmate.TextMateLanguage
 import io.github.rosemoe.sora.langs.textmate.TextMateColorScheme
-import io.github.rosemoe.sora.langs.textmate.registry.FileProviderRegistry
-import io.github.rosemoe.sora.langs.textmate.registry.GrammarRegistry
 import io.github.rosemoe.sora.langs.textmate.registry.ThemeRegistry
-import io.github.rosemoe.sora.langs.textmate.registry.model.ThemeModel
-import io.github.rosemoe.sora.langs.textmate.registry.provider.AssetsFileResolver
-import org.eclipse.tm4e.core.registry.IThemeSource
 
 // LSP
 import io.github.rosemoe.sora.lsp.editor.LspEditor
@@ -775,11 +769,63 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         lastSearchQuery = query
         isIgnoreCase = ignoreCase
         val editor = getActiveEditor() ?: return
-        if (query.isNotEmpty()) editor.searcher.search(query, EditorSearcher.SearchOptions(ignoreCase, false))
-        else editor.searcher.stopSearch()
+        if (query.isNotEmpty()) {
+            try {
+                // 先停止之前的搜索，避免状态混乱
+                editor.searcher.stopSearch()
+                editor.searcher.search(query, EditorSearcher.SearchOptions(ignoreCase, false))
+            } catch (e: Exception) {
+                LogCatcher.e("Search", "Search failed", e)
+            }
+        } else {
+            editor.searcher.stopSearch()
+        }
     }
-    fun searchNext() { getActiveEditor()?.searcher?.gotoNext() }
-    fun searchPrev() { getActiveEditor()?.searcher?.gotoPrevious() }
+
+    fun searchNext() {
+        try {
+            val editor = getActiveEditor() ?: return
+            val searcher = editor.searcher
+
+            // 检查是否有活跃的搜索结果
+            if (searcher.hasQuery()) {
+                searcher.gotoNext()
+            } else if (lastSearchQuery.isNotEmpty()) {
+                // 如果没有活跃搜索但之前有搜索词，重新搜索
+                searchText(lastSearchQuery, isIgnoreCase)
+                searcher.gotoNext()
+            }
+        } catch (e: Exception) {
+            LogCatcher.e("Search", "Search next failed", e)
+        }
+    }
+
+    fun searchPrev() {
+        try {
+            val editor = getActiveEditor() ?: return
+            val searcher = editor.searcher
+
+            // 检查是否有活跃的搜索结果
+            if (searcher.hasQuery()) {
+                searcher.gotoPrevious()
+            } else if (lastSearchQuery.isNotEmpty()) {
+                // 如果没有活跃搜索但之前有搜索词，重新搜索
+                searchText(lastSearchQuery, isIgnoreCase)
+                searcher.gotoPrevious()
+            }
+        } catch (e: Exception) {
+            LogCatcher.e("Search", "Search previous failed", e)
+        }
+    }
+
+    fun stopSearch() {
+        try {
+            getActiveEditor()?.searcher?.stopSearch()
+        } catch (e: Exception) {
+            LogCatcher.e("Search", "Stop search failed", e)
+        }
+    }
+
     fun replaceCurrent(text: String) { getActiveEditor()?.searcher?.replaceCurrentMatch(text) }
     fun replaceAll(text: String) { getActiveEditor()?.searcher?.replaceAll(text) }
 
@@ -813,8 +859,6 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
     }
-
-    fun stopSearch() { getActiveEditor()?.searcher?.stopSearch() }
 
     fun formatCode() {
         if (isFormatting) return
