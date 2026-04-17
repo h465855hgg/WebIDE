@@ -44,8 +44,7 @@ fun EditorToolbar(
     isBuilding: Boolean,
     hasWebAppConfig: Boolean
 ) {
-    Surface(
-    ) {
+    Surface {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
