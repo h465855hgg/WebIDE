@@ -57,7 +57,7 @@ import java.io.InputStreamReader
 
 data class DocSection(val id: Int, val title: String, val content: String)
 
-@SuppressLint("RememberReturnType")
+@SuppressLint("RememberReturnType", "LocalContextGetResourceValueCall")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun JsInterfaceDocScreen(navController: NavController) {
