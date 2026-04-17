@@ -70,10 +70,10 @@ object PermissionManager {
         }
 
         // 其他目录根据版本判断
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            return !Environment.isExternalStorageManager()
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            !Environment.isExternalStorageManager()
         } else {
-            return !hasBasicStoragePermission(context)
+            !hasBasicStoragePermission(context)
         }
     }
 
