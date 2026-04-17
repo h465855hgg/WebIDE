@@ -20,6 +20,7 @@
 package com.web.webide.files
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
 import android.widget.Toast
 import androidx.core.content.FileProvider
@@ -72,6 +73,7 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.log10
 import kotlin.math.pow
+import androidx.core.content.edit
 
 data class FileNode(
     val file: File,
@@ -86,7 +88,8 @@ data class FileTreeConfig(
     val compactMiddlePackages: Boolean = false,
     val compactMiddlePackageCount: Int = 3, // Default max depth for compaction
     val alwaysSelectOpenedFile: Boolean = false,
-    val showIndentGuides: Boolean = false
+    val showIndentGuides: Boolean = false,
+    val rememberExpandedStates: Boolean = false // 新增：记忆展开状态
 )
 
 enum class SortBy {
@@ -161,6 +164,7 @@ fun FileTree(
     )
 }
 
+@SuppressLint("LocalContextGetResourceValueCall")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FileTreeImpl(
@@ -220,9 +224,30 @@ private fun FileTreeImpl(
     val isHorizontalScrollEnabled = maxContentWidth > viewportWidthPx && containerWidth > 0
     val horizontalScrollState = rememberScrollState()
 
-    var expandedNodes by remember(rootPaths) { 
-        mutableStateOf(rootPaths.map { File(it).path }.toSet()) 
+    val treePrefs = remember { context.getSharedPreferences("FileTreeExpandedStates", Context.MODE_PRIVATE) }
+    val projectKey = remember(rootPaths) { rootPaths.firstOrNull() ?: "" }
+
+    var expandedNodes by remember(rootPaths) {
+        val defaultNodes = rootPaths.map { File(it).path }.toSet()
+        val initialSet = if (config.rememberExpandedStates && projectKey.isNotEmpty()) {
+            treePrefs.getStringSet(projectKey, null)?.toSet() ?: defaultNodes
+        } else {
+            defaultNodes
+        }
+        mutableStateOf(initialSet)
     }
+
+    LaunchedEffect(expandedNodes, config.rememberExpandedStates, projectKey) {
+        if (projectKey.isNotEmpty()) {
+            if (config.rememberExpandedStates) {
+                treePrefs.edit { putStringSet(projectKey, expandedNodes) }
+            } else {
+                treePrefs.edit { remove(projectKey) }
+            }
+        }
+    }
+
+
     var treeSelection by remember { mutableStateOf<String?>(null) }
 
     // Helper to expand to active file
@@ -855,6 +880,7 @@ private fun BottomSheetActionItem(icon: ImageVector, text: String, onClick: () -
     }
 }
 
+@SuppressLint("LocalContextGetResourceValueCall")
 @Suppress("DEPRECATION")
 @Composable
 fun FileActionBottomSheet(
