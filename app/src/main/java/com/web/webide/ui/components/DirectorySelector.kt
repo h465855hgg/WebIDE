@@ -289,7 +289,7 @@ private fun FastScrollbar(
 ) {
     val coroutineScope = rememberCoroutineScope()
     var isDragging by remember { mutableStateOf(false) }
-    var dragOffset by remember { mutableStateOf(0f) }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
     val density = LocalDensity.current
 
     // 计算滑块位置和大小
