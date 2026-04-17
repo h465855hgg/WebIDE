@@ -16,8 +16,8 @@
   ~ along with this program.  If not, see <https://www.gnu.org/licenses/>.
   -->
 
-<resources>
-    <string name="app_name">WebIDE</string>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
+    <string name="app_name" translatable="false">WebIDE</string>
     <string name="action_back">返回</string>
     <string name="action_next">下一步</string>
     <string name="action_close">关闭</string>
@@ -514,4 +514,6 @@
     <string name="panel_lsp_success">LSP 成功</string>
     <string name="panel_lsp_error">LSP 错误</string>
     <string name="panel_cursor_position">行 %1$d，列 %2$d</string>
+    <string name="about_developer_role_localization">本地化</string>
+    <string name="about_developer_desc_language">英语翻译与维护</string>
 </resources>

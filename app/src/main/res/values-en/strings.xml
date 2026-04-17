@@ -497,4 +497,7 @@
     <string name="panel_lsp_success">LSP Success</string>
     <string name="panel_lsp_error">LSP Error</string>
     <string name="panel_cursor_position">Ln %1$d, Col %2$d</string>
+
+    <string name="about_developer_role_localization">Localization</string>
+    <string name="about_developer_desc_language">English Translation</string>
 </resources>
