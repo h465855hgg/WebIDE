@@ -19,6 +19,7 @@
 
 package com.web.webide.ui.settings
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Build
 import android.widget.Toast
@@ -83,6 +84,7 @@ fun Color.luminance(): Float {
 
 private data class FontPresetOption(val label: String, val file: String)
 
+@SuppressLint("LocalContextGetResourceValueCall")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
