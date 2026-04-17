@@ -19,6 +19,7 @@
 
 package com.web.webide.ui.projects
 
+import android.annotation.SuppressLint
 import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
@@ -214,6 +215,7 @@ fun ProjectListScreen(navController: NavController) {
         refreshList()
     }
 
+    @SuppressLint("LocalContextGetResourceValueCall")
     fun deleteProject(folderName: String) {
         scope.launch(Dispatchers.IO) {
             val targetDir = File(projectDir, folderName)
