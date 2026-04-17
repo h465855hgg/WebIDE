@@ -17,6 +17,7 @@
  */
 package com.web.webide.ui.terminal
 
+import android.annotation.SuppressLint
 import android.app.Application
 import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
@@ -60,6 +61,7 @@ import com.web.webide.R
 // 🔥 全局 VirtualKeysView 引用，用于 TerminalBackEnd 读取 Ctrl/Alt 按键状态
 var virtualKeysView: WeakReference<VirtualKeysView>? = null
 
+@SuppressLint("LocalContextGetResourceValueCall")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TerminalScreen(navController: NavController) {
