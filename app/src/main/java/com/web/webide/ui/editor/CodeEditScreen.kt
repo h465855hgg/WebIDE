@@ -99,7 +99,7 @@ sealed class BuildResultState {
     data class Finished(val message: String, val apkPath: String? = null) : BuildResultState()
 }
 
-@SuppressLint("ConfigurationScreenWidthHeight", "UseKtx")
+@SuppressLint("ConfigurationScreenWidthHeight", "UseKtx", "LocalContextGetResourceValueCall")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CodeEditScreen(folderName: String, navController: NavController, viewModel: EditorViewModel) {
@@ -123,7 +123,8 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
     var autoSaveInterval by remember { mutableLongStateOf(0L) }
     // 🔥 优化：在初始化时直接读取 SharedPreferences，避免闪烁
     var isAiEnabled by remember {
-        val editorPrefs = context.getSharedPreferences("WebIDE_Editor_Settings", Context.MODE_PRIVATE)
+        val editorPrefs =
+            context.getSharedPreferences("WebIDE_Editor_Settings", Context.MODE_PRIVATE)
         mutableStateOf(editorPrefs.getBoolean("editor_ai_enabled", true))
     }
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -134,7 +135,8 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                 val prefs = context.getSharedPreferences("WebIDE_Settings", Context.MODE_PRIVATE)
                 autoSaveInterval = prefs.getLong("auto_save_interval", 0L)
 
-                val editorPrefs = context.getSharedPreferences("WebIDE_Editor_Settings", Context.MODE_PRIVATE)
+                val editorPrefs =
+                    context.getSharedPreferences("WebIDE_Editor_Settings", Context.MODE_PRIVATE)
                 isAiEnabled = editorPrefs.getBoolean("editor_ai_enabled", true)
             }
         }
@@ -218,11 +220,21 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                     SortBy.NAME
                 },
                 foldersAlwaysOnTop = prefs.getBoolean("foldersAlwaysOnTop", true),
-                showDetails = prefs.getBoolean("showDetails", false), // User requested default: false
+                showDetails = prefs.getBoolean(
+                    "showDetails",
+                    false
+                ), // User requested default: false
                 compactMiddlePackages = prefs.getBoolean("compactMiddlePackages", false),
                 compactMiddlePackageCount = prefs.getInt("compactMiddlePackageCount", 3),
-                alwaysSelectOpenedFile = prefs.getBoolean("alwaysSelectOpenedFile", false), // User requested default: false
-                showIndentGuides = prefs.getBoolean("showIndentGuides", false) // User requested default: false
+                alwaysSelectOpenedFile = prefs.getBoolean(
+                    "alwaysSelectOpenedFile",
+                    false
+                ), // User requested default: false
+                showIndentGuides = prefs.getBoolean(
+                    "showIndentGuides",
+                    false
+                ), // User requested default: false
+                rememberExpandedStates = prefs.getBoolean("rememberExpandedStates", false) //  新增读取
             )
         )
     }
@@ -320,7 +332,12 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                         NavigationRailItem(
                             selected = selectedTab == FILES,
                             onClick = { selectedTab = FILES },
-                            icon = { Icon(Icons.Default.Folder, contentDescription = fileLabelText) },
+                            icon = {
+                                Icon(
+                                    Icons.Default.Folder,
+                                    contentDescription = fileLabelText
+                                )
+                            },
                             label = { Text(fileTreeTitleText) }
                         )
                         // 2. Git 按钮
@@ -329,7 +346,7 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                             onClick = {
                                 selectedTab = GIT
                                 gitViewModel.refreshAll()
-                                      },
+                            },
                             icon = {
                                 val changeCount = gitViewModel.changedFiles.size
                                 BadgedBox(
@@ -337,7 +354,7 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                         if (changeCount > 0) {
                                             Badge {
                                                 // 如果数字太大，显示 99+，否则显示具体数字
-                                                Text(if(changeCount > 99) "99+" else changeCount.toString())
+                                                Text(if (changeCount > 99) "99+" else changeCount.toString())
                                             }
                                         }
                                     }
@@ -361,9 +378,11 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                     )
 
                     // --- 右侧：内容区域 ---
-                    Box(modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                    ) {
                         when (selectedTab) {
                             FILES -> {
                                 // 原有的文件管理器
@@ -396,6 +415,10 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                                     "showIndentGuides",
                                                     newConfig.showIndentGuides
                                                 )
+                                                .putBoolean(
+                                                    "rememberExpandedStates",
+                                                    newConfig.rememberExpandedStates //  新增持久化
+                                                )
                                         }
                                     },
                                     onFileClick = { file ->
@@ -408,6 +431,7 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                     }
                                 )
                             }
+
                             GIT -> {
                                 // 新增的空 Git 面板
                                 GitPanel(
@@ -431,7 +455,11 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                         TopAppBar(
                             title = {
                                 Column {
-                                    Text(appNameText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(
+                                        appNameText,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
                                     Text(
                                         text = currentFolderName,
                                         style = MaterialTheme.typography.bodyMedium,
@@ -461,7 +489,10 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                     // 🔥 修改：使用一个协程顺序执行
                                     scope.launch {
                                         // 1. 先保存所有文件 (这是一个 suspend 函数，会等待 IO 完成)
-                                        val success = viewModel.saveAllModifiedFiles(context, snackbarHostState)
+                                        val success = viewModel.saveAllModifiedFiles(
+                                            context,
+                                            snackbarHostState
+                                        )
 
                                         // 2. 保存完成后，再跳转 (Undo 栈不会丢失，因为 Editor 实例没变)
                                         if (success) {
@@ -483,7 +514,10 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                             text = { Text(saveAllText) },
                                             onClick = {
                                                 scope.launch {
-                                                    viewModel.saveAllModifiedFiles(context, snackbarHostState)
+                                                    viewModel.saveAllModifiedFiles(
+                                                        context,
+                                                        snackbarHostState
+                                                    )
                                                     gitViewModel.refreshAll() // <--- 加这一行
                                                 }
                                                 isMoreMenuExpanded = false
@@ -529,7 +563,10 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                                 onClick = {
                                                     isMoreMenuExpanded = false
                                                     // 调用安装器
-                                                    ApkInstaller.install(context, viewModel.lastBuiltApk!!)
+                                                    ApkInstaller.install(
+                                                        context,
+                                                        viewModel.lastBuiltApk!!
+                                                    )
                                                 }
                                             )
                                             HorizontalDivider() // 加个分割线好看点
@@ -554,7 +591,9 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                                                 isBuilding = false
                                                                 // 🔥 新增：如果构建成功，保存路径到 ViewModel
                                                                 if (resultState is BuildResultState.Finished && resultState.apkPath != null) {
-                                                                    viewModel.updateLastBuild(resultState.apkPath)
+                                                                    viewModel.updateLastBuild(
+                                                                        resultState.apkPath
+                                                                    )
                                                                 }
                                                             }
                                                         )
@@ -647,17 +686,21 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                 },
 
                 content = { innerPadding ->
-                    BoxWithConstraints(modifier = Modifier
-                        .padding(innerPadding)
-                        .fillMaxSize()
-                        .imePadding()) {
+                    BoxWithConstraints(
+                        modifier = Modifier
+                            .padding(innerPadding)
+                            .fillMaxSize()
+                            .imePadding()
+                    ) {
                         val availableEditorHeight = maxHeight // 这就是 EditorPanelLayout 可以用的全部高度
-                        
+
                         // 🔥 修改：在代码编辑器和Diff模式下显示符号栏，仅在媒体查看器或无文件时隐藏
                         val activeTab = viewModel.openFiles.getOrNull(viewModel.activeFileIndex)
-                        val shouldShowSymbols = activeTab is com.web.webide.ui.editor.viewmodel.CodeEditorState || 
-                                              activeTab is com.web.webide.ui.editor.viewmodel.DiffEditorState
-                        val currentSymbols = if (hasOpenFiles && shouldShowSymbols) editorConfig.getSymbolList() else emptyList()
+                        val shouldShowSymbols =
+                            activeTab is com.web.webide.ui.editor.viewmodel.CodeEditorState ||
+                                    activeTab is com.web.webide.ui.editor.viewmodel.DiffEditorState
+                        val currentSymbols =
+                            if (hasOpenFiles && shouldShowSymbols) editorConfig.getSymbolList() else emptyList()
 
                         EditorPanelLayout(
                             viewModel = viewModel,
@@ -677,11 +720,11 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                 // However, we have a HorizontalPager below that switches tabs.
                                 // The structure seems to be: 
                                 // CodeEditScreen -> Scaffold -> EditorPanelLayout -> Content (Main Area)
-                                
+
                                 // If we are here, it means we are in the single-pane mode (maybe?) or this is the common area.
                                 // Actually, `CodeEditScreen` uses `EditCode` which contains the `HorizontalPager`.
                                 // Let's look at `EditCode`.
-                                
+
                                 EditCode(
                                     modifier = Modifier.fillMaxSize(),
                                     viewModel = viewModel,
@@ -696,11 +739,11 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                 )
                             }
                         }
-                        
+
                         // 配置文件可视化入口
                         // Removed duplicate button from here
 
-                        
+
                         if (isAiEnabled) {
                             AICodingPanel()
                         }
@@ -723,106 +766,109 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
             )
         }
     }
-        // 1. 新建对话框
-        if (showCreateDialog) {
-            var nameInput by remember { mutableStateOf("") }
-            var isFileType by remember { mutableStateOf(true) }
+    // 1. 新建对话框
+    if (showCreateDialog) {
+        var nameInput by remember { mutableStateOf("") }
+        var isFileType by remember { mutableStateOf(true) }
+        AlertDialog(
+            onDismissRequest = { showCreateDialog = false },
+            title = { Text(newContentTitleText) },
+            text = {
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = isFileType, onClick = { isFileType = true })
+                        Text(fileLabelText)
+                        Spacer(Modifier.width(16.dp))
+                        RadioButton(selected = !isFileType, onClick = { isFileType = false })
+                        Text(folderLabelText)
+                    }
+                    OutlinedTextField(
+                        value = nameInput,
+                        onValueChange = { nameInput = it },
+                        label = { Text(exampleTestFileText) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (nameInput.isNotBlank()) {
+                        viewModel.createNewItem(projectPath, nameInput, isFileType) { newItem ->
+                            if (isFileType) viewModel.openFile(newItem)
+                            gitViewModel.refreshAll()
+                        }
+                    }
+                    showCreateDialog = false
+                }) { Text(createText) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCreateDialog = false }) { Text(cancelText) }
+            }
+        )
+    }
+
+    // 2. 调色板
+    if (showColorPicker) {
+        ColorPickerDialog(
+            initialColor = MaterialTheme.colorScheme.primary,
+            onDismiss = { showColorPicker = false },
+            onColorSelected = { color ->
+                val hex = colorToHex(color, color.alpha < 1f)
+                viewModel.insertText(hex)
+                val clipboardManager =
+                    context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val clipData = ClipData.newPlainText(
+                    context.getString(R.string.editor_clipboard_hex_label),
+                    hex
+                )
+                clipboardManager.setPrimaryClip(clipData)
+                showColorPicker = false
+            }
+        )
+    }
+
+    // 3. 构建结果弹窗
+    buildResult?.let { result ->
+        if (result is BuildResultState.Finished) {
+            val isSuccess = result.apkPath != null
+            val buildResultTitleText = stringResource(
+                if (isSuccess) R.string.editor_build_success_title else R.string.editor_build_failed_title
+            )
             AlertDialog(
-                onDismissRequest = { showCreateDialog = false },
-                title = { Text(newContentTitleText) },
+                onDismissRequest = { buildResult = null },
+                title = { Text(buildResultTitleText) },
                 text = {
                     Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(selected = isFileType, onClick = { isFileType = true })
-                            Text(fileLabelText)
-                            Spacer(Modifier.width(16.dp))
-                            RadioButton(selected = !isFileType, onClick = { isFileType = false })
-                            Text(folderLabelText)
+                        if (isSuccess) {
+                            Text(buildInstallPromptText)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(outputPathText, style = MaterialTheme.typography.titleSmall)
+                            Text(result.apkPath, style = MaterialTheme.typography.bodySmall)
+                        } else {
+                            Text(errorInfoText, color = MaterialTheme.colorScheme.error)
+                            Text(result.message)
                         }
-                        OutlinedTextField(
-                            value = nameInput,
-                            onValueChange = { nameInput = it },
-                            label = { Text(exampleTestFileText) },
-                            modifier = Modifier.fillMaxWidth()
-                        )
                     }
                 },
                 confirmButton = {
-                    TextButton(onClick = {
-                        if (nameInput.isNotBlank()) {
-                            viewModel.createNewItem(projectPath, nameInput, isFileType) { newItem ->
-                                if (isFileType) viewModel.openFile(newItem)
-                                gitViewModel.refreshAll()
-                            }
-                        }
-                        showCreateDialog = false
-                    }) { Text(createText) }
+                    if (isSuccess) {
+                        TextButton(onClick = {
+                            val apkFile = File(result.apkPath)
+                            ApkInstaller.install(context, apkFile)
+                            buildResult = null
+                        }) { Text(installText) }
+                    }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showCreateDialog = false }) { Text(cancelText) }
+                    TextButton(onClick = { buildResult = null }) { Text(closeText) }
                 }
             )
-        }
-
-        // 2. 调色板
-        if (showColorPicker) {
-            ColorPickerDialog(
-                initialColor = MaterialTheme.colorScheme.primary,
-                onDismiss = { showColorPicker = false },
-                onColorSelected = { color ->
-                    val hex = colorToHex(color, color.alpha < 1f)
-                    viewModel.insertText(hex)
-                    val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    val clipData = ClipData.newPlainText(context.getString(R.string.editor_clipboard_hex_label), hex)
-                    clipboardManager.setPrimaryClip(clipData)
-                    showColorPicker = false
-                }
-            )
-        }
-
-        // 3. 构建结果弹窗
-        buildResult?.let { result ->
-            if (result is BuildResultState.Finished) {
-                val isSuccess = result.apkPath != null
-                val buildResultTitleText = stringResource(
-                    if (isSuccess) R.string.editor_build_success_title else R.string.editor_build_failed_title
-                )
-                AlertDialog(
-                    onDismissRequest = { buildResult = null },
-                    title = { Text(buildResultTitleText) },
-                    text = {
-                        Column {
-                            if (isSuccess) {
-                                Text(buildInstallPromptText)
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(outputPathText, style = MaterialTheme.typography.titleSmall)
-                                Text(result.apkPath, style = MaterialTheme.typography.bodySmall)
-                            } else {
-                                Text(errorInfoText, color = MaterialTheme.colorScheme.error)
-                                Text(result.message)
-                            }
-                        }
-                    },
-                    confirmButton = {
-                        if (isSuccess) {
-                            TextButton(onClick = {
-                                val apkFile = File(result.apkPath)
-                                ApkInstaller.install(context, apkFile)
-                                buildResult = null
-                            }) { Text(installText) }
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { buildResult = null }) { Text(closeText) }
-                    }
-                )
-            }
         }
     }
+}
 
 
 // ---------------- 辅助函数 ----------------
-
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -888,31 +934,50 @@ fun EditCode(
                                 Spacer(Modifier.width(8.dp))
                                 Text(restoreRecentText)
                             }
-                            
+
                             DropdownMenu(
                                 expanded = expandedTabIndex == -2,
                                 onDismissRequest = { expandedTabIndex = null }
                             ) {
                                 if (viewModel.closedFilesHistory.isEmpty()) {
-                                     DropdownMenuItem(
-                                        text = { Text(noRecentClosedText, color = MaterialTheme.colorScheme.secondary) },
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                noRecentClosedText,
+                                                color = MaterialTheme.colorScheme.secondary
+                                            )
+                                        },
                                         onClick = { expandedTabIndex = null }
                                     )
                                 } else {
                                     DropdownMenuItem(
-                                        text = { Text(clearHistoryText, color = MaterialTheme.colorScheme.error) },
-                                        onClick = { expandedTabIndex = null; viewModel.clearClosedHistory() }
+                                        text = {
+                                            Text(
+                                                clearHistoryText,
+                                                color = MaterialTheme.colorScheme.error
+                                            )
+                                        },
+                                        onClick = {
+                                            expandedTabIndex = null; viewModel.clearClosedHistory()
+                                        }
                                     )
                                     HorizontalDivider()
                                     viewModel.closedFilesHistory.forEach { tab ->
                                         DropdownMenuItem(
-                                            text = { 
+                                            text = {
                                                 Column {
                                                     Text(tab.title)
-                                                    Text(tab.file.parentFile?.name ?: "", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+                                                    Text(
+                                                        tab.file.parentFile?.name ?: "",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.secondary
+                                                    )
                                                 }
                                             },
-                                            onClick = { expandedTabIndex = null; viewModel.restoreClosedFile(tab) }
+                                            onClick = {
+                                                expandedTabIndex =
+                                                    null; viewModel.restoreClosedFile(tab)
+                                            }
                                         )
                                     }
                                 }
@@ -931,9 +996,17 @@ fun EditCode(
                     indicator = {
                         Box(
                             modifier = Modifier
-                                .tabIndicatorOffset(pagerState.currentPage.coerceIn(0, openFiles.size - 1))
+                                .tabIndicatorOffset(
+                                    pagerState.currentPage.coerceIn(
+                                        0,
+                                        openFiles.size - 1
+                                    )
+                                )
                                 .height(3.dp)
-                                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(percent = 50))
+                                .background(
+                                    MaterialTheme.colorScheme.primary,
+                                    RoundedCornerShape(percent = 50)
+                                )
                         )
                     }
                 ) {
@@ -944,7 +1017,8 @@ fun EditCode(
 
                             // 2. 区分颜色 (Diff 模式显示不同颜色)
                             val isDiff = tab is com.web.webide.ui.editor.viewmodel.DiffEditorState
-                            val tabColor = if (isDiff) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface
+                            val tabColor =
+                                if (isDiff) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface
 
                             Tab(
                                 selected = pagerState.currentPage == index,
@@ -968,11 +1042,17 @@ fun EditCode(
                             ) {
                                 DropdownMenuItem(
                                     text = { Text(closeText) },
-                                    onClick = { expandedTabIndex = null; viewModel.closeFile(index) }
+                                    onClick = {
+                                        expandedTabIndex = null; viewModel.closeFile(index)
+                                    }
                                 )
                                 DropdownMenuItem(
                                     text = { Text(closeOthersText) },
-                                    onClick = { expandedTabIndex = null; viewModel.closeOtherFiles(index) }
+                                    onClick = {
+                                        expandedTabIndex = null; viewModel.closeOtherFiles(
+                                        index
+                                    )
+                                    }
                                 )
                                 DropdownMenuItem(
                                     text = { Text(closeAllText) },
@@ -982,38 +1062,61 @@ fun EditCode(
                         }
                     }
                 }
-                
+
                 // History Button
                 if (viewModel.editorConfig.showHistory) {
                     Box {
                         IconButton(onClick = { expandedTabIndex = -1 }) {
-                            Icon(Icons.Default.History, historyContentDescription, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(
+                                Icons.Default.History,
+                                historyContentDescription,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
-                        
+
                         DropdownMenu(
                             expanded = expandedTabIndex == -1,
                             onDismissRequest = { expandedTabIndex = null }
                         ) {
-                             if (viewModel.closedFilesHistory.isEmpty()) {
-                                 DropdownMenuItem(
-                                    text = { Text(noRecentClosedText, color = MaterialTheme.colorScheme.secondary) },
+                            if (viewModel.closedFilesHistory.isEmpty()) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            noRecentClosedText,
+                                            color = MaterialTheme.colorScheme.secondary
+                                        )
+                                    },
                                     onClick = { expandedTabIndex = null }
                                 )
                             } else {
                                 DropdownMenuItem(
-                                    text = { Text(clearHistoryText, color = MaterialTheme.colorScheme.error) },
-                                    onClick = { expandedTabIndex = null; viewModel.clearClosedHistory() }
+                                    text = {
+                                        Text(
+                                            clearHistoryText,
+                                            color = MaterialTheme.colorScheme.error
+                                        )
+                                    },
+                                    onClick = {
+                                        expandedTabIndex = null; viewModel.clearClosedHistory()
+                                    }
                                 )
                                 HorizontalDivider()
                                 viewModel.closedFilesHistory.forEach { tab ->
                                     DropdownMenuItem(
-                                        text = { 
+                                        text = {
                                             Column {
                                                 Text(tab.title)
-                                                Text(tab.file.parentFile?.name ?: "", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+                                                Text(
+                                                    tab.file.parentFile?.name ?: "",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.secondary
+                                                )
                                             }
                                         },
-                                        onClick = { expandedTabIndex = null; viewModel.restoreClosedFile(tab) }
+                                        onClick = {
+                                            expandedTabIndex =
+                                                null; viewModel.restoreClosedFile(tab)
+                                        }
                                     )
                                 }
                             }
@@ -1023,7 +1126,9 @@ fun EditCode(
             }
             HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant)
 
-            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            Box(modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()) {
                 HorizontalPager(
                     state = pagerState,
                     modifier = Modifier.fillMaxSize(),
@@ -1041,6 +1146,7 @@ fun EditCode(
                                     type = tab.mediaType
                                 )
                             }
+
                             is com.web.webide.ui.editor.viewmodel.CodeEditorState -> {
                                 com.web.webide.ui.editor.components.CodeEditorView(
                                     modifier = Modifier.fillMaxSize(),
@@ -1049,7 +1155,10 @@ fun EditCode(
                                     onShowSearch = onShowSearch,
                                     onRun = {
                                         scope.launch {
-                                            viewModel.saveAllModifiedFiles( context, snackbarHostState)
+                                            viewModel.saveAllModifiedFiles(
+                                                context,
+                                                snackbarHostState
+                                            )
                                             navController.safeNavigate("preview/$folderName")
                                         }
                                     },
@@ -1059,6 +1168,7 @@ fun EditCode(
                                     onShowColorPicker = onShowColorPicker
                                 )
                             }
+
                             is com.web.webide.ui.editor.viewmodel.DiffEditorState -> {
                                 com.web.webide.ui.editor.components.DiffViewer(
                                     viewModel = viewModel,
@@ -1068,7 +1178,10 @@ fun EditCode(
                             }
                         }
                     } else {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
                             CircularProgressIndicator()
                         }
                     }
@@ -1078,7 +1191,10 @@ fun EditCode(
                 if (activeTab?.file?.name == "webapp.json") {
                     FilledIconButton(
                         onClick = {
-                            val encodedPath = URLEncoder.encode(activeTab.file.absolutePath, StandardCharsets.UTF_8.toString())
+                            val encodedPath = URLEncoder.encode(
+                                activeTab.file.absolutePath,
+                                StandardCharsets.UTF_8.toString()
+                            )
                             navController.navigate("project_config/$encodedPath")
                         },
                         modifier = Modifier
@@ -1086,7 +1202,11 @@ fun EditCode(
                             .padding(top = 16.dp, end = 16.dp)
                             .size(35.dp)
                     ) {
-                        Icon(Icons.Outlined.Settings, visualConfigText, modifier = Modifier.size(20.dp))
+                        Icon(
+                            Icons.Outlined.Settings,
+                            visualConfigText,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 }
             }
@@ -1132,7 +1252,10 @@ fun FileManagerDrawer(
     val showDetailsText = stringResource(R.string.file_tree_show_details)
     val compactMiddlePackagesText = stringResource(R.string.file_tree_compact_middle_packages)
     val maxCompactLevelText =
-        stringResource(R.string.file_tree_max_compact_level, fileTreeConfig.compactMiddlePackageCount)
+        stringResource(
+            R.string.file_tree_max_compact_level,
+            fileTreeConfig.compactMiddlePackageCount
+        )
     val showIndentGuidesText = stringResource(R.string.file_tree_show_indent_guides)
     val behaviorText = stringResource(R.string.file_tree_behavior)
     val alwaysSelectOpenedText = stringResource(R.string.file_tree_always_select_opened)
@@ -1142,6 +1265,7 @@ fun FileManagerDrawer(
     val collapseAllContentDescription = stringResource(R.string.content_desc_collapse_all)
     val expandAllContentDescription = stringResource(R.string.content_desc_expand_all)
     val optionsContentDescription = stringResource(R.string.content_desc_options)
+    val rememberExpandedStatesText = stringResource(R.string.file_tree_remember_expanded_states)
 
     if (showCreateMenu) {
         AlertDialog(
@@ -1159,7 +1283,11 @@ fun FileManagerDrawer(
                             }
                             .padding(vertical = 12.dp)
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.InsertDriveFile, null, tint = MaterialTheme.colorScheme.primary)
+                        Icon(
+                            Icons.AutoMirrored.Filled.InsertDriveFile,
+                            null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
                         Spacer(Modifier.width(16.dp))
                         Text(fileLabelText)
                     }
@@ -1204,8 +1332,14 @@ fun FileManagerDrawer(
                     if (name.isNotBlank()) {
                         scope.launch(Dispatchers.IO) {
                             try {
-                                val parent = if (activeFile != null) activeFile.parentFile else File(projectPath)
-                                val target = if (parent != null && parent.exists()) parent else File(projectPath)
+                                val parent =
+                                    if (activeFile != null) activeFile.parentFile else File(
+                                        projectPath
+                                    )
+                                val target =
+                                    if (parent != null && parent.exists()) parent else File(
+                                        projectPath
+                                    )
                                 val newFile = File(target, name)
                                 if (!newFile.exists()) {
                                     newFile.createNewFile()
@@ -1246,8 +1380,14 @@ fun FileManagerDrawer(
                     if (name.isNotBlank()) {
                         scope.launch(Dispatchers.IO) {
                             try {
-                                val parent = if (activeFile != null) activeFile.parentFile else File(projectPath)
-                                val target = if (parent != null && parent.exists()) parent else File(projectPath)
+                                val parent =
+                                    if (activeFile != null) activeFile.parentFile else File(
+                                        projectPath
+                                    )
+                                val target =
+                                    if (parent != null && parent.exists()) parent else File(
+                                        projectPath
+                                    )
                                 val newFile = File(target, name)
                                 if (!newFile.exists()) {
                                     newFile.mkdirs()
@@ -1275,68 +1415,166 @@ fun FileManagerDrawer(
             title = { Text(settingsTitleText) },
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                    Text(sortTitleText, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                    
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { onConfigChange(fileTreeConfig.copy(sortBy = SortBy.NAME)) }.padding(vertical = 8.dp)) {
+                    Text(
+                        sortTitleText,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onConfigChange(fileTreeConfig.copy(sortBy = SortBy.NAME)) }
+                            .padding(vertical = 8.dp)
+                    ) {
                         RadioButton(selected = fileTreeConfig.sortBy == SortBy.NAME, onClick = null)
                         Spacer(Modifier.width(8.dp))
                         Text(sortByNameText)
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { onConfigChange(fileTreeConfig.copy(sortBy = SortBy.TYPE)) }.padding(vertical = 8.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onConfigChange(fileTreeConfig.copy(sortBy = SortBy.TYPE)) }
+                            .padding(vertical = 8.dp)
+                    ) {
                         RadioButton(selected = fileTreeConfig.sortBy == SortBy.TYPE, onClick = null)
                         Spacer(Modifier.width(8.dp))
                         Text(sortByTypeText)
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { onConfigChange(fileTreeConfig.copy(sortBy = SortBy.DATE_NEWEST)) }.padding(vertical = 8.dp)) {
-                        RadioButton(selected = fileTreeConfig.sortBy == SortBy.DATE_NEWEST, onClick = null)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onConfigChange(fileTreeConfig.copy(sortBy = SortBy.DATE_NEWEST)) }
+                            .padding(vertical = 8.dp)
+                    ) {
+                        RadioButton(
+                            selected = fileTreeConfig.sortBy == SortBy.DATE_NEWEST,
+                            onClick = null
+                        )
                         Spacer(Modifier.width(8.dp))
                         Text(sortByDateNewestText)
                     }
 
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                    Text(appearanceText, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    Text(
+                        appearanceText,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
 
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { onConfigChange(fileTreeConfig.copy(foldersAlwaysOnTop = !fileTreeConfig.foldersAlwaysOnTop)) }.padding(vertical = 8.dp)) {
-                        Checkbox(checked = fileTreeConfig.foldersAlwaysOnTop, onCheckedChange = null)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onConfigChange(fileTreeConfig.copy(foldersAlwaysOnTop = !fileTreeConfig.foldersAlwaysOnTop)) }
+                            .padding(vertical = 8.dp)
+                    ) {
+                        Checkbox(
+                            checked = fileTreeConfig.foldersAlwaysOnTop,
+                            onCheckedChange = null
+                        )
                         Spacer(Modifier.width(8.dp))
                         Text(foldersOnTopText)
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { onConfigChange(fileTreeConfig.copy(showDetails = !fileTreeConfig.showDetails)) }.padding(vertical = 8.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onConfigChange(fileTreeConfig.copy(showDetails = !fileTreeConfig.showDetails)) }
+                            .padding(vertical = 8.dp)
+                    ) {
                         Checkbox(checked = fileTreeConfig.showDetails, onCheckedChange = null)
                         Spacer(Modifier.width(8.dp))
                         Text(showDetailsText)
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { onConfigChange(fileTreeConfig.copy(compactMiddlePackages = !fileTreeConfig.compactMiddlePackages)) }.padding(vertical = 8.dp)) {
-                        Checkbox(checked = fileTreeConfig.compactMiddlePackages, onCheckedChange = null)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onConfigChange(fileTreeConfig.copy(compactMiddlePackages = !fileTreeConfig.compactMiddlePackages)) }
+                            .padding(vertical = 8.dp)
+                    ) {
+                        Checkbox(
+                            checked = fileTreeConfig.compactMiddlePackages,
+                            onCheckedChange = null
+                        )
                         Spacer(Modifier.width(8.dp))
                         Text(compactMiddlePackagesText)
                     }
-                    
+
                     if (fileTreeConfig.compactMiddlePackages) {
                         Column(modifier = Modifier.padding(start = 40.dp, bottom = 8.dp)) {
-                             Text(maxCompactLevelText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                             Slider(
-                                 value = fileTreeConfig.compactMiddlePackageCount.toFloat(),
-                                 onValueChange = { onConfigChange(fileTreeConfig.copy(compactMiddlePackageCount = it.toInt())) },
-                                 valueRange = 1f..10f,
-                                 steps = 8
-                             )
+                            Text(
+                                maxCompactLevelText,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Slider(
+                                value = fileTreeConfig.compactMiddlePackageCount.toFloat(),
+                                onValueChange = {
+                                    onConfigChange(
+                                        fileTreeConfig.copy(
+                                            compactMiddlePackageCount = it.toInt()
+                                        )
+                                    )
+                                },
+                                valueRange = 1f..10f,
+                                steps = 8
+                            )
                         }
                     }
 
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { onConfigChange(fileTreeConfig.copy(showIndentGuides = !fileTreeConfig.showIndentGuides)) }.padding(vertical = 8.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onConfigChange(fileTreeConfig.copy(showIndentGuides = !fileTreeConfig.showIndentGuides)) }
+                            .padding(vertical = 8.dp)
+                    ) {
                         Checkbox(checked = fileTreeConfig.showIndentGuides, onCheckedChange = null)
                         Spacer(Modifier.width(8.dp))
                         Text(showIndentGuidesText)
                     }
-                    
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                    Text(behaviorText, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
 
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { onConfigChange(fileTreeConfig.copy(alwaysSelectOpenedFile = !fileTreeConfig.alwaysSelectOpenedFile)) }.padding(vertical = 8.dp)) {
-                        Checkbox(checked = fileTreeConfig.alwaysSelectOpenedFile, onCheckedChange = null)
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    Text(
+                        behaviorText,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onConfigChange(fileTreeConfig.copy(alwaysSelectOpenedFile = !fileTreeConfig.alwaysSelectOpenedFile)) }
+                            .padding(vertical = 8.dp)
+                    ) {
+                        Checkbox(
+                            checked = fileTreeConfig.alwaysSelectOpenedFile,
+                            onCheckedChange = null
+                        )
                         Spacer(Modifier.width(8.dp))
                         Text(alwaysSelectOpenedText)
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onConfigChange(fileTreeConfig.copy(rememberExpandedStates = !fileTreeConfig.rememberExpandedStates)) }
+                            .padding(vertical = 8.dp)
+                    ) {
+                        Checkbox(
+                            checked = fileTreeConfig.rememberExpandedStates,
+                            onCheckedChange = null
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        // 如果之后你有在 strings.xml 添加，这里可以用 stringResource，此处暂用硬编码以免报错
+                        Text(rememberExpandedStatesText)
                     }
                 }
             },
@@ -1360,7 +1598,7 @@ fun FileManagerDrawer(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(start = 8.dp)
             )
-            
+
             Row(
                 modifier = Modifier.padding(end = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -1386,7 +1624,7 @@ fun FileManagerDrawer(
                         .clickable { locateTrigger = System.currentTimeMillis() }
                         .padding(4.dp)
                 )
-                
+
                 // Collapse All
                 Icon(
                     imageVector = Icons.Filled.UnfoldLess,
@@ -1421,7 +1659,7 @@ fun FileManagerDrawer(
                 )
             }
         }
-        
+
         HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
 
         FileTree(
@@ -1434,13 +1672,11 @@ fun FileManagerDrawer(
             refreshTrigger = refreshTrigger,
             modifier = Modifier.fillMaxSize(),
             onFileClick = onFileClick,
-            onFileRenamed = onFileRenamed
-        )
+            onFileRenamed = onFileRenamed,
+
+            )
     }
 }
-
-
-
 
 
 @Composable
@@ -1544,7 +1780,6 @@ fun AnimatedDrawerToggle(
 }
 
 
-
 private suspend fun performBuild(
     context: Context,
     projectPath: String,
@@ -1624,14 +1859,24 @@ private suspend fun performBuild(
                         // 如果别名密码为空，通常默认与库密码相同，或者尝试读取 keyPassword
                         customKeyPass = signingObj.optString("keyPassword", customStorePass)
                     } else {
-                        LogCatcher.w("Build", "webapp.json 中指定了 keystore 但文件未找到: $keyFileName")
+                        LogCatcher.w(
+                            "Build",
+                            "webapp.json 中指定了 keystore 但文件未找到: $keyFileName"
+                        )
                     }
                 }
             }
 
         } catch (e: Exception) {
             LogCatcher.e("Build", "JSON Error", e)
-            onResult(BuildResultState.Finished(context.getString(R.string.editor_webapp_json_error, e.message)))
+            onResult(
+                BuildResultState.Finished(
+                    context.getString(
+                        R.string.editor_webapp_json_error,
+                        e.message
+                    )
+                )
+            )
             return
         }
     }
@@ -1660,6 +1905,11 @@ private suspend fun performBuild(
     if (result.startsWith("error:")) {
         onResult(BuildResultState.Finished(result, null))
     } else {
-        onResult(BuildResultState.Finished(context.getString(R.string.editor_build_success_simple), result))
+        onResult(
+            BuildResultState.Finished(
+                context.getString(R.string.editor_build_success_simple),
+                result
+            )
+        )
     }
 }
