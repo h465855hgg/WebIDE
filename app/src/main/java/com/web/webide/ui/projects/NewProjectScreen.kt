@@ -249,6 +249,7 @@ fun NewProjectScreen(navController: NavController) {
     val imageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { if(it!=null) { iconPath=it.toString(); syncJsonFromUi() } }
     val keystoreLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { if(it!=null) { keystorePath=it.toString(); syncJsonFromUi() } }
 
+    @SuppressLint("LocalContextGetResourceValueCall")
     fun handleCreate() {
         if (projectName.isBlank()) {
             scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.new_project_enter_name_error)) }
