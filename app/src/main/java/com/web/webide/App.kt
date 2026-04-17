@@ -162,7 +162,7 @@ fun App(
         ) { backStackEntry ->
             val folderName = backStackEntry.arguments?.getString("folderName")
             if (folderName != null) {
-                WebPreviewScreen(folderName, navController, mainViewModel)
+                WebPreviewScreen(folderName, navController)
             }
         }
 
