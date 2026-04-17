@@ -17,6 +17,7 @@
  */
 package com.web.webide.ui.projects
 
+import android.annotation.SuppressLint
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -213,6 +214,7 @@ fun ProjectConfigScreen(
     }
 
     // Save Logic
+    @SuppressLint("LocalContextGetResourceValueCall")
     fun handleSave() {
         scope.launch {
             isLoading = true
