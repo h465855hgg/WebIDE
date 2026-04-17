@@ -27,7 +27,6 @@ import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.graphics.Color as AndroidColor
 import android.net.Uri
-import android.os.Build
 import android.view.ViewGroup
 import android.webkit.*
 import androidx.activity.compose.BackHandler
@@ -56,7 +55,6 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.navigation.NavController
 import com.web.webide.core.utils.LogCatcher
 import com.web.webide.core.utils.WorkspaceManager
-import com.web.webide.ui.editor.viewmodel.EditorViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -71,6 +69,9 @@ import android.webkit.URLUtil
 import android.widget.Toast
 import rrzt.web.web_bridge.WebsApiAdapter
 import com.web.webide.R
+import androidx.core.content.edit
+import androidx.core.graphics.toColorInt
+import androidx.core.net.toUri
 
 class TinyWebServer(private val rootDir: File) {
     private var serverSocket: ServerSocket? = null
@@ -104,7 +105,7 @@ class TinyWebServer(private val rootDir: File) {
                     try {
                         val client = serverSocket?.accept() ?: break
                         thread { handleClient(client) }
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         break
                     }
                 }
@@ -120,7 +121,7 @@ class TinyWebServer(private val rootDir: File) {
         isRunning.set(false)
         try {
             serverSocket?.close()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
         }
     }
 
@@ -142,7 +143,6 @@ class TinyWebServer(private val rootDir: File) {
 
             // 2. 智能文件查找逻辑
             var targetFile: File? = null
-            var finalPath = decodedPath
 
             // 移除开头的斜杠
             val relativePath = decodedPath.removePrefix("/")
@@ -177,10 +177,9 @@ class TinyWebServer(private val rootDir: File) {
 
             // 3. 响应结果
             if (targetFile != null && targetFile.exists()) {
-                var fileBytes = targetFile.readBytes()
+                val fileBytes = targetFile.readBytes()
                 val contentType = getMimeType(targetFile.name)
-                val isHtml = contentType.contains("html")
-                
+
                 output.writeBytes("HTTP/1.1 200 OK\r\n")
                 output.writeBytes("Content-Type: $contentType\r\n")
                 output.writeBytes("Content-Length: ${fileBytes.size}\r\n")
@@ -196,10 +195,10 @@ class TinyWebServer(private val rootDir: File) {
             }
             output.flush()
             socket.close()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             try {
                 socket.close()
-            } catch (e2: Exception) {
+            } catch (_: Exception) {
             }
         }
     }
@@ -234,9 +233,11 @@ object UserAgents {
         "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36"
 }
 
+@Suppress("DEPRECATION")
+@SuppressLint("LocalContextGetResourceValueCall")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WebPreviewScreen(folderName: String, navController: NavController, viewModel: EditorViewModel) {
+fun WebPreviewScreen(folderName: String, navController: NavController) {
     val context = LocalContext.current
     val activity = context as? Activity
     val workspacePath = WorkspaceManager.getWorkspacePath(context)
@@ -326,7 +327,7 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
                         ) line.substring(0, index) else line
                     }
                     JSONObject(cleanJson)
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     null
                 }
             } else null
@@ -389,8 +390,8 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
                 if (sbConfig != null) {
                     val color = sbConfig.optString("backgroundColor", "#FFFFFF")
                     window.statusBarColor = try {
-                        AndroidColor.parseColor(color)
-                    } catch (e: Exception) {
+                        color.toColorInt()
+                    } catch (_: Exception) {
                         AndroidColor.WHITE
                     }
                     controller.isAppearanceLightStatusBars =
@@ -485,7 +486,7 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
                                 userAgentOptions.forEach { (ua, name) ->
                                     DropdownMenuItem(text = { Text(name) }, onClick = {
                                         currentUAType = ua
-                                        prefs.edit().putString("ua_type_$folderName", ua).apply()
+                                        prefs.edit { putString("ua_type_$folderName", ua) }
                                         showUAMenu = false
                                         configRefreshTrigger = System.currentTimeMillis()
                                         scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.preview_ua_selected, name)) }
@@ -495,7 +496,7 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
                         }
                         IconButton(onClick = {
                             isDebugEnabled = !isDebugEnabled
-                            prefs.edit().putBoolean("debug_$folderName", isDebugEnabled).apply()
+                            prefs.edit { putBoolean("debug_$folderName", isDebugEnabled) }
                             webViewRef?.clearCache(true)
                             webViewRef?.reload()
                         }) {
@@ -546,7 +547,7 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
                                             p?.createIntent()
                                                 ?.let { fileChooserLauncher.launch(it); true }
                                                 ?: false
-                                        } catch (e: Exception) {
+                                        } catch (_: Exception) {
                                             false
                                         }
                                     },
@@ -577,6 +578,7 @@ fun WebPreviewScreen(folderName: String, navController: NavController, viewModel
 }
 
 // --- 辅助函数：WebView 配置 ---
+@Suppress("DEPRECATION")
 @SuppressLint("SetJavaScriptEnabled")
 private fun configureFullWebView(
     webView: WebView,
@@ -629,9 +631,7 @@ private fun configureFullWebView(
         settings.setSupportZoom(false)
     }
 
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-        settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-    }
+    settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
 
     val packageName = config?.optString("package", "com.example.webapp") ?: "com.web.preview"
 
@@ -680,7 +680,7 @@ private fun configureFullWebView(
         // 复用 SharedWebInterface 里的下载逻辑，或者直接在这里写
         // 这里我们简单起见，直接启动系统下载
         try {
-            val request = android.app.DownloadManager.Request(Uri.parse(url))
+            val request = android.app.DownloadManager.Request(url.toUri())
             request.setMimeType(mimetype)
             val filename = URLUtil.guessFileName(url, contentDisposition, mimetype)
             val cookies = CookieManager.getInstance().getCookie(url)
@@ -698,11 +698,11 @@ private fun configureFullWebView(
                 context.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
             dm.enqueue(request)
             Toast.makeText(context, context.getString(R.string.preview_downloading, filename), Toast.LENGTH_SHORT).show()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // 如果 DownloadManager 失败，尝试用浏览器打开
             try {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-            } catch (e2: Exception) {
+                context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
+            } catch (_: Exception) {
                 Toast.makeText(context, context.getString(R.string.preview_download_failed), Toast.LENGTH_SHORT).show()
             }
         }
@@ -732,8 +732,8 @@ private fun configureFullWebView(
             val url = request?.url.toString()
             if (url.startsWith("tel:") || url.startsWith("mailto:") || url.startsWith("intent:")) {
                 try {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))); return true
-                } catch (e: Exception) {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())); return true
+                } catch (_: Exception) {
                 }
             }
             return false
@@ -757,7 +757,7 @@ private fun injectEruda(context: Context, webView: WebView?) {
 
     val scriptContent = try {
         context.assets.open("eruda.min.js").bufferedReader().use { it.readText() }
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         null
     }
 
