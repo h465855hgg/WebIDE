@@ -62,6 +62,19 @@ fun DirectorySelector(
     var currentPath by remember { mutableStateOf(initialPath.ifEmpty { rootPath }) }
     var showCreateFolderDialog by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
+    // 权限可能在外部（系统设置页）授予，从设置返回时 Activity 会 ON_RESUME。
+    // 递增 refreshKey 让下方 directoryList 重新读取目录，避免“授权后列表仍为空、需重启 app”的问题。
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    var refreshKey by remember { mutableStateOf(0) }
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                refreshKey++
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     rememberCoroutineScope()
     val selectorTitle = stringResource(R.string.directory_selector_title)
     val newFolderDescription = stringResource(R.string.content_desc_new_folder)
@@ -72,7 +85,7 @@ fun DirectorySelector(
     val cancelText = stringResource(R.string.action_cancel)
     val selectThisText = stringResource(R.string.directory_select_this)
 
-    val directoryList by remember(currentPath) {
+    val directoryList by remember(currentPath, refreshKey) {
         derivedStateOf {
             try {
                 val currentDir = File(currentPath)
