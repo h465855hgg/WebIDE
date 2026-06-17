@@ -93,8 +93,9 @@ android {
     }
     packaging {
         resources {
-            // 排除导致冲突的 JGit 配置文件
+            // 排除导致冲突的 JGit 配置文件（Eclipse OSGi 插件元数据，Android 运行时不使用）
             excludes += "OSGI-INF/l10n/plugin.properties"
+            excludes += "plugin.properties"
 
             // 如果后续还有类似冲突，通常也是 META-INF 下的文件，比如：
             excludes += "META-INF/DEPENDENCIES"
@@ -187,9 +188,22 @@ dependencies {
     // Source: https://mvnrepository.com/artifact/org.eclipse.jgit/org.eclipse.jgit
     implementation(libs.org.eclipse.jgit)
     // Source: https://mvnrepository.com/artifact/org.eclipse.jgit/org.eclipse.jgit.ssh.apache
-    implementation(libs.org.eclipse.jgit.ssh.apache)
+    implementation(libs.org.eclipse.jgit.ssh.apache) {
+        // sshd-osgi 是把 sshd-core + sshd-common 重新打包的 OSGi fat bundle，
+        // 在 Android（非 OSGi）上会与分离的 core/common 构件产生重复类和重复资源
+        //（如 org/apache/sshd/common/kex/group15.prime）。排除它，改用下面的分离构件。
+        exclude(group = "org.apache.sshd", module = "sshd-osgi")
+    }
     //noinspection UseTomlInstead
     implementation("org.slf4j:slf4j-simple:2.0.17")
+    // JGit 5.13.3 传递依赖 Apache MINA SSHD 2.7.0，但 2.7.0 缺少
+    // PathUtils.setUserHomeFolderResolver()（自 2.10.0 引入），该方法是 Android 上
+    // 重定向 SSH 用户主目录、避免 "No user home folder available" 崩溃的关键。
+    // 显式引入分离的 SSHD 2.10.0 构件（Java 8 字节码，不会引入 readNBytes），
+    // 替代被排除的 sshd-osgi fat bundle（sshd-osgi 不含独有类，仅聚合 core+common）。
+    implementation(libs.apache.sshd.common)
+    implementation(libs.apache.sshd.core)
+    implementation(libs.apache.sshd.sftp)
 
     // 🔥🔥🔥添加终端依赖
     implementation(project(":core:main"))

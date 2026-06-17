@@ -22,8 +22,12 @@ animation = "1.10.4"
 materialIconsExtended = "1.7.8"
 materialKolor = "4.1.1"
 navigationCompose = "2.9.7"
-orgEclipseJgit = "7.3.0.202506031305-r"
-orgEclipseJgitSshApache = "7.5.0.202512021534-r"
+orgEclipseJgit = "5.13.3.202401111512-r"
+orgEclipseJgitSshApache = "5.13.3.202401111512-r"
+# JGit 5.13.3 传递依赖 Apache MINA SSHD 2.7.0；该版本无 PathUtils.setUserHomeFolderResolver
+#（自 2.10.0 引入，用于在 Android 上重定向 SSH 用户主目录）。显式引入分离构件升级到 2.10.0，
+# 并排除 sshd-osgi fat bundle（其与 core/common 重复）。
+apacheSshd = "2.10.0"
 orgEclipseLsp4j = "0.24.0"
 treeSitterJson = "4.3.2"
 ui = "1.10.4"
@@ -113,6 +117,10 @@ gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 lsp4j = { module = "org.eclipse.lsp4j:org.eclipse.lsp4j", version.ref = "orgEclipseLsp4j" }
 org-eclipse-jgit = { module = "org.eclipse.jgit:org.eclipse.jgit", version.ref = "orgEclipseJgit" }
 org-eclipse-jgit-ssh-apache = { module = "org.eclipse.jgit:org.eclipse.jgit.ssh.apache", version.ref = "orgEclipseJgitSshApache" }
+apache-sshd-common = { group = "org.apache.sshd", name = "sshd-common", version.ref = "apacheSshd" }
+apache-sshd-core = { group = "org.apache.sshd", name = "sshd-core", version.ref = "apacheSshd" }
+# sshd-osgi 是 fat bundle，Android 上排除不用（见 app/build.gradle.kts 的 exclude）
+apache-sshd-sftp = { group = "org.apache.sshd", name = "sshd-sftp", version.ref = "apacheSshd" }
 tree-sitter-json = { module = "com.itsaky.androidide.treesitter:tree-sitter-json", version.ref = "treeSitterJson" }
 zipalign-java = { module = "com.github.iyxan23:zipalign-java", version.ref = "zipalignJava" }
 volley = { group = "com.android.volley", name = "volley", version.ref = "volley" }
