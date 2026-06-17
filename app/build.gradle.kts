@@ -28,14 +28,15 @@ plugins {
 
 android {
     namespace = "com.web.webide"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.web.webide"
         minSdk = 29
+        //noinspection OldTargetApi
         targetSdk = 36
-        versionCode = 32
-        versionName = "0.3.2"
+        versionCode = 33
+        versionName = "0.3.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             //noinspection ChromeOsAbiSupport

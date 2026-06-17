@@ -93,6 +93,7 @@ import java.io.File
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import androidx.core.content.edit
+import kotlin.time.Duration.Companion.milliseconds
 
 // 构建结果状态
 sealed class BuildResultState {
@@ -125,7 +126,7 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
     var isAiEnabled by remember {
         val editorPrefs =
             context.getSharedPreferences("WebIDE_Editor_Settings", Context.MODE_PRIVATE)
-        mutableStateOf(editorPrefs.getBoolean("editor_ai_enabled", true))
+        mutableStateOf(editorPrefs.getBoolean("editor_ai_enabled", false))
     }
     val lifecycleOwner = LocalLifecycleOwner.current
     // 2. 监听生命周期：当从设置页返回时，重新读取 SharedPreferences
@@ -137,7 +138,7 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
 
                 val editorPrefs =
                     context.getSharedPreferences("WebIDE_Editor_Settings", Context.MODE_PRIVATE)
-                isAiEnabled = editorPrefs.getBoolean("editor_ai_enabled", true)
+                isAiEnabled = editorPrefs.getBoolean("editor_ai_enabled", false)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -153,7 +154,7 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
     LaunchedEffect(autoSaveInterval, context, projectPath) {
         if (autoSaveInterval > 0) {
             while (isActive) {
-                delay(autoSaveInterval)
+                delay(autoSaveInterval.milliseconds)
                 // 执行自动保存
                 viewModel.autoSaveProject(context, projectPath)
 
@@ -243,7 +244,7 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
     var currentSearchText by remember { mutableStateOf("") }
     LaunchedEffect(viewModel.activeFileIndex) {
         if (isOpenSearch && currentSearchText.isNotEmpty()) {
-            delay(200)
+            delay(200.milliseconds)
             viewModel.searchText(currentSearchText)
         }
     }
@@ -273,7 +274,7 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
 
     LaunchedEffect(Unit) {
         if (showInitialLoader) {
-            delay(500L)
+            delay(500L.milliseconds)
             showInitialLoader = false
             viewModel.onInitialLoaderShown()
         }

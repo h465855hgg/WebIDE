@@ -69,7 +69,7 @@ import com.web.webide.ui.components.ColorPickerDialog
 import com.web.webide.ui.welcome.themeColors
 
 // 自动保存选项枚举
-enum class AutoSaveOption(@StringRes val labelRes: Int, val interval: Long) {
+enum class AutoSaveOption(@field:StringRes val labelRes: Int, val interval: Long) {
     OFF(R.string.auto_save_off, 0L),
     SEC_30(R.string.auto_save_30_seconds, 30_000L),
     MIN_1(R.string.auto_save_1_minute, 60_000L),
@@ -110,7 +110,7 @@ fun SettingsScreen(
     var showToolbar by remember { mutableStateOf(prefs.getBoolean("editor_show_toolbar", true)) }
     var showHistory by remember { mutableStateOf(prefs.getBoolean("editor_show_history", true)) }
     var lspEnabled by remember { mutableStateOf(prefs.getBoolean("editor_lsp_enabled", false)) }
-    var aiEnabled by remember { mutableStateOf(prefs.getBoolean("editor_ai_enabled", true)) }
+    var aiEnabled by remember { mutableStateOf(prefs.getBoolean("editor_ai_enabled", false)) }
     var fontPath by remember { mutableStateOf(prefs.getString("editor_font_path", "") ?: "") }
     var customSymbols by remember { mutableStateOf(prefs.getString("editor_custom_symbols", "Tab,<,>,/,=,\",',!,?,;,:,{,},[,],(,),+,-,*,_,&,|") ?: "") }
     var autoSaveInterval by remember { mutableLongStateOf(generalPrefs.getLong("auto_save_interval", 0L)) }
