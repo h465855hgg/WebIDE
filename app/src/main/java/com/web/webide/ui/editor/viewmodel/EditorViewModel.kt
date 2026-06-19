@@ -492,9 +492,10 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
                 "yaml", "yml" -> "source.yaml"
                 else -> return null
             }
-            val prefs = context.getSharedPreferences("WebIDE_Editor_Settings", Context.MODE_PRIVATE)
-            val lspEnabled = prefs.getBoolean("editor_lsp_enabled", false)
-            TextMateLanguage.create(scopeName, !lspEnabled)
+            // interruptionEnabled 始终为 true：TextMate 词法化是从文件头顺序扫描的正则状态机，
+            // 大文件首屏 tokenize 耗时较长。开启中断后 sora 会分片计算、及时让出主线程，
+            // 避免切换文件时 UI 卡顿（token 仍会全部完成，不影响正确性与 LSP）。
+            TextMateLanguage.create(scopeName, true)
         } catch (_: Exception) { null }
     }
 
@@ -543,7 +544,32 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    /**
+     * 以编辑器组件的实时文本刷新 [state.content]。
+     *
+     * 对应参考实现 `save()` 中 `code_code1.getText().toString()` 的做法：保存前始终
+     * 从编辑器现场读取最新内容。这样即便 ContentListener 偶发漏触发（使 state.content
+     * 落后于编辑器），也不会把用户“上一秒写的代码”当成旧内容写丢，彻底避免“代码被吞”。
+     *
+     * 该方法只读取编辑器、不修改编辑器，因此不会影响 undo/redo 栈。须在主线程调用。
+     */
+    fun flushEditorContent(state: CodeEditorState) {
+        val editor = editorInstances[state.file.absolutePath] ?: return
+        try {
+            val live = editor.text.toString()
+            if (live != state.content) {
+                state.content = live
+            }
+        } catch (_: Exception) { }
+    }
+
     suspend fun saveAllModifiedFiles(context: Context, snackbarHostState: SnackbarHostState): Boolean {
+        // 保存前先在主线程以编辑器实时内容刷新 state.content，避免写入陈旧内容
+        withContext(Dispatchers.Main) {
+            openFiles.filterIsInstance<CodeEditorState>()
+                .filter { it.isModified }
+                .forEach { flushEditorContent(it) }
+        }
         return withContext(Dispatchers.IO) {
             val modifiedFiles = openFiles.filterIsInstance<CodeEditorState>().filter { it.isModified }
             if (modifiedFiles.isEmpty()) return@withContext true
@@ -683,6 +709,12 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     suspend fun autoSaveProject(context: Context, projectPath: String) {
+        // 先在主线程以编辑器实时内容刷新 state.content（同 saveAllModifiedFiles）
+        withContext(Dispatchers.Main) {
+            openFiles.filterIsInstance<CodeEditorState>()
+                .filter { it.isModified }
+                .forEach { flushEditorContent(it) }
+        }
         withContext(Dispatchers.IO) {
             val modifiedFiles = openFiles.filterIsInstance<CodeEditorState>().filter { it.isModified }
             if (modifiedFiles.isNotEmpty()) {
