@@ -343,21 +343,14 @@ fun CodeEditorView(
                     view.nonPrintablePaintingFlags = 0
                 }
 
-                if (view.text.toString() != state.content) {
-                    val cursor = view.cursor
-                    val cursorLine = cursor.leftLine
-                    val cursorColumn = cursor.leftColumn
-                    view.setText(state.content)
-                    try {
-                        val lineCount = view.text.lineCount
-                        val targetLine = cursorLine.coerceIn(0, lineCount - 1)
-                        val lineLength = if (targetLine < view.text.lineCount) view.text.getColumnCount(targetLine) else 0
-                        val targetColumn = cursorColumn.coerceIn(0, lineLength)
-                        view.setSelection(targetLine, targetColumn)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                }
+                // ⚠️ 不在此处用 setText(state.content) 回填编辑器（对应参考实现 §5.1 / §5.3）。
+                // 编辑器组件自身才是内容与 undo/redo 历史的权威来源：
+                //  - 用户输入经 ContentListener → onContentChanged 同步到 state.content；
+                //  - 外部改动（Diff / 配置保存）经 onContentChanged 的实例同步分支推送给编辑器；
+                //  - 从运行/预览页返回时编辑器实例未被销毁，文本与撤销栈完整保留。
+                // 若在此 setText，一旦 state.content 偶发落后于编辑器（如输入法批量编辑
+                // 漏触发监听），就会把用户“上一秒写的代码”覆盖回去 —— 即“代码被吞”。
+                // 因此重组 / 返回时绝不触碰编辑器内容与历史。
                 view.isEnabled = true
                 view.visibility = android.view.View.VISIBLE
                 view.requestLayout()
