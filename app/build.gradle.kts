@@ -35,8 +35,8 @@ android {
         minSdk = 29
         //noinspection OldTargetApi
         targetSdk = 36
-        versionCode = 34
-        versionName = "0.3.4"
+        versionCode = 35
+        versionName = "0.3.5"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             //noinspection ChromeOsAbiSupport
