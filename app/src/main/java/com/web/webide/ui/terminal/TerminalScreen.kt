@@ -25,16 +25,53 @@ import android.widget.EditText
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SecondaryScrollableTabRow
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRowDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.VerticalDivider
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -46,17 +83,18 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.widget.doOnTextChanged
 import androidx.navigation.NavController
-import com.termux.view.TerminalView
-import java.lang.ref.WeakReference
-import com.rk.terminal.ui.screens.terminal.TerminalBackEnd
 import com.rk.libcommons.application
+import com.rk.terminal.ui.screens.terminal.TerminalBackEnd
 import com.rk.terminal.ui.screens.terminal.virtualkeys.VirtualKeysConstants
 import com.rk.terminal.ui.screens.terminal.virtualkeys.VirtualKeysInfo
 import com.rk.terminal.ui.screens.terminal.virtualkeys.VirtualKeysView
+import com.termux.terminal.TextStyle
+import com.termux.view.TerminalView
+import com.web.webide.R
 import com.web.webide.ui.terminal.TerminalConfig.VIRTUAL_KEYS_JSON
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import com.web.webide.R
+import java.lang.ref.WeakReference
 
 // 🔥 全局 VirtualKeysView 引用，用于 TerminalBackEnd 读取 Ctrl/Alt 按键状态
 var virtualKeysView: WeakReference<VirtualKeysView>? = null
@@ -91,9 +129,12 @@ fun TerminalScreen(navController: NavController) {
     val currentSession = SessionManager.currentSession
     var terminalViewRef by remember { mutableStateOf<WeakReference<TerminalView>?>(null) }
 
-    val buttonTextColor =
-        if (isSystemDark) android.graphics.Color.WHITE else android.graphics.Color.BLACK
-    val buttonBgColor = if (isSystemDark) 0xFF21222C.toInt() else 0xFFE0E0E0.toInt()
+    val buttonTextColor = TerminalConfig.getButtonTextColor(isSystemDark)
+    val buttonBgColor = TerminalConfig.getButtonBarBgColor(isSystemDark)
+    val buttonActiveTextColor = TerminalConfig.getButtonActiveTextColor(isSystemDark)
+    val buttonActiveBgColor = TerminalConfig.getButtonActiveBgColor(isSystemDark)
+
+
 
     Scaffold(
         modifier = Modifier
@@ -132,7 +173,7 @@ fun TerminalScreen(navController: NavController) {
                         containerColor = MaterialTheme.colorScheme.surface,
                         titleContentColor = MaterialTheme.colorScheme.onSurface,
                         navigationIconContentColor = MaterialTheme.colorScheme.onSurface
-                    )
+                    ),
                 )
 
                 // 2. Tabs + Add Button
@@ -246,6 +287,7 @@ fun TerminalScreen(navController: NavController) {
                 color = Color(buttonBgColor),
                 modifier = Modifier
                     .fillMaxWidth()
+                    .navigationBarsPadding() // 🔥 抬高至导航栏之上（经典三按键导航）
                     .imePadding() // 确保被输入法顶起
             ) {
                 val pagerState = rememberPagerState(pageCount = { 2 })
@@ -266,6 +308,13 @@ fun TerminalScreen(navController: NavController) {
                                         virtualKeysViewClient = currentSession?.let { VirtualKeysListener(it) }
 
                                         setButtonTextAllCaps(true)
+                                        // 🔥 必须在 reload() 之前设置颜色，否则按钮创建时使用默认白色文字
+                                        setButtonColors(
+                                            buttonTextColor,
+                                            buttonActiveTextColor,
+                                            0x00000000,
+                                            buttonActiveBgColor
+                                        )
                                         reload(
                                             VirtualKeysInfo(
                                                 VIRTUAL_KEYS_JSON,
@@ -279,10 +328,12 @@ fun TerminalScreen(navController: NavController) {
                                 update = { view ->
                                     view.setButtonColors(
                                         buttonTextColor,
-                                        0xFFf44336.toInt(),
+                                        buttonActiveTextColor,
                                         0x00000000,
-                                        0xFF7F7F7F.toInt()
+                                        buttonActiveBgColor
                                     )
+                                    // 🔥 更新已创建按钮的实际文字颜色（不只是字段值）
+                                    view.updateAllButtonColors()
                                 }
                             )
                         }
@@ -302,8 +353,8 @@ fun TerminalScreen(navController: NavController) {
                                             maxLines = 1; isSingleLine = true; imeOptions =
                                             EditorInfo.IME_ACTION_DONE
                                             background = null; hint = context.getString(R.string.terminal_input_hint)
-                                            setHintTextColor(if (isSystemDark) 0xFF888888.toInt() else 0xFFAAAAAA.toInt())
-                                            setTextColor(if (isSystemDark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt())
+                                            setHintTextColor(if (isSystemDark) 0xFF888888.toInt() else 0xFF757575.toInt())
+                                            setTextColor(TerminalConfig.getButtonTextColor(isSystemDark))
                                             doOnTextChanged { t, _, _, _ ->
                                                 val inputChar = t.toString()
                                                 if (inputChar.isNotEmpty()) {
@@ -331,7 +382,7 @@ fun TerminalScreen(navController: NavController) {
                                     },
                                     update = {
                                         if (it.text.toString() != text) it.setText(text); it.setTextColor(
-                                        if (isSystemDark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt()
+                                        TerminalConfig.getButtonTextColor(isSystemDark)
                                     )
                                     }
                                 )
@@ -371,6 +422,13 @@ fun TerminalScreen(navController: NavController) {
                     update = { view ->
                         view.setTypeface(TerminalFontManager.getTypeface(context))
                         view.setBackgroundColor(TerminalConfig.getBackgroundColor(isSystemDark))
+                        // 🔥 更新终端模拟器的颜色方案（前景色、背景色、光标色）
+                        view.mEmulator?.let { emulator ->
+                            val colors = emulator.mColors.mCurrentColors
+                            colors[TextStyle.COLOR_INDEX_FOREGROUND] = TerminalConfig.getForegroundColor(isSystemDark)
+                            colors[TextStyle.COLOR_INDEX_BACKGROUND] = TerminalConfig.getBackgroundColor(isSystemDark)
+                            colors[TextStyle.COLOR_INDEX_CURSOR] = TerminalConfig.getCursorColor(isSystemDark)
+                        }
                         if (view.currentSession != currentSession) {
                             view.attachSession(currentSession)
                             val client = TerminalBackEnd(view, context)

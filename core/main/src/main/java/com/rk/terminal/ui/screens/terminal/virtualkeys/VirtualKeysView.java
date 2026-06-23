@@ -90,6 +90,28 @@ public final class VirtualKeysView extends GridLayout {
     mButtonActiveBackgroundColor = buttonActiveBackgroundColor;
   }
 
+  /**
+   * 更新所有已创建按钮的文字颜色。
+   * 用于主题切换时动态更新按钮颜色，无需 reload() 重建整个布局。
+   * 特殊按钮（CTRL/ALT等）处于激活态时使用 mButtonActiveTextColor。
+   */
+  public void updateAllButtonColors() {
+    for (int i = 0; i < getChildCount(); i++) {
+      View child = getChildAt(i);
+      if (child instanceof Button) {
+        Button button = (Button) child;
+        boolean isActiveSpecial = false;
+        for (SpecialButtonState state : mSpecialButtons.values()) {
+          if (state.isActive && state.buttons.contains(button)) {
+            isActiveSpecial = true;
+            break;
+          }
+        }
+        button.setTextColor(isActiveSpecial ? mButtonActiveTextColor : mButtonTextColor);
+      }
+    }
+  }
+
   @NonNull
   public Map<SpecialButton, SpecialButtonState> getDefaultSpecialButtons(
           VirtualKeysView extraKeysView) {

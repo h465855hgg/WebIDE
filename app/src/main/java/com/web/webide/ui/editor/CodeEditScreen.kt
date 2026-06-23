@@ -691,6 +691,7 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                         modifier = Modifier
                             .padding(innerPadding)
                             .fillMaxSize()
+                            .navigationBarsPadding() // 🔥 抬高至导航栏之上（经典三按键导航）
                             .imePadding()
                     ) {
                         val availableEditorHeight = maxHeight // 这就是 EditorPanelLayout 可以用的全部高度

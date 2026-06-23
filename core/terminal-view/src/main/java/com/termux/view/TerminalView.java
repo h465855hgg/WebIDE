@@ -1006,7 +1006,7 @@ public final class TerminalView extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         if (mEmulator == null) {
-            canvas.drawColor(0XFF000000);
+            // 不再硬编码黑色，让 View 的背景色（由 setBackgroundColor 设置）透显
         } else {
             // render the terminal view and highlight any selected text
             int[] sel = mDefaultSelectors;
