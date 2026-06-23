@@ -212,7 +212,7 @@ fun App(
             AboutScreen(navController = navController)
         }
         composable("terminal") {
-            TerminalScreen(navController = navController)
+            TerminalScreen(navController = navController, themeViewModel = themeViewModel)
         }
     }
 }

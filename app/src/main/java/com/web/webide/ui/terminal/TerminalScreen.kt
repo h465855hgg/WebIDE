@@ -67,6 +67,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -91,6 +92,7 @@ import com.rk.terminal.ui.screens.terminal.virtualkeys.VirtualKeysView
 import com.termux.terminal.TextStyle
 import com.termux.view.TerminalView
 import com.web.webide.R
+import com.web.webide.ui.ThemeViewModel
 import com.web.webide.ui.terminal.TerminalConfig.VIRTUAL_KEYS_JSON
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -102,10 +104,20 @@ var virtualKeysView: WeakReference<VirtualKeysView>? = null
 @SuppressLint("LocalContextGetResourceValueCall")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TerminalScreen(navController: NavController) {
+fun TerminalScreen(navController: NavController, themeViewModel: ThemeViewModel) {
     val context = LocalContext.current
     var isEnvironmentReady by remember { mutableStateOf(false) }
+
+    // 🔥 终端配色必须跟随应用实际主题（用户可选跟随系统/强制浅色/强制深色），
+    // 而不是直接用 isSystemInDarkTheme()，否则应用内强制深色时终端仍是浅色配色。
+    val themeState by themeViewModel.themeState.collectAsState()
     val isSystemDark = isSystemInDarkTheme()
+    val isDark = when (themeState.selectedModeIndex) {
+        0 -> isSystemDark // 跟随系统
+        1 -> false        // 强制浅色
+        2 -> true         // 强制深色
+        else -> isSystemDark
+    }
 
     // === 初始化逻辑 ===
     LaunchedEffect(Unit) {
@@ -119,6 +131,13 @@ fun TerminalScreen(navController: NavController) {
         }
     }
 
+    // 🔥 明暗模式切换时，同步更新全局颜色方案（TerminalColors.COLOR_SCHEME）
+    // 这样 shell 发出 OSC 颜色重置序列（如 reset 命令）时，颜色会重置为当前明暗模式的值，
+    // 而不是默认的黑底白字。
+    LaunchedEffect(isDark) {
+        TerminalConfig.applyColorScheme(isDark)
+    }
+
     if (!isEnvironmentReady) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
@@ -129,10 +148,10 @@ fun TerminalScreen(navController: NavController) {
     val currentSession = SessionManager.currentSession
     var terminalViewRef by remember { mutableStateOf<WeakReference<TerminalView>?>(null) }
 
-    val buttonTextColor = TerminalConfig.getButtonTextColor(isSystemDark)
-    val buttonBgColor = TerminalConfig.getButtonBarBgColor(isSystemDark)
-    val buttonActiveTextColor = TerminalConfig.getButtonActiveTextColor(isSystemDark)
-    val buttonActiveBgColor = TerminalConfig.getButtonActiveBgColor(isSystemDark)
+    val buttonTextColor = TerminalConfig.getButtonTextColor(isDark)
+    val buttonBgColor = TerminalConfig.getButtonBarBgColor(isDark)
+    val buttonActiveTextColor = TerminalConfig.getButtonActiveTextColor(isDark)
+    val buttonActiveBgColor = TerminalConfig.getButtonActiveBgColor(isDark)
 
 
 
@@ -353,8 +372,8 @@ fun TerminalScreen(navController: NavController) {
                                             maxLines = 1; isSingleLine = true; imeOptions =
                                             EditorInfo.IME_ACTION_DONE
                                             background = null; hint = context.getString(R.string.terminal_input_hint)
-                                            setHintTextColor(if (isSystemDark) 0xFF888888.toInt() else 0xFF757575.toInt())
-                                            setTextColor(TerminalConfig.getButtonTextColor(isSystemDark))
+                                            setHintTextColor(if (isDark) 0xFF888888.toInt() else 0xFF757575.toInt())
+                                            setTextColor(TerminalConfig.getButtonTextColor(isDark))
                                             doOnTextChanged { t, _, _, _ ->
                                                 val inputChar = t.toString()
                                                 if (inputChar.isNotEmpty()) {
@@ -382,7 +401,7 @@ fun TerminalScreen(navController: NavController) {
                                     },
                                     update = {
                                         if (it.text.toString() != text) it.setText(text); it.setTextColor(
-                                        TerminalConfig.getButtonTextColor(isSystemDark)
+                                        TerminalConfig.getButtonTextColor(isDark)
                                     )
                                     }
                                 )
@@ -401,7 +420,7 @@ fun TerminalScreen(navController: NavController) {
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding) // 必须应用 Scaffold 传递的 Padding
-                    .background(Color(TerminalConfig.getBackgroundColor(isSystemDark)))
+                    .background(Color(TerminalConfig.getBackgroundColor(isDark)))
             ) {
                 AndroidView(
                     modifier = Modifier.fillMaxSize(),
@@ -421,13 +440,13 @@ fun TerminalScreen(navController: NavController) {
                     },
                     update = { view ->
                         view.setTypeface(TerminalFontManager.getTypeface(context))
-                        view.setBackgroundColor(TerminalConfig.getBackgroundColor(isSystemDark))
+                        view.setBackgroundColor(TerminalConfig.getBackgroundColor(isDark))
                         // 🔥 更新终端模拟器的颜色方案（前景色、背景色、光标色）
                         view.mEmulator?.let { emulator ->
                             val colors = emulator.mColors.mCurrentColors
-                            colors[TextStyle.COLOR_INDEX_FOREGROUND] = TerminalConfig.getForegroundColor(isSystemDark)
-                            colors[TextStyle.COLOR_INDEX_BACKGROUND] = TerminalConfig.getBackgroundColor(isSystemDark)
-                            colors[TextStyle.COLOR_INDEX_CURSOR] = TerminalConfig.getCursorColor(isSystemDark)
+                            colors[TextStyle.COLOR_INDEX_FOREGROUND] = TerminalConfig.getForegroundColor(isDark)
+                            colors[TextStyle.COLOR_INDEX_BACKGROUND] = TerminalConfig.getBackgroundColor(isDark)
+                            colors[TextStyle.COLOR_INDEX_CURSOR] = TerminalConfig.getCursorColor(isDark)
                         }
                         if (view.currentSession != currentSession) {
                             view.attachSession(currentSession)
@@ -435,6 +454,11 @@ fun TerminalScreen(navController: NavController) {
                             view.setTerminalViewClient(client)
                             currentSession.updateTerminalSessionClient(client)
                             view.onScreenUpdated()
+                        } else {
+                            // 🔥 明暗模式切换时，颜色已更新到 mCurrentColors，但 AndroidView 的 update
+                            // 不会自动触发 onDraw，必须主动 invalidate 才能立即重绘，否则要等到下一次
+                            // 终端输出或切换 session 才会显示新颜色。
+                            view.invalidate()
                         }
                     }
                 )
