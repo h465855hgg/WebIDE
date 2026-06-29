@@ -94,6 +94,8 @@ class LspLanguage(var editor: LspEditor) : Language {
         }*/
 
         if (!editor.isConnected) {
+            // LSP 未连接时（如 CDN 挂了 Node.js 没装上），回退到包装语言的本地补全
+            wrapperLanguage?.requireAutoComplete(content, position, publisher, extraArguments)
             return
         }
 
