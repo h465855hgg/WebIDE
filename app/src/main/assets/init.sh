@@ -44,27 +44,11 @@ fi
 # 4. 美化终端提示符 (绿色用户名@主机名 当前路径 $)
 export PS1="\[\e[38;5;46m\]\u\[\033[39m\]@localhost \[\033[39m\]\w \[\033[0m\]\\$ "
 
-# 5. 检查并初始化环境 (Node.js & LSP) —— 可选步骤，失败不阻塞终端
-# 仅在第一次运行(找不到 node 命令)时执行
-if ! command -v node > /dev/null 2>&1; then
-    echo -e "\e[34;1m[*] \e[0mInitializing Environment (Alpine 3.19)...\e[0m"
-
-    # 更新软件源索引并安装基础依赖
-    # 网络失败时只打印警告，不退出脚本
-    if apk update && apk add bash gcompat glib nano nodejs npm; then
-        # 安装 LSP 服务 (可选功能，编辑器已有本地补全作为后备)
-        echo -e "\e[34;1m[*] \e[0mInstalling Language Servers...\e[0m"
-        rm -rf /usr/local/lib/node_modules
-        if npm install -g typescript typescript-language-server vscode-langservers-extracted; then
-            echo -e "\e[32;1m[+] \e[0mEnvironment Ready! LSP features available.\e[0m"
-        else
-            echo -e "\e[33;1m[!] \e[0mLSP install failed (network issue). Terminal works fine.\e[0m"
-            echo -e "\e[33;1m[!] \e[0mCode completion uses local mode. Retry later: npm install -g typescript-language-server vscode-langservers-extracted\e[0m"
-        fi
-    else
-        echo -e "\e[33;1m[!] \e[0mapk install failed (CDN/network issue). Terminal works fine.\e[0m"
-        echo -e "\e[33;1m[!] \e[0mRetry later: apk update && apk add nodejs npm\e[0m"
-    fi
+# 5. 环境检查 (Node.js + LSP 已在 rootfs 构建时预装，无需在线安装)
+if command -v node > /dev/null 2>&1; then
+    echo -e "\e[32;1m[+] \e[0mNode.js $(node --version) ready. LSP features available.\e[0m"
+else
+    echo -e "\e[33;1m[!] \e[0mNode.js not found in rootfs. Code completion uses local mode.\e[0m"
 fi
 
 # 6. 启动交互式 Shell
