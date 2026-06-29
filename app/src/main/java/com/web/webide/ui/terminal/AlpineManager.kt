@@ -163,14 +163,12 @@ object AlpineManager {
         val prefixDir = getPrefixDir(context)
         val nativeLibDir = context.applicationInfo.nativeLibraryDir
 
-        // 1. 确保脚本存在
+        // 1. 每次都覆盖脚本，确保使用最新版本（修复旧版本残留导致的问题）
         val initHostScript = File(binDir, "init-host")
-        if (!initHostScript.exists()) {
-            copyAsset(context, "init-host.sh", initHostScript)
-            copyAsset(context, "init.sh", File(binDir, "init"))
-            initHostScript.setExecutable(true)
-            File(binDir, "init").setExecutable(true)
-        }
+        copyAsset(context, "init-host.sh", initHostScript)
+        copyAsset(context, "init.sh", File(binDir, "init"))
+        initHostScript.setExecutable(true)
+        File(binDir, "init").setExecutable(true)
         val workspacePath = WorkspaceManager.getWorkspacePath(context)
         var versionName = "Unknown"
         var versionCode = 0L
