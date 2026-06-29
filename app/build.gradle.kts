@@ -35,8 +35,8 @@ android {
         minSdk = 29
         //noinspection OldTargetApi
         targetSdk = 36
-        versionCode = 35
-        versionName = "0.3.5"
+        versionCode = 36
+        versionName = "0.3.6"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     // 按架构分离：每个 flavor 的 APK 只含对应架构的 rootfs（48MB），而非两个都打包（96MB）

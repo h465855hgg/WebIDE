@@ -1,6 +1,6 @@
 # WebIDE ![Stone Badge](https://stone.professorlee.work/api/stone/h465855hgg/WebIDE)
 
-![Version](https://img.shields.io/badge/version-0.3.5-blue?style=flat-square)
+![Version](https://img.shields.io/badge/version-0.3.6-blue?style=flat-square)
 [![Language](https://img.shields.io/badge/Language-Kotlin-blue?style=flat-square)](https://kotlinlang.org/)
 [![UI](https://img.shields.io/badge/UI-Jetpack_Compose-green?style=flat-square)](https://developer.android.com/jetpack/compose)
 [![License](https://img.shields.io/badge/License-GPLv3-orange?style=flat-square)](LICENSE)
