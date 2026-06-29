@@ -42,11 +42,11 @@ android {
     // 按架构分离：每个 flavor 的 APK 只含对应架构的 rootfs（48MB），而非两个都打包（96MB）
     flavorDimensions += "arch"
     productFlavors {
-        create("arm64") {
+        create("arm64-v8a") {
             //noinspection ChromeOsAbiSupport
             ndk { abiFilters += "arm64-v8a" }
         }
-        create("arm32") {
+        create("armeabi-v7a") {
             //noinspection ChromeOsAbiSupport
             ndk { abiFilters += "armeabi-v7a" }
         }
