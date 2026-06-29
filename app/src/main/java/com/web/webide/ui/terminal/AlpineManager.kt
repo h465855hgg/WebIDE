@@ -193,6 +193,7 @@ object AlpineManager {
             "LD_LIBRARY_PATH=${libDir.absolutePath}",
             // 尝试适配不同架构的 linker
             "LINKER=${if(File("/system/bin/linker64").exists()) "/system/bin/linker64" else "/system/bin/linker"}",
+            "NATIVE_LIB_DIR=$nativeLibDir",
             "PROOT_TMP_DIR=${context.cacheDir.absolutePath}",
             "TMPDIR=${context.cacheDir.absolutePath}",
 
