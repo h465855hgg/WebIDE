@@ -218,12 +218,12 @@ object AlpineManager {
         if (!vmstatFile.exists()) vmstatFile.writeText(vmstat)
 
         // 4. 启动 Shell
-        // 注意：init-host.sh 用 #!/bin/bash shebang，需要在 Alpine 环境内执行（proot 后）
-        // 容器内 /usr/bin/bash 存在。直接传脚本路径，让 shebang 生效。
-        // ❌ 原来用 "-cpp" 参数传给 /system/bin/sh 是错的：-cpp 不是 sh 的有效参数，
-        //    Android toybox/mksh 会把脚本内容当命令串解析，导致 "unexpected 'do'" 等语法错误
-        val shell = initHostScript.absolutePath
-        val args = emptyArray<String>()
+        // Android SELinux 禁止直接 exec /data 目录下的脚本（Permission denied），
+        // 也不能用 "-cpp"（不是 /system/bin/sh 的有效参数，会导致语法错误）。
+        // 正确做法：用 /system/bin/sh 读取脚本文件并执行。
+        // 脚本内的 $LINKER/proot 调用会在 proot 容器内用 /usr/bin/bash 执行 init.sh。
+        val shell = "/system/bin/sh"
+        val args = arrayOf(initHostScript.absolutePath)
 
         return TerminalSession(
             shell,
