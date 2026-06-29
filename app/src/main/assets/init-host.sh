@@ -88,15 +88,4 @@ ARGS="$ARGS --link2symlink"
 ARGS="$ARGS --sysvipc"
 ARGS="$ARGS -L"
 
-# 优先使用 nativeLibDir 中的 libproot.so（APK 安装目录，有执行权限）
-# /data 下的 proot 在 release 版会被 SELinux 拦截（Permission denied）
-if [ -n "$NATIVE_LIB_DIR" ] && [ -e "$NATIVE_LIB_DIR/libproot.so" ]; then
-  PROOT_BIN="$NATIVE_LIB_DIR/libproot.so"
-elif [ -e "$PREFIX/local/bin/proot" ]; then
-  PROOT_BIN="$PREFIX/local/bin/proot"
-else
-  echo "Error: proot not found"
-  exit 1
-fi
-
-$LINKER "$PROOT_BIN" $ARGS sh $PREFIX/local/bin/init "$@"
+$LINKER $PREFIX/local/bin/proot $ARGS sh $PREFIX/local/bin/init "$@"

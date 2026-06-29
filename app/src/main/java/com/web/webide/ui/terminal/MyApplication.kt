@@ -20,6 +20,10 @@ package com.web.webide.ui.terminal
 import android.app.Application
 import com.rk.libcommons.application
 import com.rk.resources.Res
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class MyApplication : Application() {
     override fun onCreate() {
@@ -31,6 +35,15 @@ class MyApplication : Application() {
         // 2. 初始化资源模块
         Res.application = this
 
-        // 3. (可选) 如果你复制了 CrashHandler，也可以在这里初始化
+        // 3. 🔥 App 启动即后台解压 rootfs（LSP 进程依赖 Alpine 容器已就绪）
+        // 不阻塞主线程；用户在 welcome 阅读协议/做题的几十秒里通常已经解压完
+        appScope.launch {
+            SetupWorker.prepareEnvironment(this@MyApplication, timeoutMs = 180_000L)
+        }
+    }
+
+    companion object {
+        // 🔥 全局协程作用域，用于后台启动任务（如 rootfs 解压），随进程退出
+        val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
 }

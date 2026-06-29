@@ -26,6 +26,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -50,6 +51,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -107,6 +109,8 @@ var virtualKeysView: WeakReference<VirtualKeysView>? = null
 fun TerminalScreen(navController: NavController, themeViewModel: ThemeViewModel) {
     val context = LocalContext.current
     var isEnvironmentReady by remember { mutableStateOf(false) }
+    // null = 进行中，非空 = 已结束（成功/超时/出错）
+    var prepareStatus by remember { mutableStateOf<SetupWorker.PrepareResult?>(null) }
 
     // 🔥 终端配色必须跟随应用实际主题（用户可选跟随系统/强制浅色/强制深色），
     // 而不是直接用 isSystemInDarkTheme()，否则应用内强制深色时终端仍是浅色配色。
@@ -120,11 +124,11 @@ fun TerminalScreen(navController: NavController, themeViewModel: ThemeViewModel)
     }
 
     // === 初始化逻辑 ===
+    // 90 秒超时；超时/出错也允许进入终端（不阻塞用户）
     LaunchedEffect(Unit) {
         if (application == null) application = context.applicationContext as Application
-        withContext(Dispatchers.IO) {
-            SetupWorker.prepareEnvironment(context)
-        }
+        val result = SetupWorker.prepareEnvironment(context, timeoutMs = 90_000L)
+        prepareStatus = result
         isEnvironmentReady = true
         if (SessionManager.sessions.isEmpty()) {
             SessionManager.addNewSession(context)
@@ -139,8 +143,54 @@ fun TerminalScreen(navController: NavController, themeViewModel: ThemeViewModel)
     }
 
     if (!isEnvironmentReady) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
+        // 🔥 loading 体验修复：显示当前阶段、百分比、已耗时
+        val progress by SetupWorker.progress.collectAsState()
+        val phaseText = when (progress.phase) {
+            SetupWorker.Progress.Phase.IDLE,
+            SetupWorker.Progress.Phase.COPYING_PROOT ->
+                stringResource(R.string.terminal_prepare_copying_proot)
+            SetupWorker.Progress.Phase.EXTRACTING_ROOTFS ->
+                stringResource(R.string.terminal_prepare_extracting_rootfs)
+            SetupWorker.Progress.Phase.FINALIZING ->
+                stringResource(R.string.terminal_prepare_finalizing)
+            SetupWorker.Progress.Phase.TIMEOUT ->
+                stringResource(R.string.terminal_prepare_timeout)
+            SetupWorker.Progress.Phase.ERROR ->
+                stringResource(R.string.terminal_prepare_error)
+            SetupWorker.Progress.Phase.SUCCESS ->
+                stringResource(R.string.terminal_preparing)
+        }
+        Box(
+            modifier = Modifier.fillMaxSize().padding(24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                if (progress.phase == SetupWorker.Progress.Phase.TIMEOUT ||
+                    progress.phase == SetupWorker.Progress.Phase.ERROR
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                } else {
+                    val p = if (progress.percent in 0..100) progress.percent / 100f else 0f
+                    CircularProgressIndicator(progress = p)
+                }
+                Text(text = phaseText, style = MaterialTheme.typography.titleMedium)
+                if (progress.percent in 0..100) {
+                    Text(text = "${progress.percent}%", style = MaterialTheme.typography.bodyLarge)
+                }
+                val seconds = progress.elapsedMs / 1000
+                Text(
+                    text = stringResource(R.string.terminal_prepare_elapsed, seconds),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
         return
     }

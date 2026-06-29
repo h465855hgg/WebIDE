@@ -74,6 +74,11 @@
     <string name="welcome_appearance_title">外观风格</string>
     <string name="welcome_dynamic_color">动态取色 (Monet)</string>
     <string name="welcome_custom_theme">自定义</string>
+    <string name="welcome_features_title">功能选项</string>
+    <string name="welcome_features_description">可随时在设置中修改，立即生效。</string>
+    <string name="welcome_lsp_title">启用代码补全 (LSP)</string>
+    <string name="welcome_lsp_subtitle">启动内置语言服务器，提供智能补全/诊断。占用约 50MB 内存。</string>
+    <string name="welcome_language_title">应用语言</string>
     <string name="content_desc_permission_granted">已授权</string>
 
     <string name="workspace_select_title">选择工作目录</string>
@@ -406,6 +411,18 @@
     <string name="terminal_title">终端</string>
     <string name="terminal_new_session">新建会话</string>
     <string name="terminal_input_hint">输入命令...</string>
+    <string name="terminal_preparing">正在准备终端环境…</string>
+    <string name="terminal_prepare_copying_proot">正在初始化运行时（步骤 1/3）…</string>
+    <string name="terminal_prepare_extracting_rootfs">正在解压运行环境（步骤 2/3），首次启动需 30–90 秒，请耐心等待…</string>
+    <string name="terminal_prepare_finalizing">即将完成（步骤 3/3）…</string>
+    <string name="terminal_prepare_elapsed">已耗时 %1$d 秒</string>
+    <string name="terminal_prepare_timeout">环境准备超时（&gt;3 分钟），已进入受限模式。可返回后重试。</string>
+    <string name="terminal_prepare_error">环境准备出错，已进入受限模式。</string>
+
+    <!-- 后台解压进度 banner（首页/编辑器全局可见）-->
+    <string name="setup_banner_extracting">正在后台准备运行环境… %1$d%%</string>
+    <string name="setup_banner_success">运行环境已就绪 ✓</string>
+    <string name="setup_banner_failed">运行环境准备失败，已切换至受限模式</string>
 
     <string name="about_team_title">WebIDE 团队</string>
     <string name="about_special_thanks_title">特别鸣谢</string>

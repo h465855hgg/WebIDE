@@ -341,9 +341,21 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         editor.setEditorLanguage(LocalCompletionLanguage(baseLanguage, ext))
     }
 
-    // 🔥 修复报错: 补充 reloadAllEditors 方法
+    // 🔥 LSP 热加载修复（真因：关 LSP 时只 dispose 了 LspEditor，
+    // 但 LspProject 和它持有的 LSP 进程依然存活，再次开启时复用了旧的半死状态）
     fun reloadAllEditors(context: Context) {
         viewModelScope.launch(Dispatchers.Main) {
+            val prefs = context.getSharedPreferences("WebIDE_Editor_Settings", Context.MODE_PRIVATE)
+            val lspEnabled = prefs.getBoolean("editor_lsp_enabled", false)
+
+            // 1. 关 LSP 时，彻底拆掉 LspProject + kill 进程；开 LSP 时，如果之前被拆过则重新建
+            if (!lspEnabled) {
+                try { lspProject?.dispose() } catch (_: Exception) {}
+                lspProject = null
+                addedLspDefinitions.clear()
+            }
+
+            // 2. 逐个 editor 处理
             val currentIndex = activeFileIndex
             openFiles.forEach { tab ->
                 if (tab is CodeEditorState) {
@@ -356,8 +368,10 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
                     applyLanguageToEditor(editor, tab.file.extension)
 
-                    val currentLang = editor.editorLanguage
-                    setupLspForEditor(context, tab, editor, currentLang)
+                    if (lspEnabled) {
+                        // setupLspForEditor 内部会按需 init lspProject 并起进程
+                        setupLspForEditor(context, tab, editor, editor.editorLanguage)
+                    }
 
                     editor.setSelection(cursorLine, cursorColumn)
                 }
