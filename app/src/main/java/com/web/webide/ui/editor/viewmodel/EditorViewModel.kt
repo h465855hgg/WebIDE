@@ -71,6 +71,7 @@ import io.github.rosemoe.sora.lsp.events.EventListener
 import io.github.rosemoe.sora.lsp.events.EventContext
 import io.github.rosemoe.sora.lsp.client.languageserver.serverdefinition.CustomLanguageServerDefinition
 import com.web.webide.lsp.ProotStreamConnectionProvider
+import com.web.webide.lsp.LocalCompletionLanguage
 import org.eclipse.lsp4j.Diagnostic
 
 import com.web.webide.ui.editor.components.MediaType
@@ -309,8 +310,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         }
 
         val currentLanguage = editor.editorLanguage
-        val textMateLanguage = currentLanguage as? TextMateLanguage
-        setupLspForEditor(context, state, editor, textMateLanguage)
+        setupLspForEditor(context, state, editor, currentLanguage)
 
         editorInstances[filePath] = editor
         return editor
@@ -321,20 +321,24 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         val ext = extension.lowercase()
         val tsLanguage = loadTreeSitterLanguage(context, ext)
 
-        if (tsLanguage != null) {
-            editor.setEditorLanguage(tsLanguage)
+        val baseLanguage: Language = if (tsLanguage != null) {
             configureRainbowColors(editor.colorScheme)
+            tsLanguage
         } else {
             val tmLanguage = loadTextMateLanguage(context, ext)
             if (tmLanguage != null) {
-                editor.setEditorLanguage(tmLanguage)
                 try {
                     editor.colorScheme = TextMateColorScheme.create(ThemeRegistry.getInstance())
                 } catch (_: Exception) {}
+                tmLanguage
             } else {
-                editor.setEditorLanguage(EmptyLanguage())
+                EmptyLanguage()
             }
         }
+
+        // 包装本地补全（默认启用，不依赖 LSP/Node.js/Alpine）
+        // 即使 CDN 全挂、Node.js 没装上，编辑器也有代码补全
+        editor.setEditorLanguage(LocalCompletionLanguage(baseLanguage, ext))
     }
 
     // 🔥 修复报错: 补充 reloadAllEditors 方法
@@ -353,9 +357,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
                     applyLanguageToEditor(editor, tab.file.extension)
 
                     val currentLang = editor.editorLanguage
-                    if (currentLang is TextMateLanguage) {
-                        setupLspForEditor(context, tab, editor, currentLang)
-                    }
+                    setupLspForEditor(context, tab, editor, currentLang)
 
                     editor.setSelection(cursorLine, cursorColumn)
                 }
@@ -756,10 +758,9 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         editorInstances.values.forEach { editor ->
             EditorColorSchemeManager.applyThemeColors(editor.colorScheme, colorScheme)
             
-            // Re-apply rainbow colors if needed (as applying theme colors might reset some custom colors)
-            if (editor.editorLanguage is TsLanguage) {
-                configureRainbowColors(editor.colorScheme)
-            }
+            // Re-apply rainbow colors (as applying theme colors might reset some custom colors)
+            // 语言已被 LocalCompletionLanguage 包装，无法直接判断 TsLanguage，统一设置即可
+            configureRainbowColors(editor.colorScheme)
             editor.invalidate()
         }
     }
