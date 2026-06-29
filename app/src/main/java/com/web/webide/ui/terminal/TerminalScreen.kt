@@ -353,6 +353,11 @@ fun TerminalScreen(navController: NavController, themeViewModel: ThemeViewModel)
                                     )
                                     // 🔥 更新已创建按钮的实际文字颜色（不只是字段值）
                                     view.updateAllButtonColors()
+                                    // 🔥 session 变化时更新 listener，否则点击符号栏无反应
+                                    // factory 只执行一次，首次创建时 session 可能为 null
+                                    currentSession?.let { session ->
+                                        view.virtualKeysViewClient = VirtualKeysListener(session)
+                                    }
                                 }
                             )
                         }

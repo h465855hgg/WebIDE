@@ -163,14 +163,12 @@ object AlpineManager {
         val prefixDir = getPrefixDir(context)
         val nativeLibDir = context.applicationInfo.nativeLibraryDir
 
-        // 1. 确保脚本存在
+        // 1. 每次都覆盖脚本，确保使用最新版本（修复旧版本残留导致的问题）
         val initHostScript = File(binDir, "init-host")
-        if (!initHostScript.exists()) {
-            copyAsset(context, "init-host.sh", initHostScript)
-            copyAsset(context, "init.sh", File(binDir, "init"))
-            initHostScript.setExecutable(true)
-            File(binDir, "init").setExecutable(true)
-        }
+        copyAsset(context, "init-host.sh", initHostScript)
+        copyAsset(context, "init.sh", File(binDir, "init"))
+        initHostScript.setExecutable(true)
+        File(binDir, "init").setExecutable(true)
         val workspacePath = WorkspaceManager.getWorkspacePath(context)
         var versionName = "Unknown"
         var versionCode = 0L
@@ -193,6 +191,7 @@ object AlpineManager {
             "LD_LIBRARY_PATH=${libDir.absolutePath}",
             // 尝试适配不同架构的 linker
             "LINKER=${if(File("/system/bin/linker64").exists()) "/system/bin/linker64" else "/system/bin/linker"}",
+            "NATIVE_LIB_DIR=$nativeLibDir",
             "PROOT_TMP_DIR=${context.cacheDir.absolutePath}",
             "TMPDIR=${context.cacheDir.absolutePath}",
 
@@ -218,11 +217,12 @@ object AlpineManager {
         if (!vmstatFile.exists()) vmstatFile.writeText(vmstat)
 
         // 4. 启动 Shell
-        // 注意：这里仍然使用 init-host.sh，如果你的 init-host.sh 里写死了调用 ./proot
-        // 在 Android 10+ 可能会有问题。但在 Terminal 环境下通常比较宽容。
-        // 如果 Terminal 也报错 Permission denied，需要修改 init-host.sh 或者在这里直接调用 libproot.so
+        // Android SELinux 禁止直接 exec /data 目录下的脚本（Permission denied），
+        // 也不能用 "-cpp"（不是 /system/bin/sh 的有效参数，会导致语法错误）。
+        // 正确做法：用 /system/bin/sh 读取脚本文件并执行。
+        // 脚本内的 $LINKER/proot 调用会在 proot 容器内用 /usr/bin/bash 执行 init.sh。
         val shell = "/system/bin/sh"
-        val args = arrayOf("-cpp", initHostScript.absolutePath)
+        val args = arrayOf(initHostScript.absolutePath)
 
         return TerminalSession(
             shell,
