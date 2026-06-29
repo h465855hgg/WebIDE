@@ -76,7 +76,13 @@ fun WorkspaceSelectionScreen(navController: NavController) {
     // 只有在未配置时才渲染 UI 内容，避免跳转时的闪烁（可选优化）
     if (!WorkspaceManager.isWorkspaceConfigured(context)) {
         Scaffold(
-            topBar = { TopAppBar(title = { Text(stringResource(R.string.app_name)) }) }
+            topBar = {
+                Column {
+                    // 🔥 后台 rootfs 解压进度提示（仅在准备中/刚完成时显示）
+                    com.web.webide.ui.common.SetupBanner()
+                    TopAppBar(title = { Text(stringResource(R.string.app_name)) })
+                }
+            }
         ) { innerPadding ->
             Column(
                 modifier = Modifier

@@ -56,6 +56,11 @@
     <string name="welcome_permission_install_description">Install built APK files</string>
     <string name="welcome_appearance_title">Appearance</string>
     <string name="welcome_dynamic_color">Dynamic Color (Monet)</string>
+    <string name="welcome_features_title">Features</string>
+    <string name="welcome_features_description">Can be changed later in Settings. Takes effect immediately.</string>
+    <string name="welcome_lsp_title">Enable Code Completion (LSP)</string>
+    <string name="welcome_lsp_subtitle">Run built-in language servers for smart completion and diagnostics. Uses ~50MB RAM.</string>
+    <string name="welcome_language_title">App Language</string>
     <string name="welcome_custom_theme">Custom</string>
     <string name="content_desc_permission_granted">Granted</string>
 
@@ -389,6 +394,18 @@
     <string name="terminal_title">Terminal</string>
     <string name="terminal_new_session">New Session</string>
     <string name="terminal_input_hint">Type command...</string>
+    <string name="terminal_preparing">Preparing terminal environment…</string>
+    <string name="terminal_prepare_copying_proot">Initializing runtime (step 1/3)…</string>
+    <string name="terminal_prepare_extracting_rootfs">Extracting runtime (step 2/3). First launch takes 30–90 seconds, please wait…</string>
+    <string name="terminal_prepare_finalizing">Almost done (step 3/3)…</string>
+    <string name="terminal_prepare_elapsed">Elapsed: %1$d s</string>
+    <string name="terminal_prepare_timeout">Environment preparation timed out (&gt;3 min). Entered limited mode.</string>
+    <string name="terminal_prepare_error">Environment preparation failed. Entered limited mode.</string>
+
+    <!-- Setup banner (global) -->
+    <string name="setup_banner_extracting">Preparing runtime in background… %1$d%%</string>
+    <string name="setup_banner_success">Runtime ready ✓</string>
+    <string name="setup_banner_failed">Runtime setup failed, switched to limited mode</string>
 
     <string name="about_team_title">WebIDE Team</string>
     <string name="about_special_thanks_title">Special Thanks</string>

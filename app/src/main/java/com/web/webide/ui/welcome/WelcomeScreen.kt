@@ -22,6 +22,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -47,6 +48,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.web.webide.R
 import com.web.webide.core.utils.PermissionManager
+import androidx.core.content.edit
 import com.web.webide.ui.ThemeViewModel
 import com.web.webide.ui.components.ColorPickerDialog
 import com.web.webide.ui.components.WebIDE_Icon
@@ -61,10 +63,20 @@ fun WelcomeScreen(
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val themeState by themeViewModel.themeState.collectAsState()
     val scope = rememberCoroutineScope()
-    val pagerState = rememberPagerState(pageCount = { 3 })
+    // 🔥 pageCount = 4：page0 介绍 → page1 权限 → page2 主题 → page3 功能
+    // App 启动时（MyApplication.onCreate）已后台解压 rootfs，无需 EULA 倒计时拖延
+    val pagerState = rememberPagerState(pageCount = { 4 })
 
     var storageGranted by remember { mutableStateOf(false) }
     var installGranted by remember { mutableStateOf(true) }
+
+    // 🔥 新增：功能选项页的状态（LSP 开关、App 语言）
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val editorPrefs = remember {
+        context.getSharedPreferences("WebIDE_Editor_Settings", android.content.Context.MODE_PRIVATE)
+    }
+    var lspEnabled by remember { mutableStateOf(editorPrefs.getBoolean("editor_lsp_enabled", false)) }
+    val currentLanguageOption by com.web.webide.core.utils.AppLanguageManager.currentOption.collectAsState()
 
     var showColorPicker by remember { mutableStateOf(false) }
     var customColor by remember { mutableStateOf(themeState.customColor) }
@@ -166,12 +178,14 @@ fun WelcomeScreen(
                 WelcomeBottomBar(
                     pagerState = pagerState,
                     activeColor = activeColor,
-                    isLastPage = pagerState.currentPage == 2,
+                    isLastPage = pagerState.currentPage == 3,
                     onBack = { scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) } },
                     onNext = {
-                        if (pagerState.currentPage < 2) {
+                        if (pagerState.currentPage < 3) {
                             scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
                         } else {
+                            // 🔥 离开 welcome 前持久化 LSP 开关（语言切换已是即写即生效）
+                            editorPrefs.edit { putBoolean("editor_lsp_enabled", lspEnabled) }
                             themeViewModel.saveThemeConfig(
                                 selectedModeIndex, selectedThemeIndex, customColor, isMonetEnabled,
                                 selectedThemeIndex == themeColors.size
@@ -218,6 +232,16 @@ fun WelcomeScreen(
                             onCustomColorClick = {
                                 selectedThemeIndex = themeColors.size
                                 showColorPicker = true
+                            }
+                        )
+
+                        // 🔥 第 4 页 - 功能选项（LSP + 语言）
+                        3 -> FeaturesContent(
+                            lspEnabled = lspEnabled,
+                            onLspEnabledChange = { lspEnabled = it },
+                            currentLanguage = currentLanguageOption,
+                            onLanguageSelected = {
+                                com.web.webide.core.utils.AppLanguageManager.updateLanguage(context, it)
                             }
                         )
                     }
@@ -412,6 +436,76 @@ private fun ThemeSetupContent(
                     }
                 }
             }
+        }
+    }
+}
+
+// --- 页面 4: Features (LSP + Language) ---
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FeaturesContent(
+    lspEnabled: Boolean,
+    onLspEnabledChange: (Boolean) -> Unit,
+    currentLanguage: com.web.webide.core.utils.AppLanguageOption,
+    onLanguageSelected: (com.web.webide.core.utils.AppLanguageOption) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            stringResource(R.string.welcome_features_title),
+            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+            modifier = Modifier.padding(horizontal = 24.dp)
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            stringResource(R.string.welcome_features_description),
+            style = MaterialTheme.typography.bodyMedium,
+            color = LocalContentColor.current.copy(alpha = 0.8f),
+            modifier = Modifier.padding(horizontal = 24.dp)
+        )
+
+        Spacer(Modifier.height(24.dp))
+
+        // LSP 开关
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.welcome_lsp_title)) },
+            supportingContent = { Text(stringResource(R.string.welcome_lsp_subtitle)) },
+            trailingContent = { Switch(checked = lspEnabled, onCheckedChange = onLspEnabledChange) },
+            colors = ListItemDefaults.colors(
+                containerColor = Color.Transparent,
+                headlineColor = LocalContentColor.current,
+                supportingColor = LocalContentColor.current.copy(alpha = 0.7f),
+                trailingIconColor = LocalContentColor.current
+            )
+        )
+
+        HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp))
+
+        // 语言选择
+        Text(
+            stringResource(R.string.welcome_language_title),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
+        )
+        com.web.webide.core.utils.AppLanguageOption.entries.forEach { option ->
+            ListItem(
+                headlineContent = { Text(stringResource(option.labelRes)) },
+                leadingContent = {
+                    RadioButton(
+                        selected = currentLanguage == option,
+                        onClick = { onLanguageSelected(option) }
+                    )
+                },
+                modifier = Modifier.clickable { onLanguageSelected(option) },
+                colors = ListItemDefaults.colors(
+                    containerColor = Color.Transparent,
+                    headlineColor = LocalContentColor.current
+                )
+            )
         }
     }
 }
