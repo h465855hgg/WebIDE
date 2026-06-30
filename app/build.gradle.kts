@@ -38,6 +38,10 @@ android {
         versionCode = 37
         versionName = "0.3.7"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // 编译时间戳：每次构建时写入当前毫秒时间，供“关于”页展示构建时间。
+        // 用 Long 类型避免地区化问题，UI 端再格式化为本地时间字符串。
+        buildConfigField("long", "BUILD_TIME", "${System.currentTimeMillis()}L")
     }
     // 按架构分离：每个 flavor 的 APK 只含对应架构的 rootfs（48MB），而非两个都打包（96MB）
     flavorDimensions += "arch"
@@ -49,6 +53,18 @@ android {
         create("armeabi-v7a") {
             //noinspection ChromeOsAbiSupport
             ndk { abiFilters += "armeabi-v7a" }
+        }
+    }
+    // flavor 使用标准 ABI 名（arm64-v8a / armeabi-v7a），但架构相关资源（rootfs 等）
+    // 仍按历史约定放在 src/arm64/、src/arm32/（与 build-rootfs.sh 输出路径一致）。
+    // 显式映射源集，确保各 flavor 能正确打包对应架构的 rootfs。
+    // 否则 AGP 只会查找 src/<flavorName>/（即 src/arm64-v8a/），导致 rootfs 漏打入 APK。
+    sourceSets {
+        getByName("arm64-v8a") {
+            assets.srcDir("src/arm64/assets")
+        }
+        getByName("armeabi-v7a") {
+            assets.srcDir("src/arm32/assets")
         }
     }
     signingConfigs {
