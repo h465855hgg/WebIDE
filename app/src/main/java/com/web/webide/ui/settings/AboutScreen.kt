@@ -19,6 +19,7 @@
 
 package com.web.webide.ui.settings
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
@@ -29,7 +30,20 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -45,8 +59,27 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -68,16 +101,17 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.edit
 import androidx.core.net.toUri
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.mikepenz.aboutlibraries.Libs
 import com.mikepenz.aboutlibraries.entity.Library
 import com.mikepenz.aboutlibraries.util.withContext
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
 import com.web.webide.BuildConfig
 import com.web.webide.R
+import com.web.webide.core.update.UpdateChecker
 import com.web.webide.ui.components.WebIDE_Icon
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 // --- 1. 数据模型定义 ---
 
@@ -225,7 +259,13 @@ fun AboutScreen(navController: NavController) {
             // 1. App 头部
             item { AppHeaderSection() }
 
-            // 2. 开发团队 (Chip 风格)
+            // 2. 应用信息：版本 / 构建时间 / 检查更新
+            item {
+                SectionTitle(stringResource(R.string.about_app_info_title))
+                AppInfoCard()
+            }
+
+            // 3. 开发团队 (Chip 风格)
             item {
                 SectionTitle(stringResource(R.string.about_team_title))
                 LazyRow(
@@ -574,6 +614,132 @@ private fun AppHeaderSection() {
                             fontFamily = FontFamily.Monospace
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InfoRow(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.weight(1f))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontFamily = FontFamily.Monospace
+        )
+    }
+}
+
+@SuppressLint("LocalContextGetResourceValueCall")
+@Composable
+private fun AppInfoCard() {
+    val context = LocalContext.current
+    val buildTimeText = remember {
+        val df = java.text.SimpleDateFormat(
+            "yyyy-MM-dd HH:mm",
+            java.util.Locale.getDefault()
+        )
+        df.format(java.util.Date(BuildConfig.BUILD_TIME))
+    }
+    // 更新检测状态：null=检测中, 其它=结果/错误
+    var updateStatus by remember { mutableStateOf<String?>(null) }
+    var hasUpdate by remember { mutableStateOf(false) }
+
+    // 进入关于页自动检测更新
+    LaunchedEffect(Unit) {
+        val result = UpdateChecker.checkForUpdate(BuildConfig.VERSION_NAME)
+        updateStatus = when (result) {
+            is UpdateChecker.UpdateResult.UpdateAvailable -> {
+                hasUpdate = true
+                context.getString(R.string.about_update_available, result.latestVersion)
+            }
+            UpdateChecker.UpdateResult.UpToDate -> context.getString(R.string.about_up_to_date)
+            is UpdateChecker.UpdateResult.Error ->
+                context.getString(R.string.about_update_failed, result.message)
+        }
+    }
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column {
+            InfoRow(stringResource(R.string.about_version), BuildConfig.VERSION_NAME)
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 20.dp),
+                thickness = 0.5.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+            )
+            InfoRow(stringResource(R.string.about_build_time), buildTimeText)
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 20.dp),
+                thickness = 0.5.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+            )
+            // 检查更新：整行可点击（有新版本时跳浏览器），右侧自动显示检测状态
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .let { if (hasUpdate) it.clickable {
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW, UpdateChecker.releasesPageUrl.toUri())
+                            context.startActivity(intent)
+                        } catch (_: Exception) {
+                        }
+                    } else it }
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.about_check_update),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                if (hasUpdate) {
+                    Text(
+                        text = updateStatus ?: "",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                } else if (updateStatus == null) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text(
+                        text = updateStatus!!,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1
+                    )
                 }
             }
         }
