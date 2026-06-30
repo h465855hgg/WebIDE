@@ -37,6 +37,7 @@ import com.web.webide.core.utils.PermissionManager
 import com.web.webide.ui.editor.EditorColorSchemeManager
 import com.web.webide.ui.editor.TextMateInitializer
 import com.web.webide.ui.editor.git.GitManager
+import com.web.webide.ui.terminal.SetupWorker
 import io.github.rosemoe.sora.lang.Language
 import io.github.rosemoe.sora.lang.EmptyLanguage
 import io.github.rosemoe.sora.lang.styling.TextStyle
@@ -989,7 +990,20 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
                 }
             })
 
-            viewModelScope.launch(Dispatchers.IO) { try { lspEditor.connect() } catch (_: Exception){} }
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    // rootfs 完整时直接连 LSP（瞬时，不阻塞）；不完整才重新解压修复。
+                    // 避免每次启动 LSP 都等 30-90s 解压。
+                    if (!SetupWorker.isEnvironmentReady(context)) {
+                        android.util.Log.w("LSP-Setup", "rootfs 不完整，开始重新解压...")
+                        SetupWorker.prepareEnvironment(context)
+                        android.util.Log.i("LSP-Setup", "rootfs 修复完成，连接 LSP")
+                    }
+                    lspEditor.connect()
+                } catch (e: Exception) {
+                    android.util.Log.e("LSP-Setup", "LSP 连接失败", e)
+                }
+            }
         } catch (e: Exception) { e.printStackTrace() }
     }
 

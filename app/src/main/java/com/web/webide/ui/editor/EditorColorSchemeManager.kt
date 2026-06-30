@@ -37,6 +37,12 @@ object EditorColorSchemeManager {
         val background = colorScheme.background.toArgb()
         val onSurfaceVariant = colorScheme.onSurfaceVariant.toArgb()
 
+        // 明暗判断必须基于 Material 主题色（colorScheme.background），它总是可靠地反映
+        // 应用当前的实际明暗模式。不能用 editor scheme 的 WHOLE_BACKGROUND：当编辑器使用
+        // TextMateColorScheme 时，getColor(WHOLE_BACKGROUND) 会被覆盖为 TextMate 主题计算值，
+        // 而 TextMate 主题是异步应用的，此时可能仍是浅色，导致误判为亮色、补全文字仍为黑色。
+        val isDark = isColorDark(background)
+
         scheme.apply {
             // 只更新基础背景和文本颜色
             setColor(EditorColorScheme.WHOLE_BACKGROUND, background)
@@ -44,57 +50,57 @@ object EditorColorSchemeManager {
             setColor(EditorColorScheme.LINE_DIVIDER, surfaceVariant)
             setColor(EditorColorScheme.LINE_NUMBER, onSurfaceVariant)
             setColor(EditorColorScheme.LINE_NUMBER_CURRENT, primary)
-            
+
             // 当前行高亮
             setColor(EditorColorScheme.CURRENT_LINE, adjustAlpha(surfaceVariant, 0.3f))
-            
+
             // 选择相关
             setColor(EditorColorScheme.SELECTED_TEXT_BACKGROUND, adjustAlpha(primary, 0.25f))
             setColor(EditorColorScheme.SELECTION_INSERT, primary)
             setColor(EditorColorScheme.SELECTION_HANDLE, primary)
-            
+
             // 滚动条
             setColor(EditorColorScheme.SCROLL_BAR_THUMB, adjustAlpha(onSurfaceVariant, 0.3f))
             setColor(EditorColorScheme.SCROLL_BAR_THUMB_PRESSED, adjustAlpha(primary, 0.5f))
-            
+
             // 自动完成窗口
             setColor(EditorColorScheme.COMPLETION_WND_BACKGROUND, surface)
             setColor(EditorColorScheme.COMPLETION_WND_CORNER, surfaceVariant)
             setColor(EditorColorScheme.COMPLETION_WND_ITEM_CURRENT, adjustAlpha(primary, 0.2f))
             // 补全窗口文字颜色：sora 默认依赖 isDark()（恒为 false）导致暗色下显示黑字看不清。
-            // 这里显式覆盖：暗色模式用纯白，亮色模式跟随主题前景色。
-            if (isDarkScheme(this)) {
+            // 用 Material 主题的明暗判断显式覆盖：暗色模式用纯白，亮色模式跟随主题前景色。
+            if (isDark) {
                 setColor(EditorColorScheme.COMPLETION_WND_TEXT_PRIMARY, AndroidColor.WHITE)
                 setColor(EditorColorScheme.COMPLETION_WND_TEXT_SECONDARY, 0xFFB0B0B0.toInt())
             } else {
                 setColor(EditorColorScheme.COMPLETION_WND_TEXT_PRIMARY, colorScheme.onSurface.toArgb())
                 setColor(EditorColorScheme.COMPLETION_WND_TEXT_SECONDARY, onSurfaceVariant)
             }
-            
+
             // 文本操作弹窗 (双击/长按弹出的菜单)
             setColor(EditorColorScheme.TEXT_ACTION_WINDOW_BACKGROUND, surface)
             setColor(EditorColorScheme.TEXT_ACTION_WINDOW_ICON_COLOR, primary)
-            
+
             // 括号匹配
             setColor(EditorColorScheme.HIGHLIGHTED_DELIMITERS_FOREGROUND, primary)
             setColor(EditorColorScheme.HIGHLIGHTED_DELIMITERS_BACKGROUND, AndroidColor.TRANSPARENT)
             setColor(EditorColorScheme.HIGHLIGHTED_DELIMITERS_BORDER, AndroidColor.TRANSPARENT)
             setColor(EditorColorScheme.HIGHLIGHTED_DELIMITERS_UNDERLINE, primary)
-            
+
             // 下划线
             setColor(EditorColorScheme.UNDERLINE, primary)
-            
+
             // 代码块线条
             setColor(EditorColorScheme.BLOCK_LINE, surfaceVariant)
             setColor(EditorColorScheme.BLOCK_LINE_CURRENT, primary)
             setColor(EditorColorScheme.SIDE_BLOCK_LINE, surfaceVariant)
-            
+
             // 确保文本颜色适配深色/浅色模式 (针对 TreeSitter 或默认编辑器)
             val onBackground = colorScheme.onBackground.toArgb()
             setColor(EditorColorScheme.TEXT_NORMAL, onBackground)
-            
+
             // 如果是浅色模式，优化 TreeSitter 的默认高亮颜色 (简单的覆盖，防止看不清)
-            if (!isDarkScheme(this)) {
+            if (!isDark) {
                  setColor(EditorColorScheme.KEYWORD, 0xFF0000FF.toInt()) // 蓝色关键字
                  setColor(EditorColorScheme.COMMENT, 0xFF008000.toInt()) // 绿色注释
                  setColor(EditorColorScheme.LITERAL, 0xFF098658.toInt()) // 深绿数字/常量
@@ -107,6 +113,13 @@ object EditorColorSchemeManager {
                  setColor(EditorColorScheme.HTML_TAG, 0xFF800000.toInt()) // HTML标签
             }
         }
+    }
+
+    private fun isColorDark(color: Int): Boolean {
+        val r = AndroidColor.red(color)
+        val g = AndroidColor.green(color)
+        val b = AndroidColor.blue(color)
+        return (r * 0.299 + g * 0.587 + b * 0.114) < 128
     }
 
     private fun adjustAlpha(color: Int, alpha: Float): Int {
