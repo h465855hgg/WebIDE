@@ -237,7 +237,7 @@ dependencies {
     implementation(project(":editor-lsp"))
     implementation(libs.lsp4j)
     implementation(libs.androidx.compose.foundation.layout)
-    implementation(libs.androidx.compose.ui.ui)
+
     //脱唐
     coreLibraryDesugaring(libs.desugar.jdk.libs)
     //TreeSitter语言包
