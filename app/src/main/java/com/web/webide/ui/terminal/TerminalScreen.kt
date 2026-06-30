@@ -88,6 +88,7 @@ import androidx.core.widget.doOnTextChanged
 import androidx.navigation.NavController
 import com.rk.libcommons.application
 import com.rk.terminal.ui.screens.terminal.TerminalBackEnd
+import com.rk.terminal.ui.screens.terminal.virtualKeysView
 import com.rk.terminal.ui.screens.terminal.virtualkeys.VirtualKeysConstants
 import com.rk.terminal.ui.screens.terminal.virtualkeys.VirtualKeysInfo
 import com.rk.terminal.ui.screens.terminal.virtualkeys.VirtualKeysView
@@ -99,9 +100,6 @@ import com.web.webide.ui.terminal.TerminalConfig.VIRTUAL_KEYS_JSON
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.lang.ref.WeakReference
-
-// 🔥 全局 VirtualKeysView 引用，用于 TerminalBackEnd 读取 Ctrl/Alt 按键状态
-var virtualKeysView: WeakReference<VirtualKeysView>? = null
 
 @SuppressLint("LocalContextGetResourceValueCall")
 @OptIn(ExperimentalMaterial3Api::class)
