@@ -77,7 +77,7 @@ com.web.webide
 ## 贡献者
 
 <a href="https://github.com/h465855hgg/WebIDE/graphs/contributors">
-  <img src="https://contributors-img.web.app/image?repo=h465855hgg/WebIDE" />
+  <img src="https://contributors-img.web.app/image?repo=hA465855hgg/WebIDE" />
 </a>
 
 ## 许可证
