@@ -1,6 +1,6 @@
 # WebIDE ![Stone Badge](https://stone.professorlee.work/api/stone/h465855hgg/WebIDE)
 
-![Version](https://img.shields.io/badge/version-0.3.6-blue?style=flat-square)
+![Version](https://img.shields.io/badge/version-0.3.7-blue?style=flat-square)
 [![Language](https://img.shields.io/badge/Language-Kotlin-blue?style=flat-square)](https://kotlinlang.org/)
 [![UI](https://img.shields.io/badge/UI-Jetpack_Compose-green?style=flat-square)](https://developer.android.com/jetpack/compose)
 [![License](https://img.shields.io/badge/License-GPLv3-orange?style=flat-square)](LICENSE)
@@ -53,16 +53,19 @@ com.web.webide
 ## 功能特性
 
 *   **语法高亮**: 基于 TextMate 语法文件，完美支持 HTML, CSS, JavaScript 和 JSON。
+*   **代码补全 (LSP)**: 内置语言服务器，提供智能补全与诊断，弹窗配色自动适配明暗模式。
 *   **项目管理**: 完整的文件系统访问权限，支持多文件 Web 项目的创建与管理。
 *   **实时预览**: 集成 WebView 预览环境，支持 JavaScript 交互测试。
+*   **终端模拟器**: 内嵌 Alpine Linux 环境（基于 proot），提供终端、多会话管理以及 Ctrl/Alt/Shift/Fn 虚拟按键。
 *   **现代化 UI**: 100% 使用 Kotlin 和 Jetpack Compose 编写，支持动态主题。
 *   **Git 集成**: 内置 Git 版本控制，提供可视化提交历史图谱，支持克隆、提交、推送、拉取和分支管理。自动忽略敏感文件和构建产物。
+*   **国际化 (i18n)**: 字符串资源已抽离至独立的 `:i18n` 模块，当前内置中文与英文。新增语言只需放入 `values-<语言>/strings.xml`，欢迎社区贡献翻译。
 
 ## 展望与挑战
 
 我们正在积极改进 WebIDE。以下是我们的主要规划和目前面临的挑战：
 
-*   **多语言支持**: 原生支持应用内中英文切换。
+*   **更多语言**: i18n 模块已就绪，欢迎社区贡献日语、法语、繁体中文等翻译。
 *   **自定义代码高亮**: 允许用户导入和自定义 TextMate 语法及颜色主题。
 *   **云端资源与体积优化**: 目前最大的挑战是嵌入式 Linux 环境导致的 APK 体积过大。我们计划将 `rootfs.bin` 等大型资源移至云端存储，实现按需下载。这将显著减小初始安装包的体积。
 
