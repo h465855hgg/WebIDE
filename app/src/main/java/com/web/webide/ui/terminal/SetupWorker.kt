@@ -123,6 +123,18 @@ object SetupWorker {
         return size
     }
 
+    /**
+     * 校验 Alpine rootfs 是否解压完整。
+     * 关键可执行文件全部存在即认为完整，避免解压中断后 etc 已生成但 /usr/bin/env 缺失，
+     * 导致 proot 执行 `/usr/bin/env <语言服务器>` 时报 not found。
+     */
+    private fun isRootfsComplete(alpineDir: File): Boolean {
+        if (!alpineDir.exists()) return false
+        return File(alpineDir, "usr/bin/env").exists() &&
+               File(alpineDir, "bin/busybox").exists() &&
+               File(alpineDir, "bin/sh").exists()
+    }
+
     private fun doPrepare(context: Context): PrepareResult {
         return try {
             val filesDir = context.filesDir
@@ -138,14 +150,22 @@ object SetupWorker {
             File(filesDir, "proot").setExecutable(true)
 
             // 阶段 2：复制并解压 rootfs（最耗时）
+            // 注意：不能用 etc 目录是否存在判断解压是否完成。当应用在后台被系统因内存
+            // 压力终止进程时，解压会被中断：etc 已写出，但关键可执行文件
+            // （usr/bin/env）尚未落盘。下次启动若仅凭 etc 存在就跳过解压，会导致 proot
+            // 启动语言服务器时报 '/usr/bin/env' not found 并陷入重启死循环，表现为
+            // LSP 代码补全完全失效、编辑器被拖卡。这里改为校验关键文件完整性。
             val rootfsTar = File(filesDir, "alpine.tar.gz")
             if (!rootfsTar.exists()) {
                 emit(Progress.Phase.EXTRACTING_ROOTFS, 0)
                 copyAsset(context, "rootfs.bin", rootfsTar)
             }
 
-            val etcDir = File(alpineDir, "etc")
-            if (!etcDir.exists()) {
+            if (!isRootfsComplete(alpineDir)) {
+                // 解压不完整（首次安装或上次被中断）：清理残留后重新解压，避免文件错乱
+                if (alpineDir.exists()) {
+                    alpineDir.deleteRecursively()
+                }
                 alpineDir.mkdirs()
                 // 启动进度监控线程
                 val monitor = startExtractProgressMonitor(rootfsTar.length(), alpineDir)
