@@ -16,9 +16,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# 注意：不使用 set -e！
-# CDN/网络不稳定时 apk/npm 安装会失败，使用 set -e 会导致整个脚本退出，
-# 终端直接用不了。LSP 安装是可选的，失败不应该阻塞终端启动。
 
 # 1. 环境变量配置
 export PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin
