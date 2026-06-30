@@ -417,6 +417,15 @@
     <string name="about_see_project_website">See the project website for license details.</string>
     <string name="about_no_license_info">No license information.</string>
     <string name="about_library_version_format">v%1$s</string>
+    <string name="about_app_info_title">App Info</string>
+    <string name="about_version">Version</string>
+    <string name="about_build_time">Build Time</string>
+    <string name="about_check_update">Check for Updates</string>
+    <string name="about_update_download">Download</string>
+    <string name="about_checking_update">Checking for updates...</string>
+    <string name="about_update_available">New version %1$s available. Tap to download</string>
+    <string name="about_up_to_date">Up to date</string>
+    <string name="about_update_failed">Check failed: %1$s</string>
     <string name="about_developer_role_lead">Lead</string>
     <string name="about_developer_role_theme">Theme</string>
     <string name="about_developer_role_ts_language">TS Language</string>

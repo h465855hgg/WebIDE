@@ -434,6 +434,15 @@
     <string name="about_see_project_website">请访问项目网站查看许可证。</string>
     <string name="about_no_license_info">暂无许可证信息。</string>
     <string name="about_library_version_format">v%1$s</string>
+    <string name="about_app_info_title">应用信息</string>
+    <string name="about_version">版本</string>
+    <string name="about_build_time">构建时间</string>
+    <string name="about_check_update">检查更新</string>
+    <string name="about_update_download">前往下载</string>
+    <string name="about_checking_update">正在检查更新...</string>
+    <string name="about_update_available">发现新版本 %1$s，点击前往下载</string>
+    <string name="about_up_to_date">已是最新版本</string>
+    <string name="about_update_failed">检查失败：%1$s</string>
     <string name="about_developer_role_lead">负责人</string>
     <string name="about_developer_role_theme">主题</string>
     <string name="about_developer_role_ts_language">TS 语言</string>
