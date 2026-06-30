@@ -59,6 +59,7 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -79,6 +80,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -111,6 +113,7 @@ import com.web.webide.R
 import com.web.webide.core.update.UpdateChecker
 import com.web.webide.ui.components.WebIDE_Icon
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 // --- 1. 数据模型定义 ---
@@ -647,6 +650,7 @@ private fun InfoRow(label: String, value: String) {
 @Composable
 private fun AppInfoCard() {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val buildTimeText = remember {
         val df = java.text.SimpleDateFormat(
             "yyyy-MM-dd HH:mm",
@@ -654,23 +658,33 @@ private fun AppInfoCard() {
         )
         df.format(java.util.Date(BuildConfig.BUILD_TIME))
     }
-    // 更新检测状态：null=检测中, 其它=结果/错误
+    // 更新检测状态：null=尚未有结果, 其它=结果/错误
     var updateStatus by remember { mutableStateOf<String?>(null) }
     var hasUpdate by remember { mutableStateOf(false) }
+    var checking by remember { mutableStateOf(false) }
 
-    // 进入关于页自动检测更新
-    LaunchedEffect(Unit) {
-        val result = UpdateChecker.checkForUpdate(BuildConfig.VERSION_NAME)
-        updateStatus = when (result) {
-            is UpdateChecker.UpdateResult.UpdateAvailable -> {
-                hasUpdate = true
-                context.getString(R.string.about_update_available, result.latestVersion)
+    // 执行一次更新检测（进入页面自动调用，也可由用户点击手动重新触发）
+    fun performCheck() {
+        checking = true
+        hasUpdate = false
+        updateStatus = null
+        scope.launch {
+            val result = UpdateChecker.checkForUpdate(BuildConfig.VERSION_NAME)
+            updateStatus = when (result) {
+                is UpdateChecker.UpdateResult.UpdateAvailable -> {
+                    hasUpdate = true
+                    context.getString(R.string.about_update_available, result.latestVersion)
+                }
+                UpdateChecker.UpdateResult.UpToDate -> context.getString(R.string.about_up_to_date)
+                is UpdateChecker.UpdateResult.Error ->
+                    context.getString(R.string.about_update_failed, result.message)
             }
-            UpdateChecker.UpdateResult.UpToDate -> context.getString(R.string.about_up_to_date)
-            is UpdateChecker.UpdateResult.Error ->
-                context.getString(R.string.about_update_failed, result.message)
+            checking = false
         }
     }
+
+    // 进入关于页自动检测一次
+    LaunchedEffect(Unit) { performCheck() }
 
     Surface(
         modifier = Modifier
@@ -692,17 +706,22 @@ private fun AppInfoCard() {
                 thickness = 0.5.dp,
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
             )
-            // 检查更新：整行可点击（有新版本时跳浏览器），右侧自动显示检测状态
+            // 检查更新：进入页面自动检测一次；点击整行——有新版本时跳浏览器，否则重新检测
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .let { if (hasUpdate) it.clickable {
-                        try {
-                            val intent = Intent(Intent.ACTION_VIEW, UpdateChecker.releasesPageUrl.toUri())
-                            context.startActivity(intent)
-                        } catch (_: Exception) {
+                    .clickable {
+                        if (checking) return@clickable
+                        if (hasUpdate) {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, UpdateChecker.releasesPageUrl.toUri())
+                                context.startActivity(intent)
+                            } catch (_: Exception) {
+                            }
+                        } else {
+                            performCheck()
                         }
-                    } else it }
+                    }
                     .padding(horizontal = 20.dp, vertical = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -712,7 +731,12 @@ private fun AppInfoCard() {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.weight(1f))
-                if (hasUpdate) {
+                if (checking) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else if (hasUpdate) {
                     Text(
                         text = updateStatus ?: "",
                         style = MaterialTheme.typography.bodyMedium,
@@ -727,18 +751,20 @@ private fun AppInfoCard() {
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(16.dp)
                     )
-                } else if (updateStatus == null) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp
-                    )
                 } else {
                     Text(
-                        text = updateStatus!!,
+                        text = updateStatus ?: "",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                         fontFamily = FontFamily.Monospace,
                         maxLines = 1
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Icon(
+                        imageVector = Icons.Outlined.Refresh,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
