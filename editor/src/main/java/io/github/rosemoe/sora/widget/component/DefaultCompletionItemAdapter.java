@@ -53,13 +53,22 @@ public final class DefaultCompletionItemAdapter extends EditorCompletionAdapter 
         }
         var item = getItem(pos);
 
+        // 补全文字颜色根据补全窗口背景亮度自适应，不依赖 COMPLETION_WND_TEXT_PRIMARY。
+        // 当编辑器使用 TextMateColorScheme 时，其 onChangeTheme 回调会 colors.clear() 清空
+        // 我们 setColor 写入的值并重置为默认（暗色判断不准时为黑色），导致暗色下补全文字看不清。
+        // 直接按背景算颜色可彻底绕开该问题：暗色背景→白字，亮色背景→黑字。
+        int bgColor = getThemeColor(EditorColorScheme.COMPLETION_WND_BACKGROUND);
+        boolean dark = isColorDark(bgColor);
+        int primaryColor = dark ? 0xFFFFFFFF : 0xFF000000;
+        int secondaryColor = dark ? 0xFFB0B0B0 : 0xFF616161;
+
         TextView tv = view.findViewById(R.id.result_item_label);
         tv.setText(item.label);
-        tv.setTextColor(getThemeColor(EditorColorScheme.COMPLETION_WND_TEXT_PRIMARY));
+        tv.setTextColor(primaryColor);
 
         tv = view.findViewById(R.id.result_item_desc);
         tv.setText(item.desc);
-        tv.setTextColor(getThemeColor(EditorColorScheme.COMPLETION_WND_TEXT_SECONDARY));
+        tv.setTextColor(secondaryColor);
 
         view.setTag(pos);
         if (isCurrentCursorPosition) {
@@ -70,6 +79,13 @@ public final class DefaultCompletionItemAdapter extends EditorCompletionAdapter 
         ImageView iv = view.findViewById(R.id.result_item_image);
         iv.setImageDrawable(item.icon);
         return view;
+    }
+
+    private static boolean isColorDark(int color) {
+        int r = (color >> 16) & 0xFF;
+        int g = (color >> 8) & 0xFF;
+        int b = color & 0xFF;
+        return (r * 0.299 + g * 0.587 + b * 0.114) < 128;
     }
 
 }

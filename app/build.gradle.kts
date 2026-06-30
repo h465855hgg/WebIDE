@@ -35,8 +35,8 @@ android {
         minSdk = 29
         //noinspection OldTargetApi
         targetSdk = 36
-        versionCode = 37
-        versionName = "0.3.7"
+        versionCode = 38
+        versionName = "0.3.8"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // 编译时间戳：每次构建时写入当前毫秒时间，供“关于”页展示构建时间。
