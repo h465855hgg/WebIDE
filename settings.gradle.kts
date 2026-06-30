@@ -51,6 +51,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "WebIDE"
 include(":app",":signer",":webapp",":web-bridge",":editor",":editor-lsp",":language-treesitter")
+include(":i18n")
 include(":core:main")
 include(":core:components")
 include(":core:resources")

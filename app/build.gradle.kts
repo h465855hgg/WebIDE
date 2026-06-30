@@ -35,8 +35,8 @@ android {
         minSdk = 29
         //noinspection OldTargetApi
         targetSdk = 36
-        versionCode = 36
-        versionName = "0.3.6"
+        versionCode = 37
+        versionName = "0.3.7"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     // 按架构分离：每个 flavor 的 APK 只含对应架构的 rootfs（48MB），而非两个都打包（96MB）
@@ -249,6 +249,9 @@ dependencies {
     implementation(project(":signer"))
 
     implementation(libs.zipalign.java)
+
+    // i18n 字符串资源（独立模块，便于社区贡献更多语言翻译）
+    implementation(project(":i18n"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

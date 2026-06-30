@@ -61,6 +61,15 @@ object EditorColorSchemeManager {
             setColor(EditorColorScheme.COMPLETION_WND_BACKGROUND, surface)
             setColor(EditorColorScheme.COMPLETION_WND_CORNER, surfaceVariant)
             setColor(EditorColorScheme.COMPLETION_WND_ITEM_CURRENT, adjustAlpha(primary, 0.2f))
+            // 补全窗口文字颜色：sora 默认依赖 isDark()（恒为 false）导致暗色下显示黑字看不清。
+            // 这里显式覆盖：暗色模式用纯白，亮色模式跟随主题前景色。
+            if (isDarkScheme(this)) {
+                setColor(EditorColorScheme.COMPLETION_WND_TEXT_PRIMARY, AndroidColor.WHITE)
+                setColor(EditorColorScheme.COMPLETION_WND_TEXT_SECONDARY, 0xFFB0B0B0.toInt())
+            } else {
+                setColor(EditorColorScheme.COMPLETION_WND_TEXT_PRIMARY, colorScheme.onSurface.toArgb())
+                setColor(EditorColorScheme.COMPLETION_WND_TEXT_SECONDARY, onSurfaceVariant)
+            }
             
             // 文本操作弹窗 (双击/长按弹出的菜单)
             setColor(EditorColorScheme.TEXT_ACTION_WINDOW_BACKGROUND, surface)

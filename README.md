@@ -1,6 +1,6 @@
 # WebIDE ![Stone Badge](https://stone.professorlee.work/api/stone/h465855hgg/WebIDE)
 
-![Version](https://img.shields.io/badge/version-0.3.6-blue?style=flat-square)
+![Version](https://img.shields.io/badge/version-0.3.7-blue?style=flat-square)
 [![Language](https://img.shields.io/badge/Language-Kotlin-blue?style=flat-square)](https://kotlinlang.org/)
 [![UI](https://img.shields.io/badge/UI-Jetpack_Compose-green?style=flat-square)](https://developer.android.com/jetpack/compose)
 [![License](https://img.shields.io/badge/License-GPLv3-orange?style=flat-square)](LICENSE)
@@ -53,10 +53,21 @@ com.web.webide
 ## Features
 
 *   **Syntax Highlighting**: Based on TextMate grammar files, providing perfect support for HTML, CSS, JavaScript, and JSON.
+*   **Code Completion (LSP)**: Built-in language servers for smart completion and diagnostics, with theme-aware popup colors that adapt to light/dark mode.
 *   **Project Management**: Full file system access permissions, supporting the creation and management of multi-file Web projects.
 *   **Real-time Preview**: Integrated WebView preview environment supporting JavaScript interaction testing.
+*   **Terminal Emulator**: Embedded Alpine Linux environment (via proot) with a terminal, multi-session management, and virtual keys for Ctrl/Alt/Shift/Fn.
 *   **Modern UI**: Written 100% in Kotlin and Jetpack Compose, supporting dynamic themes.
 *   **Git Integration**: Built-in Git version control with a visual commit history graph, supporting Clone, Commit, Push, Pull, and Branch management. Automatically ignores sensitive files and build artifacts.
+*   **Localization (i18n)**: Strings live in a dedicated `:i18n` module, currently shipping Chinese and English. Adding a language only requires dropping a new `values-<locale>/strings.xml` — contributions are welcome.
+
+## Roadmap & Challenges
+
+We are actively improving WebIDE. Here are the main plans and current challenges:
+
+*   **More Languages**: The i18n module is ready for community translations (Japanese, French, Traditional Chinese, etc.).
+*   **Custom Syntax Highlighting**: Allow users to import and customize TextMate grammars and color themes.
+*   **Cloud Resources & Size Optimization**: The biggest challenge today is the large APK size caused by the embedded Linux environment. We plan to move large assets like `rootfs.bin` to cloud storage for on-demand download, significantly reducing the initial install size.
 
 ## Discussion
 
