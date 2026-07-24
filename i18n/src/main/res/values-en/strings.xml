@@ -526,5 +526,9 @@
 
     <string name="about_developer_role_localization">Localization</string>
     <string name="about_developer_desc_language">English Translation</string>
+    
+    <string name="about_community_title">Community</string>
+    <string name="about_community_qq_group">QQ Group</string>
+    <string name="about_community_tg_group">Telegram Channel</string>
     <string name="file_tree_remember_expanded_states">Remember expanded folders</string>
 </resources>

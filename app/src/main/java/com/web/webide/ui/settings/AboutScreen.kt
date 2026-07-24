@@ -268,6 +268,13 @@ fun AboutScreen(navController: NavController) {
                 AppInfoCard()
             }
 
+            // 2.5 交流群组
+            item {
+                Spacer(modifier = Modifier.height(24.dp))
+                SectionTitle(stringResource(R.string.about_community_title))
+                CommunityCard()
+            }
+
             // 3. 开发团队 (Chip 风格)
             item {
                 SectionTitle(stringResource(R.string.about_team_title))
