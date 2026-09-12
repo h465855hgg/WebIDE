@@ -15,20 +15,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-ALPINE_DIR=$PREFIX/local/alpine
+ALPINE_DIR="$PREFIX/local/alpine"
 
-mkdir -p $ALPINE_DIR
-
-if [ -z "$(ls -A "$ALPINE_DIR" | grep -vE '^(root|tmp)$')" ]; then
-    tar -xf "$PREFIX/files/alpine.tar.gz" -C "$ALPINE_DIR"
+# SetupWorker owns installation. Opening a terminal must not extract over the
+# shared Node.js/LSP rootfs or replace a library used by another proot process.
+if [ ! -f "$ALPINE_DIR/bin/busybox" ]; then
+    echo "Alpine environment is not ready. Return and try again." >&2
+    exit 1
 fi
-
-[ ! -e "$PREFIX/local/bin/proot" ] && cp "$PREFIX/files/proot" "$PREFIX/local/bin"
-
-for sofile in "$PREFIX/files/"*.so.2; do
-    dest="$PREFIX/local/lib/$(basename "$sofile")"
-    [ ! -e "$dest" ] && cp "$sofile" "$dest"
-done
 
 
 ARGS="--kill-on-exit"
@@ -88,4 +82,10 @@ ARGS="$ARGS --link2symlink"
 ARGS="$ARGS --sysvipc"
 ARGS="$ARGS -L"
 
-$LINKER $PREFIX/local/bin/proot $ARGS sh $PREFIX/local/bin/init "$@"
+# Prefer Android's executable native-library directory, as in the LSP launcher.
+# The linker fallback supports installations with only the legacy asset binary.
+if [ -x "$NATIVE_LIB_DIR/libproot.so" ]; then
+    exec "$NATIVE_LIB_DIR/libproot.so" $ARGS /bin/sh "$PREFIX/local/bin/init" "$@"
+else
+    exec "$LINKER" "$PREFIX/local/bin/proot" $ARGS /bin/sh "$PREFIX/local/bin/init" "$@"
+fi

@@ -32,7 +32,6 @@ import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
 import com.web.webide.core.utils.WorkspaceManager
 import java.io.File
-import java.io.FileOutputStream
 
 object AlpineManager {
     var currentProject: String? = null
@@ -163,6 +162,19 @@ object AlpineManager {
         val prefixDir = getPrefixDir(context)
         val nativeLibDir = context.applicationInfo.nativeLibraryDir
 
+        // 旧安装可能已有 rootfs，但只有 files/libtalloc.so.2，或尚未复制依赖库。
+        // 只补齐缺失文件，不覆盖 LSP/其他终端进程正在使用的库。
+        val talloc = File(libDir, "libtalloc.so.2")
+        if (!talloc.isFile || talloc.length() == 0L) {
+            context.assets.open("libtalloc.so.2").use { input ->
+                talloc.outputStream().use { output -> input.copyTo(output) }
+            }
+        }
+        val prootEnv = getProotEnv(context).toMutableMap().apply {
+            // 保留 LSP 的已有搜索路径，额外加入 SetupWorker 实际使用的 local/lib。
+            this["LD_LIBRARY_PATH"] = "${getValue("LD_LIBRARY_PATH")}:${libDir.absolutePath}"
+        }
+
         // 1. 每次都覆盖脚本，确保使用最新版本（修复旧版本残留导致的问题）
         val initHostScript = File(binDir, "init-host")
         copyAsset(context, "init-host.sh", initHostScript)
@@ -188,12 +200,9 @@ object AlpineManager {
             "TERM=xterm-256color",
             "LANG=C.UTF-8",
             "PREFIX=${prefixDir.absolutePath}",
-            "LD_LIBRARY_PATH=${libDir.absolutePath}",
             // 尝试适配不同架构的 linker
             "LINKER=${if(File("/system/bin/linker64").exists()) "/system/bin/linker64" else "/system/bin/linker"}",
             "NATIVE_LIB_DIR=$nativeLibDir",
-            "PROOT_TMP_DIR=${context.cacheDir.absolutePath}",
-            "TMPDIR=${context.cacheDir.absolutePath}",
 
             //自定义环境变量
             "WEBIDE_VERSION_NAME=$versionName",
@@ -202,13 +211,7 @@ object AlpineManager {
             "WEBIDE_PROJECT_DIR=$targetProjectPath"
         )
 
-        // 注入 Loader
-        if (File(nativeLibDir, "libproot-loader.so").exists()) {
-            env.add("PROOT_LOADER=$nativeLibDir/libproot-loader.so")
-        }
-        if (File(nativeLibDir, "libproot-loader32.so").exists()) {
-            env.add("PROOT_LOADER32=$nativeLibDir/libproot-loader32.so")
-        }
+        env.addAll(prootEnv.map { (key, value) -> "$key=$value" })
 
         // 3. 伪造系统文件
         val statFile = File(getLocalDir(context), "stat")
@@ -220,9 +223,10 @@ object AlpineManager {
         // Android SELinux 禁止直接 exec /data 目录下的脚本（Permission denied），
         // 也不能用 "-cpp"（不是 /system/bin/sh 的有效参数，会导致语法错误）。
         // 正确做法：用 /system/bin/sh 读取脚本文件并执行。
-        // 脚本内的 $LINKER/proot 调用会在 proot 容器内用 /usr/bin/bash 执行 init.sh。
+        // 宿主脚本启动独立的 proot 进程，容器内脚本再选择 bash 或 ash。
         val shell = "/system/bin/sh"
-        val args = arrayOf(initHostScript.absolutePath)
+        // TerminalSession 将参数数组原样作为 argv 传入，首项必须是 Shell 名称。
+        val args = arrayOf(shell, initHostScript.absolutePath)
 
         return TerminalSession(
             shell,
@@ -235,14 +239,10 @@ object AlpineManager {
     }
 
     private fun copyAsset(context: Context, assetName: String, destFile: File) {
-        try {
-            context.assets.open(assetName).use { input ->
-                FileOutputStream(destFile).use { output ->
-                    input.copyTo(output)
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
+        // Windows checkout/旧 APK 中的 CRLF 会让 Android sh 解析失败。
+        // 写入前统一换行，也修复之前已复制到设备上的脚本。
+        context.assets.open(assetName).bufferedReader().use { reader ->
+            destFile.writeText(reader.readText().replace("\r\n", "\n").replace('\r', '\n'))
         }
     }
 }

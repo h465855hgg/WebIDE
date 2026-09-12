@@ -51,6 +51,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -94,8 +96,6 @@ import com.termux.view.TerminalView
 import com.web.webide.R
 import com.web.webide.ui.ThemeViewModel
 import com.web.webide.ui.terminal.TerminalConfig.VIRTUAL_KEYS_JSON
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.lang.ref.WeakReference
 
 @SuppressLint("LocalContextGetResourceValueCall")
@@ -115,13 +115,22 @@ fun TerminalScreen(navController: NavController, themeViewModel: ThemeViewModel)
         else -> isSystemDark
     }
 
+    var showSessionMenu by remember { mutableStateOf(false) }
+    var alpinePrepareResult by remember { mutableStateOf<SetupWorker.PrepareResult?>(null) }
+
     // === 初始化逻辑 ===
     // 环境准备在后台进行，不再用整屏 loading 阻塞界面。终端 UI 立即显示，
     // 会话在准备完成后创建（首次解压需 30–90s，后续启动因 rootfs 已就绪而瞬时完成）。
     LaunchedEffect(Unit) {
         if (application == null) application = context.applicationContext as Application
-        SetupWorker.prepareEnvironment(context, timeoutMs = 90_000L)
-        if (SessionManager.sessions.isEmpty()) {
+        // 已就绪时不重复复制 proot/动态库，避免覆盖 LSP 正在使用的文件。
+        val result = if (SetupWorker.isEnvironmentReady(context)) {
+            SetupWorker.PrepareResult.Success
+        } else {
+            SetupWorker.prepareEnvironment(context, timeoutMs = 90_000L)
+        }
+        alpinePrepareResult = result
+        if (result is SetupWorker.PrepareResult.Success && SessionManager.sessions.isEmpty()) {
             SessionManager.addNewSession(context)
         }
     }
@@ -268,7 +277,7 @@ fun TerminalScreen(navController: NavController, themeViewModel: ThemeViewModel)
                     Box(
                         modifier = Modifier
                             .size(45.dp) // 宽度和高度填满 Row
-                            .clickable { SessionManager.addNewSession(context) },
+                            .clickable { showSessionMenu = true },
                         contentAlignment = Alignment.Center // 按钮图标在格子里居中
                     ) {
                         Icon(
@@ -277,6 +286,39 @@ fun TerminalScreen(navController: NavController, themeViewModel: ThemeViewModel)
                             tint = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.size(24.dp)
                         )
+                        DropdownMenu(
+                            expanded = showSessionMenu,
+                            onDismissRequest = { showSessionMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.terminal_session_normal)) },
+                                onClick = {
+                                    showSessionMenu = false
+                                    SessionManager.addNewSession(context, SessionType.NORMAL)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Text(stringResource(R.string.terminal_session_alpine))
+                                        if (alpinePrepareResult !is SetupWorker.PrepareResult.Success) {
+                                            Text(
+                                                text = stringResource(
+                                                    if (alpinePrepareResult == null) R.string.terminal_preparing
+                                                    else R.string.terminal_alpine_unavailable
+                                                ),
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
+                                        }
+                                    }
+                                },
+                                enabled = alpinePrepareResult is SetupWorker.PrepareResult.Success,
+                                onClick = {
+                                    showSessionMenu = false
+                                    SessionManager.addNewSession(context, SessionType.ALPINE)
+                                }
+                            )
+                        }
                     }
                 }
 
