@@ -24,6 +24,15 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.setValue
 import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
+import com.termux.terminal.TerminalEmulator
+import com.web.webide.R
+import com.web.webide.core.utils.WorkspaceManager
+import java.io.File
+
+enum class SessionType {
+    NORMAL,
+    ALPINE
+}
 
 /**
  * 包装类：解决 TerminalSession 内部 mTitle 不可见的问题
@@ -51,7 +60,7 @@ object SessionManager {
     /**
      * 创建新会话并添加到列表
      */
-    fun addNewSession(context: Context) {
+    fun addNewSession(context: Context, type: SessionType = SessionType.ALPINE) {
         // 定义 Session 的回调接口
         val client = object : TerminalSessionClient {
             override fun onTextChanged(changedSession: TerminalSession) {
@@ -94,17 +103,48 @@ object SessionManager {
             }
         }
 
-        // 调用 AlpineManager 创建核心会话
-        val session = AlpineManager.createSession(context, client)
+        val session = when (type) {
+            SessionType.NORMAL -> createNormalSession(context, client)
+            SessionType.ALPINE -> AlpineManager.createSession(context, client)
+        }
 
-        // 生成标题 (例如: Term 1, Term 2)
-        val title = "Term ${sessions.size + 1}"
+        val titleRes = when (type) {
+            SessionType.NORMAL -> R.string.terminal_session_normal
+            SessionType.ALPINE -> R.string.terminal_session_alpine
+        }
+        val title = "${context.getString(titleRes)} ${sessions.size + 1}"
 
         // 包装并添加到列表
         sessions.add(SessionWrapper(session, title))
 
         // 自动切换到新创建的会话
         currentSessionIndex = sessions.lastIndex
+    }
+
+    private fun createNormalSession(context: Context, client: TerminalSessionClient): TerminalSession {
+        val workspacePath = WorkspaceManager.getWorkspacePath(context)
+        val workingDirectory = listOfNotNull(AlpineManager.currentProject, workspacePath)
+            .map { File(it) }
+            .firstOrNull { it.isDirectory && it.canRead() && it.canExecute() }
+            ?: context.filesDir
+        val env = System.getenv().toMutableMap().apply {
+            put("PATH", System.getenv("PATH") ?: "/system/bin:/system/xbin")
+            put("HOME", context.filesDir.absolutePath)
+            put("SHELL", "/system/bin/sh")
+            put("TERM", "xterm-256color")
+            put("LANG", "C.UTF-8")
+            put("TMPDIR", context.cacheDir.absolutePath)
+            put("WEBIDE_WORKSPACE", workspacePath)
+            put("WEBIDE_PROJECT_DIR", AlpineManager.currentProject.orEmpty())
+        }
+        return TerminalSession(
+            "/system/bin/sh",
+            workingDirectory.absolutePath,
+            arrayOf("/system/bin/sh", "-i"),
+            env.map { (key, value) -> "$key=$value" }.toTypedArray(),
+            TerminalEmulator.DEFAULT_TERMINAL_TRANSCRIPT_ROWS,
+            client
+        )
     }
 
     /**

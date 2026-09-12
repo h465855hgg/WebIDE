@@ -410,6 +410,9 @@
 
     <string name="terminal_title">终端</string>
     <string name="terminal_new_session">新建会话</string>
+    <string name="terminal_session_normal">普通会话</string>
+    <string name="terminal_session_alpine">Alpine Linux 会话</string>
+    <string name="terminal_alpine_unavailable">Alpine 环境准备失败，请返回后重试</string>
     <string name="terminal_input_hint">输入命令...</string>
     <string name="terminal_preparing">正在准备终端环境…</string>
     <string name="terminal_prepare_copying_proot">正在初始化运行时（步骤 1/3）…</string>

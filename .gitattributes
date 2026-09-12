@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Android/Linux shells must not receive Windows CRLF line endings.
+*.sh text eol=lf

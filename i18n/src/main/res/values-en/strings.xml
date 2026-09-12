@@ -393,6 +393,9 @@
 
     <string name="terminal_title">Terminal</string>
     <string name="terminal_new_session">New Session</string>
+    <string name="terminal_session_normal">Normal session</string>
+    <string name="terminal_session_alpine">Alpine Linux session</string>
+    <string name="terminal_alpine_unavailable">Alpine setup failed. Go back and try again.</string>
     <string name="terminal_input_hint">Type command...</string>
     <string name="terminal_preparing">Preparing terminal environment…</string>
     <string name="terminal_prepare_copying_proot">Initializing runtime (step 1/3)…</string>
