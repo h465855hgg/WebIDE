@@ -73,7 +73,14 @@ jobs:
             "cmake;3.22.1"
 
       - name: Build ${{ matrix.flavor }} (${{ matrix.build_type }})
-        run: ./gradlew ":${{ matrix.task }}" --console=plain --no-daemon 2>&1 | tee gradle-build.log
+        run: |
+          set +e
+          LOG="$GITHUB_WORKSPACE/gradle-build.log"
+          echo "::error::CI-STEP cwd=$(pwd) writable=$(test -w . && echo yes || echo no) tee=$(command -v tee || echo NONE) java=$(java -version 2>&1 | head -1)"
+          ./gradlew ":${{ matrix.task }}" --console=plain --no-daemon > "$LOG" 2>&1
+          rc=$?
+          echo "::error::CI-RC rc=$rc lines=$(wc -l < "$LOG" 2>/dev/null || echo 0)"
+          exit $rc
 
       # 无论成败，都输出构建日志：
       # 1) 写进 Job Summary（Run 页面 Summary 直接渲染，方便人看）
@@ -83,7 +90,7 @@ jobs:
         if: always()
         shell: bash
         run: |
-          LOG=gradle-build.log
+          LOG="$GITHUB_WORKSPACE/gradle-build.log"
           {
             echo "### ${{ matrix.flavor }} / ${{ matrix.build_type }} — task: \`${{ matrix.task }}\`"
             if [ -f "$LOG" ]; then
