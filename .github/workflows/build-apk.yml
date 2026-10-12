@@ -115,6 +115,11 @@ jobs:
 
           emit() { echo "::error::CI $1"; }
           emit "[info] 构建日志 $(wc -l < "$LOG" 2>/dev/null || echo 0) 行"
+          # 关键错误行（每条一个标注）
+          grep -nE "FAILURE:|What went wrong|Caused by:|> Task .+ FAILED|^e: |Execution failed for task|Could not (resolve|determine|find)|SDK location|No toolchains|CMake Error|ninja: build stopped|error:|No such file|Permission denied" \
+            "$LOG" 2>/dev/null | head -20 | while IFS= read -r l; do emit "$l"; done
+          # 日志尾部（Gradle 失败原因所在）
+          emit "TAIL=[$(tail -22 "$LOG" 2>/dev/null | tr '\n' '⏎')]"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
