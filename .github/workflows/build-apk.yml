@@ -4,21 +4,27 @@ name: Build APK
 #
 # 触发方式：
 #   - push / PR 到 main、master：只构建 1 个变体（arm64-v8a / debug），快速验证
-#   - 打 tag（v*）或手动触发：4 个变体（debug/release × arm64-v8a/armeabi-v7a）全量构建
-#   - tag 构建会自动把 APK 发布到 GitHub Release
+#   - 打 tag（X.Y.Z 或 vX.Y.Z）或手动触发：4 个变体（debug/release × arm64-v8a/armeabi-v7a）全量构建
+#   - tag 构建会自动把 APK 发布到 GitHub Release（Release 名称 = tag）
 #
 # 产物：每个变体一个 artifact；tag 构建会汇总到 Release。
 # 注意：paths-ignore 对 tag 推送同样生效——若发版 tag 指向的提交只改了被忽略的
-#       文件（纯文档等），构建与 Release 都不会触发；发版请确保 tag 含代码变更。
+#       文件（纯文档等），构建与 Release 都不会触发；发版提交务必包含非文档改动
+#       （例如 app/build.gradle.kts 里的版本号提升）。
 # 说明：app 模块带 arm64-v8a / armeabi-v7a 两个 flavor，任务名必须带 flavor 和模块前缀
 #       （如 :app:assembleArm64-v8aDebug），不存在 assembleDebug 这类无 flavor 任务。
+#       native 模块支持 -PtargetAbi 只编目标 ABI，CI/本地构建脚本均已传入。
 
 # 注意：空提交（无文件变更）配合 paths-ignore 不会触发本工作流。
 
 on:
   push:
     branches: [main, master]
-    tags: ["v*"]
+    # 本项目 tag 约定是 X.Y.Z（无 v 前缀，如 0.3.9 / 0.4.0），
+    # 同时兼容 vX.Y.Z 写法；两种都会触发全量构建并发布 Release。
+    tags:
+      - "*.*.*"
+      - "v*"
     paths-ignore:
       - "**.md"
       - "docs/**"
@@ -45,7 +51,7 @@ jobs:
         run: |
           FULL='{"include":[{"flavor":"arm64-v8a","build_type":"debug","task":"assembleArm64-v8aDebug"},{"flavor":"arm64-v8a","build_type":"release","task":"assembleArm64-v8aRelease"},{"flavor":"armeabi-v7a","build_type":"debug","task":"assembleArmeabi-v7aDebug"},{"flavor":"armeabi-v7a","build_type":"release","task":"assembleArmeabi-v7aRelease"}]}'
           QUICK='{"include":[{"flavor":"arm64-v8a","build_type":"debug","task":"assembleArm64-v8aDebug"}]}'
-          if [[ "$GITHUB_REF" == refs/tags/v* || "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+          if [[ "$GITHUB_REF" == refs/tags/* || "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
             echo "matrix=$FULL" >> "$GITHUB_OUTPUT"
             echo "构建 4 个变体（debug/release × arm64-v8a/armeabi-v7a）"
           else
@@ -150,10 +156,10 @@ jobs:
             "$LOG" 2>/dev/null | head -20 | while IFS= read -r l; do emit "$l"; done
           emit "TAIL=[$(tail -22 "$LOG" 2>/dev/null | tr '\n' '⏎')]"
 
-  # 打 tag（v*）时把 APK 汇总发布到 GitHub Release
+  # 打 tag（X.Y.Z 或 vX.Y.Z）时把 APK 汇总发布到 GitHub Release
   release:
     name: Publish to GitHub Release
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/')
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -169,6 +175,7 @@ jobs:
         run: |
           tag="${GITHUB_REF#refs/tags/}"
           ls -lh artifacts/
+          # 仓库约定：Release 名称就是 tag 本身（如 0.4.0）
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" artifacts/*.apk --clobber
           else

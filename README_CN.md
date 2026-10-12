@@ -1,6 +1,6 @@
 # WebIDE ![Stone Badge](https://stone.professorlee.work/api/stone/h465855hgg/WebIDE)
 
-![Version](https://img.shields.io/badge/version-0.3.9-blue?style=flat-square)
+![Version](https://img.shields.io/badge/version-0.4.0-blue?style=flat-square)
 [![Language](https://img.shields.io/badge/Language-Kotlin-blue?style=flat-square)](https://kotlinlang.org/)
 [![UI](https://img.shields.io/badge/UI-Jetpack_Compose-green?style=flat-square)](https://developer.android.com/jetpack/compose)
 [![License](https://img.shields.io/badge/License-GPLv3-orange?style=flat-square)](LICENSE)
@@ -65,9 +65,9 @@ com.web.webide
 
 本项目通过 **GitHub Actions** 自动构建（`.github/workflows/build-apk.yml`）：
 
-* **push / PR 到 `main`、`master`**：自动并行构建 4 个变体（debug/release × arm64-v8a / armeabi-v7a），APK 与 R8 mapping 上传为 artifact
-* **打 tag（`v*`）**：构建并自动发布到 GitHub Release
-* **手动触发**：Actions 页面 → `Build APK` → `Run workflow`
+* **push / PR 到 `main`、`master`**：只构建 1 个变体（`arm64-v8a` / debug）做快速验证
+* **打 tag（`X.Y.Z`）**：构建全部 4 个变体（debug/release × arm64-v8a / armeabi-v7a）并自动发布到 GitHub Release（Release 名称 = tag）
+* **手动触发**：Actions 页面 → `Build APK` → `Run workflow`（4 个变体全量）
 
 本地一键构建（Git Bash / WSL / Linux / macOS）：
 
@@ -79,7 +79,7 @@ scripts/build.sh release arm64-v8a --open
 
 Windows 也可直接双击 `scripts\build.bat`。
 
-> 注意：app 模块带 flavor，gradle 任务名必须带架构（如 `:app:assembleArm64-v8aDebug`），不存在 `assembleDebug` 这类无 flavor 任务；NDK/CMake 版本已在构建脚本中钉死（`28.0.13004108` / `3.22.1`）。
+> 注意：app 模块带 flavor，gradle 任务名必须带架构（如 `:app:assembleArm64-v8aDebug`），不存在 `assembleDebug` 这类无 flavor 任务；NDK/CMake 版本已在构建脚本中钉死（`28.0.13004108` / `3.22.1`）。native 模块支持 `-PtargetAbi=<abi>[,<abi>]`，只编译需要的 ABI（构建脚本与 CI 已自动传入）。
 
 ## 展望与挑战
 

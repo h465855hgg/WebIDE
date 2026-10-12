@@ -1,6 +1,6 @@
 # WebIDE ![Stone Badge](https://stone.professorlee.work/api/stone/h465855hgg/WebIDE)
 
-![Version](https://img.shields.io/badge/version-0.3.9-blue?style=flat-square)
+![Version](https://img.shields.io/badge/version-0.4.0-blue?style=flat-square)
 [![Language](https://img.shields.io/badge/Language-Kotlin-blue?style=flat-square)](https://kotlinlang.org/)
 [![UI](https://img.shields.io/badge/UI-Jetpack_Compose-green?style=flat-square)](https://developer.android.com/jetpack/compose)
 [![License](https://img.shields.io/badge/License-GPLv3-orange?style=flat-square)](LICENSE)
@@ -65,9 +65,9 @@ com.web.webide
 
 This project is built automatically via **GitHub Actions** (`.github/workflows/build-apk.yml`):
 
-* **Push / PR to `main` or `master`**: automatically builds all 4 variants in parallel (debug/release × arm64-v8a / armeabi-v7a), uploading APKs and R8 mappings as artifacts
-* **Push a tag (`v*`)**: builds and publishes to the GitHub Release
-* **Manual run**: Actions → `Build APK` → `Run workflow`
+* **Push / PR to `main` or `master`**: builds a single variant (`arm64-v8a` / debug) for quick verification
+* **Push a tag (`X.Y.Z`)**: builds all 4 variants (debug/release × arm64-v8a / armeabi-v7a) and publishes them to the GitHub Release (release name = tag)
+* **Manual run**: Actions → `Build APK` → `Run workflow` (all 4 variants)
 
 Local one-command build (Git Bash / WSL / Linux / macOS):
 
@@ -79,7 +79,7 @@ scripts/build.sh release arm64-v8a --open
 
 On Windows you can also double-click `scripts\build.bat`.
 
-> Note: the app module has flavors, so Gradle task names must include the architecture (e.g. `:app:assembleArm64-v8aDebug`); flavor-less tasks like `assembleDebug` do not exist. NDK/CMake versions are pinned in the build files (`28.0.13004108` / `3.22.1`).
+> Note: the app module has flavors, so Gradle task names must include the architecture (e.g. `:app:assembleArm64-v8aDebug`); flavor-less tasks like `assembleDebug` do not exist. NDK/CMake versions are pinned in the build files (`28.0.13004108` / `3.22.1`). Native modules accept `-PtargetAbi=<abi>[,<abi>]` so only the ABIs you need get compiled (the scripts and CI pass it automatically).
 
 ## Roadmap & Challenges
 
