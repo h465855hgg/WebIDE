@@ -75,40 +75,49 @@ jobs:
       - name: Build ${{ matrix.flavor }} (${{ matrix.build_type }})
         run: ./gradlew ":${{ matrix.task }}" --console=plain --no-daemon 2>&1 | tee gradle-build.log
 
-      # 无论成败，都把 Gradle 日志写进 Job Summary（Run 页面直接渲染，
-      # 不必翻完整日志/下载 artifact 就能看到失败原因）
-      - name: Dump Gradle log to summary
+      # 无论成败，都输出构建日志：
+      # 1) 写进 Job Summary（Run 页面 Summary 直接渲染，方便人看）
+      # 2) 以 ::error:: 标注形式把日志尾部优先输出（Run 页面 Annotations 直接可见）
+      #    尾部优先是因为 Gradle 的 "What went wrong" 在日志末尾。
+      - name: Report build log
         if: always()
         shell: bash
         run: |
+          LOG=gradle-build.log
           {
             echo "### ${{ matrix.flavor }} / ${{ matrix.build_type }} — task: \`${{ matrix.task }}\`"
-            if [ -f gradle-build.log ]; then
-              echo "gradle-build.log: $(wc -l < gradle-build.log) 行 / $(wc -c < gradle-build.log) 字节"
+            if [ -f "$LOG" ]; then
+              echo "\`$LOG\`: $(wc -l < "$LOG") 行 / $(wc -c < "$LOG") 字节"
               echo "#### 日志前 60 行"
               echo '```text'
-              head -60 gradle-build.log
+              head -60 "$LOG"
               echo '```'
               echo "#### 日志后 100 行"
               echo '```text'
-              tail -100 gradle-build.log
+              tail -100 "$LOG"
               echo '```'
             else
-              echo "**gradle-build.log 不存在**（说明 Build 步骤本身没能启动 ./gradlew）"
+              echo "**\`$LOG\` 不存在**（说明 Build 步骤连 ./gradlew 都没启动起来）"
             fi
-            echo "#### 工作区根目录"
-            echo '```text'
-            ls -la
-            echo '```'
             echo "#### 环境"
             echo '```text'
             echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-            echo "ANDROID_HOME=$ANDROID_HOME"
             echo "JAVA_HOME=$JAVA_HOME"
             java -version 2>&1 | head -3
-            ls "$ANDROID_SDK_ROOT" 2>&1
             echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          } >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+
+          emit() { echo "::error::CI $1"; }
+          if [ ! -f "$LOG" ]; then
+            emit "[fatal] $LOG 不存在 —— ./gradlew 未能启动"
+            ls -la | head -50 | while IFS= read -r l; do emit "ls: $l"; done
+            exit 0
+          fi
+          emit "[info] $LOG 共 $(wc -l < "$LOG") 行"
+          # 尾部优先：Gradle 的失败原因（What went wrong）在日志末尾
+          tail -22 "$LOG" | while IFS= read -r l; do emit "LOG: $l"; done
+          awk '/FAILURE: Build failed/{f=1} f' "$LOG" | head -14 \
+            | while IFS= read -r l; do emit "ERR: $l"; done
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
