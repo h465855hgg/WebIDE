@@ -76,8 +76,10 @@ jobs:
             "cmake;3.22.1"
           echo "CIMARK-SDK-END"
 
+      # 注意：assemble* 任务属于 :app 模块（app 带 arm64-v8a / armeabi-v7a 两个 flavor，
+      # 无 flavor 的 assembleDebug 不存在），必须写成 :app:assembleXxx
       - name: Build ${{ matrix.flavor }} (${{ matrix.build_type }})
-        run: ./gradlew ":${{ matrix.task }}" --console=plain --no-daemon 2>&1 | tee gradle-build.log
+        run: ./gradlew ":app:${{ matrix.task }}" --console=plain --no-daemon 2>&1 | tee gradle-build.log
 
       # 无论成败，都输出构建日志：
       # 1) 写进 Job Summary（Run 页面 Summary 直接渲染，方便人看）
@@ -112,20 +114,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
 
           emit() { echo "::error::CI $1"; }
-          emit "CIMARK-REPORT-RAN"
-          if [ ! -f "$LOG" ]; then
-            emit "[fatal] $LOG 不存在 —— ./gradlew 未能启动"
-            emit "PWD=$(pwd)"
-            emit "ROOT=[$(ls -A | tr '\n' ' ')]"
-            emit "TOTAL=$(ls -la | head -1)"
-            emit "GRADLEW=[$(ls -l gradlew 2>&1)]"
-            emit "SETTINGS=[$(ls -l settings.gradle.kts 2>&1)]"
-            emit "APPDIR=[$(ls -A app 2>&1 | tr '\n' ' ')]"
-            exit 0
-          fi
-          emit "[info] $LOG 共 $(wc -l < "$LOG") 行"
-          emit "TAIL=[$(tail -25 "$LOG" | tr '\n' '⏎')]"
-          emit "HEAD=[$(head -12 "$LOG" | tr '\n' '⏎')]"
+          emit "[info] 构建日志 $(wc -l < "$LOG" 2>/dev/null || echo 0) 行"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
