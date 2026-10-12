@@ -73,7 +73,32 @@ jobs:
             "cmake;3.22.1"
 
       - name: Build ${{ matrix.flavor }} (${{ matrix.build_type }})
-        run: ./gradlew ":${{ matrix.task }}" --console=plain --no-daemon
+        run: ./gradlew ":${{ matrix.task }}" --console=plain --no-daemon 2>&1 | tee gradle-build.log
+
+      # 失败时把日志单独保存成 artifact，方便下载后离线分析
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: webide-${{ matrix.flavor }}-${{ matrix.build_type }}-log
+          path: gradle-build.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # 失败时把 Gradle 的关键错误行转成 Actions annotation，
+      # 直接在 Run 页面“Annotations”里就能看到失败原因，不必翻完整日志
+      - name: Surface Gradle error
+        if: failure()
+        shell: bash
+        run: |
+          grep -nE "FAILURE:|What went wrong|Caused by:|> Task .+ FAILED|^e: |Execution failed for task|Could not (resolve|determine|find)|SDK location|No toolchains|minimum supported|Unsupported class file|Download (failed|.* failed)|permission denied" \
+            gradle-build.log | head -40 > errs.txt || true
+          echo "===== 失败摘要（共 $(wc -l < errs.txt) 条） ====="
+          while IFS= read -r line; do echo "::error::${line}"; done < errs.txt
+          echo "===== gradle-build.log 最后 25 行 ====="
+          tail -25 gradle-build.log
+          echo "===== gradle-build.log 前 20 行 ====="
+          head -20 gradle-build.log
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
