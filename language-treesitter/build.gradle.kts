@@ -28,6 +28,15 @@ plugins {
     id("kotlin-android")
 }
 
+// 允许按需只编译目标 ABI：CI 传 -PtargetAbi=arm64-v8a 后，本模块的 CMake 只编该 ABI，
+// 原生编译量降到约 1/4（app 每个 flavor 也只打包一个 ABI，多编的 ABI 纯属浪费）。
+// 不传该参数时保持原行为：编译全部 4 个 ABI，供 x86/x86_64 模拟器调试使用。
+val targetAbis: List<String>? = (project.findProperty("targetAbi") as String?)
+    ?.split(',')
+    ?.map { it.trim() }
+    ?.filter { it.isNotEmpty() }
+    ?.takeIf { it.isNotEmpty() }
+
 android {
     namespace = "io.github.rosemoe.sora.ts"
     compileSdk = 36
@@ -41,8 +50,9 @@ android {
         consumerProguardFiles("consumer-rules.pro")
 
         // Build Tree-sitter .so for emulator and real devices
+        // 传了 -PtargetAbi 就只编该 ABI，否则编全部 4 个
         ndk {
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+            abiFilters += targetAbis ?: listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
         }
 
         externalNativeBuild {

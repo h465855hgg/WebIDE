@@ -93,9 +93,11 @@ jobs:
             "cmake;3.22.1"
 
       # assemble* 任务属于 :app 模块，必须写成 :app:assembleXxx（早期写成
-      # :assembleXxx 会报 "task ... not found in root project 'WebIDE'"）
+      # :assembleXxx 会报 "task ... not found in root project 'WebIDE'"）。
+      # -PtargetAbi 让 language-treesitter / core:terminal-emulator 只编当前 flavor 需要的
+      # 那一个 ABI（否则每个变体都要编 4 个 ABI 的原生库，是耗时大头）。
       - name: Build ${{ matrix.flavor }} (${{ matrix.build_type }})
-        run: ./gradlew ":app:${{ matrix.task }}" --console=plain --no-daemon 2>&1 | tee gradle-build.log
+        run: ./gradlew ":app:${{ matrix.task }}" -PtargetAbi=${{ matrix.flavor }} --console=plain --no-daemon 2>&1 | tee gradle-build.log
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

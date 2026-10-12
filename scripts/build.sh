@@ -91,6 +91,11 @@ for f in "${FLAVORS[@]}"; do
     TASKS+=(":app:assemble${f}${TYPE_CAP}")
 done
 
+# 只编译需要的 ABI：app 每个 flavor 只打包一个 ABI，而 language-treesitter /
+# core:terminal-emulator 默认会把 4 个 ABI 的 native 库都编一遍，纯属浪费。
+# 传 -PtargetAbi 后原生编译量按需下降（全架构构建则传两个）。
+TARGET_ABI="$(IFS=,; echo "${FLAVORS[*]}")"
+
 # --- 环境检查 ---
 if [[ ! -x "./gradlew" ]]; then
     echo "错误: 未找到可执行的 gradlew（应在项目根目录运行）" >&2
@@ -116,7 +121,7 @@ if [[ "$CLEAN" == true ]]; then
 fi
 
 START_TS=$(date +%s)
-./gradlew "${TASKS[@]}" --console=plain
+./gradlew "${TASKS[@]}" -PtargetAbi="$TARGET_ABI" --console=plain
 END_TS=$(date +%s)
 
 # --- 汇总产物 ---

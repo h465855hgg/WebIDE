@@ -36,12 +36,14 @@ echo    类型: %BUILD_TYPE%
 echo    架构: %FLAVOR%
 echo ==========================================
 
+rem -PtargetAbi 让 language-treesitter / core:terminal-emulator 只编当前 flavor 需要的 ABI
+rem （默认会编 arm64-v8a/armeabi-v7a/x86/x86_64 四个，其中两个用不上）
 if /i "%FLAVOR%"=="all" (
     if not "%EXTRA%"=="" ( call gradlew.bat clean --console=plain --quiet )
-    call gradlew.bat :app:assembleArm64-v8a%TYPE_CAP% :app:assembleArmeabi-v7a%TYPE_CAP% --console=plain
+    call gradlew.bat :app:assembleArm64-v8a%TYPE_CAP% :app:assembleArmeabi-v7a%TYPE_CAP% -PtargetAbi=arm64-v8a,armeabi-v7a --console=plain
 ) else (
     if not "%EXTRA%"=="" ( call gradlew.bat clean --console=plain --quiet )
-    call gradlew.bat :app:assemble%FLAVOR%%TYPE_CAP% --console=plain
+    call gradlew.bat :app:assemble%FLAVOR%%TYPE_CAP% -PtargetAbi=%FLAVOR% --console=plain
 )
 
 if errorlevel 1 (
