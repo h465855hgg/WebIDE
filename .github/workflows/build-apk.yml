@@ -61,25 +61,23 @@ jobs:
       # ubuntu-latest 镜像自带 Android SDK（cmdline-tools + platform-tools）。
       # 这里补齐项目需要的组件；NDK/CMake 版本与 core/terminal-emulator、
       # language-treesitter、webapp 中钉死的版本保持一致，保证可复现。
+      # 注意：API 37 属于季度小版本，sdkmanager 包名必须是 platforms;android-37.0，
+      #       写成 platforms;android-37 会报 "Failed to find package" 直接失败。
       - name: Set up Android SDK components
         run: |
-          echo "::error::CIMARK-SDK-START"
-          df -h 2>&1 | while IFS= read -r l; do echo "::error::CI-DISK $l"; done
           SDK="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
           echo "Using SDK at: $SDK"
+          ls "$SDK" || true
           yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
           "$SDK/cmdline-tools/latest/bin/sdkmanager" \
-            "platforms;android-37" \
+            "platforms;android-37.0" \
             "build-tools;36.0.0" \
             "ndk;28.0.13004108" \
             "cmake;3.22.1"
-          echo "::error::CIMARK-SDK-END"
+          echo "CIMARK-SDK-END"
 
       - name: Build ${{ matrix.flavor }} (${{ matrix.build_type }})
-        run: |
-          echo "::error::CIMARK-BUILD-START"
-          echo "::error::CI-SHELL shell=$0 bash=$BASH_VERSION"
-          exit 1
+        run: ./gradlew ":${{ matrix.task }}" --console=plain --no-daemon 2>&1 | tee gradle-build.log
 
       # 无论成败，都输出构建日志：
       # 1) 写进 Job Summary（Run 页面 Summary 直接渲染，方便人看）
