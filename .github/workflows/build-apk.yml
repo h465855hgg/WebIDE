@@ -13,6 +13,8 @@ name: Build APK
 # 说明：app 模块带 arm64-v8a / armeabi-v7a 两个 flavor，任务名必须带 flavor 和模块前缀
 #       （如 :app:assembleArm64-v8aDebug），不存在 assembleDebug 这类无 flavor 任务。
 
+# 注意：空提交（无文件变更）配合 paths-ignore 不会触发本工作流。
+
 on:
   push:
     branches: [main, master]
