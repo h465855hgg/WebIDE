@@ -167,6 +167,7 @@
     <string name="new_project_name">Project Name</string>
     <string name="new_project_create_index_php">Create index.php</string>
     <string name="new_project_target_url">Target URL</string>
+    <string name="new_project_entry_file">Entry file name</string>
     <string name="new_project_tab_config">Config</string>
     <string name="new_project_tab_source">Source</string>
     <string name="new_project_app_info">App Info</string>
@@ -365,6 +366,18 @@
     <string name="preview_ua_selected">UA: %1$s</string>
     <string name="preview_downloading">Downloading: %1$s</string>
     <string name="preview_download_failed">Unable to download file</string>
+    <string name="preview_entry_settings">Preview entry settings</string>
+    <string name="preview_entry_current_auto">Current entry: Auto (follow config)</string>
+    <string name="preview_entry_current">Current entry: %1$s</string>
+    <string name="preview_entry_input_hint">Entry file relative path, e.g. main.html</string>
+    <string name="preview_entry_scan">Scan HTML files in project</string>
+    <string name="preview_entry_scanning">Scanning…</string>
+    <string name="preview_entry_none_found">No HTML files found in project</string>
+    <string name="preview_entry_reset">Reset to default</string>
+    <string name="preview_entry_saved">Preview entry set to: %1$s</string>
+    <string name="preview_entry_reset_done">Entry reset to default</string>
+    <string name="preview_entry_not_found">Failed to open entry file (404), check entry settings</string>
+    <string name="content_desc_entry_settings">Preview entry settings</string>
     <string name="content_desc_fullscreen">Fullscreen</string>
     <string name="content_desc_exit_fullscreen">Exit</string>
     <string name="content_desc_push">Push</string>

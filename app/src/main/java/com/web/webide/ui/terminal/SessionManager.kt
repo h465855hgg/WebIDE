@@ -59,8 +59,10 @@ object SessionManager {
 
     /**
      * 创建新会话并添加到列表
+     * @param followProject 普通会话是否以当前项目目录为工作目录。
+     *        编辑器内入口传 true（跟随项目）；主界面入口传 false（固定工作区根目录）。
      */
-    fun addNewSession(context: Context, type: SessionType = SessionType.ALPINE) {
+    fun addNewSession(context: Context, type: SessionType = SessionType.ALPINE, followProject: Boolean = true) {
         // 定义 Session 的回调接口
         val client = object : TerminalSessionClient {
             override fun onTextChanged(changedSession: TerminalSession) {
@@ -104,7 +106,7 @@ object SessionManager {
         }
 
         val session = when (type) {
-            SessionType.NORMAL -> createNormalSession(context, client)
+            SessionType.NORMAL -> createNormalSession(context, client, followProject)
             SessionType.ALPINE -> AlpineManager.createSession(context, client)
         }
 
@@ -121,9 +123,11 @@ object SessionManager {
         currentSessionIndex = sessions.lastIndex
     }
 
-    private fun createNormalSession(context: Context, client: TerminalSessionClient): TerminalSession {
+    private fun createNormalSession(context: Context, client: TerminalSessionClient, followProject: Boolean = true): TerminalSession {
         val workspacePath = WorkspaceManager.getWorkspacePath(context)
-        val workingDirectory = listOfNotNull(AlpineManager.currentProject, workspacePath)
+        // followProject=false 时（主界面入口）忽略当前项目目录，固定从工作区根目录开始
+        val projectDir = if (followProject) AlpineManager.currentProject else null
+        val workingDirectory = listOfNotNull(projectDir, workspacePath)
             .map { File(it) }
             .firstOrNull { it.isDirectory && it.canRead() && it.canExecute() }
             ?: context.filesDir
@@ -135,7 +139,7 @@ object SessionManager {
             put("LANG", "C.UTF-8")
             put("TMPDIR", context.cacheDir.absolutePath)
             put("WEBIDE_WORKSPACE", workspacePath)
-            put("WEBIDE_PROJECT_DIR", AlpineManager.currentProject.orEmpty())
+            put("WEBIDE_PROJECT_DIR", projectDir.orEmpty())
         }
         return TerminalSession(
             "/system/bin/sh",

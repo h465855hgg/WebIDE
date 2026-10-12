@@ -61,6 +61,26 @@ com.web.webide
 *   **Git Integration**: Built-in Git version control with a visual commit history graph, supporting Clone, Commit, Push, Pull, and Branch management. Automatically ignores sensitive files and build artifacts.
 *   **Localization (i18n)**: Strings live in a dedicated `:i18n` module, currently shipping Chinese and English. Adding a language only requires dropping a new `values-<locale>/strings.xml` — contributions are welcome.
 
+## Building
+
+This project is built automatically via **GitHub Actions** (`.github/workflows/build-apk.yml`):
+
+* **Push / PR to `main` or `master`**: automatically builds all 4 variants in parallel (debug/release × arm64-v8a / armeabi-v7a), uploading APKs and R8 mappings as artifacts
+* **Push a tag (`v*`)**: builds and publishes to the GitHub Release
+* **Manual run**: Actions → `Build APK` → `Run workflow`
+
+Local one-command build (Git Bash / WSL / Linux / macOS):
+
+```bash
+scripts/build.sh                 # debug, both architectures
+scripts/build.sh release         # release, both architectures
+scripts/build.sh release arm64-v8a --open
+```
+
+On Windows you can also double-click `scripts\build.bat`.
+
+> Note: the app module has flavors, so Gradle task names must include the architecture (e.g. `:app:assembleArm64-v8aDebug`); flavor-less tasks like `assembleDebug` do not exist. NDK/CMake versions are pinned in the build files (`28.0.13004108` / `3.22.1`).
+
 ## Roadmap & Challenges
 
 We are actively improving WebIDE. Here are the main plans and current challenges:

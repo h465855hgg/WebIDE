@@ -33,12 +33,19 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.InsertDriveFile
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +53,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -206,6 +214,7 @@ class TinyWebServer(private val rootDir: File) {
     private fun getMimeType(fileName: String): String {
         return when (fileName.substringAfterLast('.', "").lowercase()) {
             "html", "htm" -> "text/html"
+            "php" -> "text/html"
             "css" -> "text/css"
             "js" -> "application/javascript"
             "json" -> "application/json"
@@ -292,6 +301,12 @@ fun WebPreviewScreen(folderName: String, navController: NavController) {
     val prefs =
         remember { context.getSharedPreferences("WebIDE_Project_Settings", Context.MODE_PRIVATE) }
     var isDebugEnabled by remember { mutableStateOf(prefs.getBoolean("debug_$folderName", false)) }
+
+    // --- 自定义预览入口（按项目持久化，优先于 webapp.json 的 targetUrl；留空 = 自动） ---
+    var customEntry by remember {
+        mutableStateOf(prefs.getString("entry_file_$folderName", "") ?: "")
+    }
+    var showEntryDialog by remember { mutableStateOf(false) }
 
     // 当 isDebugEnabled 变化时，更新 server 的状态
     LaunchedEffect(isDebugEnabled) {
@@ -405,10 +420,12 @@ fun WebPreviewScreen(folderName: String, navController: NavController) {
     }
 
     // --- 3. URL 构造 ---
-    val targetUrl = remember(projectDir, config, serverPort) {
+    // 优先级：用户自定义入口 > webapp.json 的 targetUrl > 默认 index.html
+    val targetUrl = remember(projectDir, config, serverPort, customEntry) {
         if (serverPort == 0) "about:blank"
         else {
-            val rawUrl = config?.optString("targetUrl")?.takeIf { it.isNotEmpty() }
+            val rawUrl = customEntry.takeIf { it.isNotBlank() }
+                ?: config?.optString("targetUrl")?.takeIf { it.isNotEmpty() }
                 ?: config?.optString("url")?.takeIf { it.isNotEmpty() }
                 ?: "index.html" // 默认找 index.html，由服务器决定在哪
             if (rawUrl.startsWith("http")) rawUrl
@@ -431,7 +448,7 @@ fun WebPreviewScreen(folderName: String, navController: NavController) {
 
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
     val refreshKey =
-        remember(config, isDebugEnabled, currentUAType, serverPort) { System.nanoTime() }
+        remember(config, isDebugEnabled, currentUAType, serverPort, customEntry) { System.nanoTime() }
 
     BackHandler {
         if (isJsHandlingBack) webViewRef?.evaluateJavascript(
@@ -440,6 +457,30 @@ fun WebPreviewScreen(folderName: String, navController: NavController) {
         )
         else if (webViewRef?.canGoBack() == true) webViewRef?.goBack()
         else navController.popBackStack()
+    }
+
+    // 预览入口设置对话框：支持手动输入相对路径，或扫描项目内 HTML 文件后选择
+    if (showEntryDialog) {
+        PreviewEntryDialog(
+            projectDir = projectDir,
+            currentEntry = customEntry,
+            onDismiss = { showEntryDialog = false },
+            onConfirm = { entry ->
+                customEntry = entry.trim()
+                prefs.edit { putString("entry_file_$folderName", customEntry) }
+                // 触发配置重读与 WebView 重建，使新入口立即生效
+                configRefreshTrigger = System.currentTimeMillis()
+                scope.launch {
+                    snackbarHostState.showSnackbar(
+                        if (customEntry.isBlank()) {
+                            context.getString(R.string.preview_entry_reset_done)
+                        } else {
+                            context.getString(R.string.preview_entry_saved, customEntry)
+                        }
+                    )
+                }
+            }
+        )
     }
 
     Scaffold(
@@ -472,6 +513,14 @@ fun WebPreviewScreen(folderName: String, navController: NavController) {
                         }
                     },
                     actions = {
+                        // 预览入口设置（自定义入口 / 扫描选择）
+                        IconButton(onClick = { showEntryDialog = true }) {
+                            Icon(
+                                Icons.Default.Web,
+                                stringResource(R.string.content_desc_entry_settings),
+                                tint = if (customEntry.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                         Box {
                             IconButton(onClick = { showUAMenu = true }) {
                                 Icon(
@@ -551,7 +600,19 @@ fun WebPreviewScreen(folderName: String, navController: NavController) {
                                             false
                                         }
                                     },
-                                    onBackStateChange = { isJsHandlingBack = it }
+                                    onBackStateChange = { isJsHandlingBack = it },
+                                    onMainFrame404 = {
+                                        scope.launch {
+                                            val result = snackbarHostState.showSnackbar(
+                                                message = context.getString(R.string.preview_entry_not_found),
+                                                actionLabel = context.getString(R.string.preview_entry_settings),
+                                                withDismissAction = true
+                                            )
+                                            if (result == SnackbarResult.ActionPerformed) {
+                                                showEntryDialog = true
+                                            }
+                                        }
+                                    }
                                 )
                                 webViewRef = this
                                 loadUrl(targetUrl)
@@ -587,7 +648,8 @@ private fun configureFullWebView(
     projectDir: File,
     manualUA: String,
     onShowFileChooser: (ValueCallback<Array<Uri>>, WebChromeClient.FileChooserParams?) -> Boolean,
-    onBackStateChange: (Boolean) -> Unit
+    onBackStateChange: (Boolean) -> Unit,
+    onMainFrame404: () -> Unit
 ) {
     val settings = webView.settings
     settings.javaScriptEnabled = true
@@ -709,6 +771,17 @@ private fun configureFullWebView(
     }
 
     webView.webViewClient = object : WebViewClient() {
+        override fun onReceivedHttpError(
+            view: WebView?,
+            request: WebResourceRequest?,
+            errorResponse: WebResourceResponse?
+        ) {
+            // 主文档 404：多半是入口文件不存在，提示用户设置入口
+            if (request?.isForMainFrame == true && errorResponse?.statusCode == 404) {
+                onMainFrame404()
+            }
+        }
+
         override fun onPageFinished(view: WebView?, url: String?) {
             super.onPageFinished(view, url)
 
@@ -806,4 +879,204 @@ private fun injectEruda(context: Context, webView: WebView?) {
     webView.evaluateJavascript(finalScript) { result ->
         android.util.Log.i("WebView_Inject", "注入脚本执行完毕")
     }
+}
+
+/**
+ * 预览入口设置对话框（简洁版）：
+ * - 顶部展示当前入口（自动 / 自定义）
+ * - 中部一个输入框：手动填写入口文件相对路径
+ * - 一个扫描按钮：扫描项目内 HTML 文件后在下方卡片中点选
+ * - 底部操作：取消 / 恢复默认 / 确定
+ */
+@Composable
+private fun PreviewEntryDialog(
+    projectDir: File,
+    currentEntry: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var input by remember { mutableStateOf(currentEntry) }
+    var scanResults by remember { mutableStateOf<List<String>?>(null) }
+    var scanning by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                Icons.Outlined.TravelExplore,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
+        },
+        title = { Text(stringResource(R.string.preview_entry_settings)) },
+        text = {
+            Column {
+                // 当前入口（chip 样式）
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Outlined.Web,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = if (currentEntry.isBlank()) {
+                                stringResource(R.string.preview_entry_current_auto)
+                            } else {
+                                stringResource(R.string.preview_entry_current, currentEntry)
+                            },
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                // 手动输入入口文件
+                OutlinedTextField(
+                    value = input,
+                    onValueChange = { input = it },
+                    leadingIcon = {
+                        Icon(Icons.AutoMirrored.Outlined.InsertDriveFile, null, Modifier.size(18.dp))
+                    },
+                    placeholder = { Text(stringResource(R.string.preview_entry_input_hint)) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(Modifier.height(8.dp))
+
+                // 扫描按钮
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    FilledTonalButton(
+                        onClick = {
+                            scanning = true
+                            scope.launch {
+                                val files = withContext(Dispatchers.IO) {
+                                    projectDir.walkTopDown()
+                                        .maxDepth(8)
+                                        .filter {
+                                            it.isFile && (it.extension.equals("html", true) ||
+                                                it.extension.equals("htm", true))
+                                        }
+                                        .take(300)
+                                        .map { it.relativeTo(projectDir).path.replace('\\', '/') }
+                                        .sorted()
+                                        .toList()
+                                }
+                                scanResults = files
+                                scanning = false
+                            }
+                        },
+                        enabled = !scanning,
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        if (scanning) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(14.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        } else {
+                            Icon(Icons.Outlined.Refresh, null, Modifier.size(16.dp))
+                        }
+                        Spacer(Modifier.width(6.dp))
+                        Text(stringResource(R.string.preview_entry_scan))
+                    }
+                }
+
+                // 扫描结果（卡片内滚动列表，限高避免撑爆对话框）
+                if (scanning) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        stringResource(R.string.preview_entry_scanning),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                } else {
+                    val results = scanResults
+                    if (results != null) {
+                        Spacer(Modifier.height(8.dp))
+                        if (results.isEmpty()) {
+                            Text(
+                                stringResource(R.string.preview_entry_none_found),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        } else {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .heightIn(max = 220.dp)
+                                        .verticalScroll(rememberScrollState())
+                                        .padding(4.dp)
+                                ) {
+                                    results.forEach { path ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable { input = path }
+                                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            RadioButton(
+                                                selected = input.trim() == path,
+                                                onClick = { input = path }
+                                            )
+                                            Spacer(Modifier.width(6.dp))
+                                            Icon(
+                                                Icons.Outlined.Description,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp),
+                                                tint = MaterialTheme.colorScheme.outline
+                                            )
+                                            Spacer(Modifier.width(8.dp))
+                                            Text(
+                                                path,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onConfirm(input); onDismiss() }) {
+                Text(stringResource(R.string.action_confirm))
+            }
+        },
+        dismissButton = {
+            Row {
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+                TextButton(onClick = { onConfirm(""); onDismiss() }) {
+                    Text(stringResource(R.string.preview_entry_reset))
+                }
+            }
+        }
+    )
 }

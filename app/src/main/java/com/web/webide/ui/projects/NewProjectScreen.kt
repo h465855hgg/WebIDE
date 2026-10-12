@@ -152,7 +152,12 @@ fun NewProjectScreen(navController: NavController) {
             root.put("versionCode", versionCode.toIntOrNull() ?: 1)
             root.put("encryption", encryptionEnabled)
 
-            val finalUrl = if (selectedType == ProjectType.WEBSITE) targetUrl else "index.html"
+            // WEBSITE 用外链 URL；WEBAPP 用用户配置的入口文件名（默认 index.html），不能再硬编码
+            val finalUrl = when (selectedType) {
+                ProjectType.WEBSITE -> targetUrl
+                ProjectType.WEBAPP -> targetUrl.ifBlank { "index.html" }
+                ProjectType.NORMAL -> "index.html"
+            }
             root.put("targetUrl", finalUrl)
 
             root.put("icon", "icon.png")
@@ -397,7 +402,8 @@ fun NewProjectScreen(navController: NavController) {
                     }
                 }
 
-                // === 动画：显示/隐藏 URL 输入框 ===
+                // === 动画：显示/隐藏 入口输入框 ===
+                // WEBSITE: 外链目标网址；WEBAPP: 入口文件名（与最终创建的文件保持一致）
                 AnimatedVisibility(
                     visible = selectedType == ProjectType.WEBSITE,
                     enter = expandVertically() + fadeIn(),
@@ -406,6 +412,16 @@ fun NewProjectScreen(navController: NavController) {
                     Column {
                         Spacer(modifier = Modifier.height(16.dp))
                         CleanTextField(targetUrl, { targetUrl = it; syncJsonFromUi() }, stringResource(R.string.new_project_target_url), Icons.Outlined.Link, KeyboardType.Uri)
+                    }
+                }
+                AnimatedVisibility(
+                    visible = selectedType == ProjectType.WEBAPP,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    Column {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        CleanTextField(targetUrl, { targetUrl = it; syncJsonFromUi() }, stringResource(R.string.new_project_entry_file), Icons.Outlined.Html, KeyboardType.Text)
                     }
                 }
                 Spacer(modifier = Modifier.height(24.dp))
@@ -810,11 +826,35 @@ private fun createNormalStructure(dir: File, createIndexPhp: Boolean) {
 private fun createWebAppStructure(dir: File, jsonContent: String) {
     val assets = File(dir, "src/main/assets"); assets.mkdirs()
     File(assets, "js").mkdirs(); File(assets, "css").mkdirs()
-    safeWrite(File(assets, "index.html"), ProjectTemplates.webAppIndexHtml)
+    // 入口文件名以 webapp.json 的 targetUrl 为准，保证配置与真实创建的文件一致
+    val entryName = parseWebAppEntryName(jsonContent)
+    safeWrite(File(assets, entryName), ProjectTemplates.webAppIndexHtml)
     safeWrite(File(assets, "js/api.js"), ProjectTemplates.apiJs)
     safeWrite(File(assets, "js/index.js"), ProjectTemplates.webAppIndexJs)
     safeWrite(File(assets, "css/style.css"), ProjectTemplates.webAppCss)
     safeWrite(File(dir, "webapp.json"), jsonContent)
+}
+
+/**
+ * 从 webapp.json 内容解析入口文件相对路径。
+ * 用户在配置里填了什么（如 index1.html），创建的项目就按什么建文件，
+ * 不再无条件回退成 index.html；外链或解析失败时才回退 index.html。
+ */
+private fun parseWebAppEntryName(jsonContent: String): String {
+    val fallback = "index.html"
+    return try {
+        val root = JSONObject(jsonContent)
+        val raw = root.optString("targetUrl").ifEmpty { root.optString("url") }.trim()
+        if (raw.isBlank() || raw.startsWith("http")) return fallback
+        val rel = raw.removePrefix("./").removePrefix("/")
+        when {
+            rel.isBlank() -> fallback
+            rel.endsWith(".html", true) || rel.endsWith(".htm", true) -> rel
+            else -> "$rel.html" // 无后缀时补全，保证 WebView 按 html 渲染
+        }
+    } catch (_: Exception) {
+        fallback
+    }
 }
 private fun createWebsiteStructure(dir: File, url: String, jsonContent: String) {
     val assets = File(dir, "src/main/assets"); assets.mkdirs()

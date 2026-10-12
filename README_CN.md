@@ -61,6 +61,26 @@ com.web.webide
 *   **Git 集成**: 内置 Git 版本控制，提供可视化提交历史图谱，支持克隆、提交、推送、拉取和分支管理。自动忽略敏感文件和构建产物。
 *   **国际化 (i18n)**: 字符串资源已抽离至独立的 `:i18n` 模块，当前内置中文与英文。新增语言只需放入 `values-<语言>/strings.xml`，欢迎社区贡献翻译。
 
+## 构建
+
+本项目通过 **GitHub Actions** 自动构建（`.github/workflows/build-apk.yml`）：
+
+* **push / PR 到 `main`、`master`**：自动并行构建 4 个变体（debug/release × arm64-v8a / armeabi-v7a），APK 与 R8 mapping 上传为 artifact
+* **打 tag（`v*`）**：构建并自动发布到 GitHub Release
+* **手动触发**：Actions 页面 → `Build APK` → `Run workflow`
+
+本地一键构建（Git Bash / WSL / Linux / macOS）：
+
+```bash
+scripts/build.sh                 # debug 两个架构
+scripts/build.sh release         # release 两个架构
+scripts/build.sh release arm64-v8a --open
+```
+
+Windows 也可直接双击 `scripts\build.bat`。
+
+> 注意：app 模块带 flavor，gradle 任务名必须带架构（如 `:app:assembleArm64-v8aDebug`），不存在 `assembleDebug` 这类无 flavor 任务；NDK/CMake 版本已在构建脚本中钉死（`28.0.13004108` / `3.22.1`）。
+
 ## 展望与挑战
 
 我们正在积极改进 WebIDE。以下是我们的主要规划和目前面临的挑战：

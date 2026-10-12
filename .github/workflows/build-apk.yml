@@ -1,0 +1,122 @@
+name: Build APK
+
+# 自动构建 WebIDE 双架构 APK
+#
+# 触发方式：
+#   - push / PR 到 main、master：自动构建 4 个变体（debug/release × arm64-v8a/armeabi-v7a）
+#   - 打 tag（v*）：构建并自动发布到 GitHub Release
+#   - Actions 页面手动触发：workflow_dispatch
+#
+# 产物：每个变体一个 artifact；tag 构建会汇总到 Release。
+# 注意：paths-ignore 对 tag 推送同样生效——若发版 tag 指向的提交只改了被忽略的
+#       文件（纯文档等），构建与 Release 都不会触发；发版请确保 tag 含代码变更。
+# 说明：app 模块带 arm64-v8a / armeabi-v7a 两个 flavor，任务名必须带 flavor
+#       （如 assembleArm64-v8aDebug），不存在 compileDebugKotlin 这类无 flavor 任务。
+
+on:
+  push:
+    branches: [main, master]
+    tags: ["v*"]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - ".github/ISSUE_TEMPLATE/**"
+      - "screenshots/**"
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.flavor }} / ${{ matrix.build_type }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { flavor: arm64-v8a, build_type: debug, task: assembleArm64-v8aDebug }
+          - { flavor: arm64-v8a, build_type: release, task: assembleArm64-v8aRelease }
+          - { flavor: armeabi-v7a, build_type: debug, task: assembleArmeabi-v7aDebug }
+          - { flavor: armeabi-v7a, build_type: release, task: assembleArmeabi-v7aRelease }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # gradlew 在 git 中没有可执行位（100644），Linux runner 上直接 ./gradlew 会
+      # permission denied，这里统一补上执行权限
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      # ubuntu-latest 镜像自带 Android SDK（cmdline-tools + platform-tools）。
+      # 这里补齐项目需要的组件；NDK/CMake 版本与 core/terminal-emulator、
+      # language-treesitter、webapp 中钉死的版本保持一致，保证可复现。
+      - name: Set up Android SDK components
+        run: |
+          SDK="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          echo "Using SDK at: $SDK"
+          yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
+          "$SDK/cmdline-tools/latest/bin/sdkmanager" \
+            "platforms;android-37" \
+            "build-tools;36.0.0" \
+            "ndk;28.0.13004108" \
+            "cmake;3.22.1"
+
+      - name: Build ${{ matrix.flavor }} (${{ matrix.build_type }})
+        run: ./gradlew ":${{ matrix.task }}" --console=plain --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: webide-${{ matrix.flavor }}-${{ matrix.build_type }}
+          path: |
+            app/build/outputs/apk/${{ matrix.flavor }}/${{ matrix.build_type }}/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      # release 变体附带 R8 混淆映射，便于线上崩溃还原堆栈
+      - name: Upload mapping (release only)
+        if: matrix.build_type == 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: webide-${{ matrix.flavor }}-mapping
+          path: app/build/outputs/mapping/${{ matrix.flavor }}Release/mapping.txt
+          if-no-files-found: warn
+          retention-days: 30
+
+  # 打 tag（v*）时把 4 个 APK 汇总发布到 GitHub Release
+  release:
+    name: Publish to GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Attach APKs to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          ls -lh artifacts/
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" artifacts/*.apk --clobber
+          else
+            gh release create "$tag" artifacts/*.apk \
+              --title "$tag" \
+              --generate-notes
+          fi

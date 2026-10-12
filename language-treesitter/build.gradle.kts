@@ -32,6 +32,9 @@ android {
     namespace = "io.github.rosemoe.sora.ts"
     compileSdk = 36
 
+    // 与 core/terminal-emulator、webapp 保持一致，保证本地/CI 构建可复现
+    ndkVersion = "28.0.13004108"
+
     defaultConfig {
         minSdk = 21
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -45,6 +48,7 @@ android {
         externalNativeBuild {
             cmake {
                 // Fetch grammar sources via CMake FetchContent
+                version = "3.22.1"
             }
         }
     }
@@ -52,6 +56,7 @@ android {
     externalNativeBuild {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
         }
     }
 

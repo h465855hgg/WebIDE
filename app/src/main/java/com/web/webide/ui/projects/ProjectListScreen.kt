@@ -342,6 +342,10 @@ fun ProjectListScreen(navController: NavController) {
                                     }
                                 }
                             }
+                            // 终端入口：从主界面直接打开终端
+                            IconButton(onClick = { navController.safeNavigate("terminal") }) {
+                                Icon(Icons.Default.Terminal, stringResource(R.string.action_terminal))
+                            }
                             IconButton(onClick = { navController.safeNavigate("settings") }) {
                                 Icon(Icons.Default.Settings, stringResource(R.string.action_settings))
                             }

@@ -258,6 +258,8 @@ object SetupWorker {
             copyAsset(context, "libtalloc.so.2", File(libDir, "libtalloc.so.2"))
             copyAsset(context, "proot", File(binDir, "proot"))
             File(binDir, "proot").setExecutable(true)
+            // 修复 rootfs 网络配置（DNS / apk 镜像），保证 apk 可用
+            AlpineManager.ensureNetworkConfig(context)
 
             emit(Progress.Phase.SUCCESS, 100)
             PrepareResult.Success

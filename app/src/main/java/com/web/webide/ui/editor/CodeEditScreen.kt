@@ -536,8 +536,8 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                             text = { Text(terminalText) },
                                             onClick = {
                                                 isMoreMenuExpanded = false
-                                                // 🔥 跳转到独立的终端页面
-                                                navController.navigate("terminal")
+                                                // 🔥 跳转到独立的终端页面（跟随当前项目路径）
+                                                navController.navigate("terminal_project")
                                             }
                                         )
                                         DropdownMenuItem(
@@ -734,7 +734,7 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                     snackbarHostState = snackbarHostState,
                                     navController = navController,
                                     folderName = folderName,
-                                    onNavigateToTerminal = { navController.safeNavigate("terminal") },
+                                    onNavigateToTerminal = { navController.safeNavigate("terminal_project") },
                                     onShowJumpLine = { isOpenJump = true },
                                     onShowCreate = { showCreateDialog = true },
                                     onShowColorPicker = { showColorPicker = true }

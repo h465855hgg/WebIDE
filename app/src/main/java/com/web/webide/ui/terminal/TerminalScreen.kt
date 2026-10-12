@@ -98,10 +98,18 @@ import com.web.webide.ui.ThemeViewModel
 import com.web.webide.ui.terminal.TerminalConfig.VIRTUAL_KEYS_JSON
 import java.lang.ref.WeakReference
 
+/**
+ * @param followProjectPath 是否让普通会话跟随项目路径。
+ *        编辑器内入口传 true；主界面入口传 false（普通会话固定工作区根目录）。
+ */
 @SuppressLint("LocalContextGetResourceValueCall")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TerminalScreen(navController: NavController, themeViewModel: ThemeViewModel) {
+fun TerminalScreen(
+    navController: NavController,
+    themeViewModel: ThemeViewModel,
+    followProjectPath: Boolean = false
+) {
     val context = LocalContext.current
 
     // 🔥 终端配色必须跟随应用实际主题（用户可选跟随系统/强制浅色/强制深色），
@@ -131,7 +139,7 @@ fun TerminalScreen(navController: NavController, themeViewModel: ThemeViewModel)
         }
         alpinePrepareResult = result
         if (result is SetupWorker.PrepareResult.Success && SessionManager.sessions.isEmpty()) {
-            SessionManager.addNewSession(context)
+            SessionManager.addNewSession(context, followProject = followProjectPath)
         }
     }
 
@@ -294,7 +302,7 @@ fun TerminalScreen(navController: NavController, themeViewModel: ThemeViewModel)
                                 text = { Text(stringResource(R.string.terminal_session_normal)) },
                                 onClick = {
                                     showSessionMenu = false
-                                    SessionManager.addNewSession(context, SessionType.NORMAL)
+                                    SessionManager.addNewSession(context, SessionType.NORMAL, followProject = followProjectPath)
                                 }
                             )
                             DropdownMenuItem(

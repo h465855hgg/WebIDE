@@ -212,7 +212,16 @@ fun App(
             AboutScreen(navController = navController)
         }
         composable("terminal") {
+            // 主界面入口：普通会话不跟随项目路径，固定工作区根目录
             TerminalScreen(navController = navController, themeViewModel = themeViewModel)
+        }
+        composable("terminal_project") {
+            // 编辑器内入口：普通会话跟随当前项目路径
+            TerminalScreen(
+                navController = navController,
+                themeViewModel = themeViewModel,
+                followProjectPath = true
+            )
         }
     }
 }
