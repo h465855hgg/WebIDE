@@ -74,12 +74,13 @@ jobs:
 
       - name: Build ${{ matrix.flavor }} (${{ matrix.build_type }})
         run: |
+          echo "::error::CIMARK-BUILD-START"
           set +e
           LOG="$GITHUB_WORKSPACE/gradle-build.log"
-          echo "::error::CI-STEP cwd=$(pwd) writable=$(test -w . && echo yes || echo no) tee=$(command -v tee || echo NONE) java=$(java -version 2>&1 | head -1)"
           ./gradlew ":${{ matrix.task }}" --console=plain --no-daemon > "$LOG" 2>&1
           rc=$?
-          echo "::error::CI-RC rc=$rc lines=$(wc -l < "$LOG" 2>/dev/null || echo 0)"
+          echo "::error::CIMARK-BUILD-END"
+          echo "::error::CI-RC rc=$rc lines=$(wc -l < "$LOG" 2>/dev/null)"
           exit $rc
 
       # 无论成败，都输出构建日志：
@@ -115,6 +116,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
 
           emit() { echo "::error::CI $1"; }
+          emit "CIMARK-REPORT-RAN"
           if [ ! -f "$LOG" ]; then
             emit "[fatal] $LOG 不存在 —— ./gradlew 未能启动"
             emit "PWD=$(pwd)"
