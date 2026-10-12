@@ -110,14 +110,17 @@ jobs:
           emit() { echo "::error::CI $1"; }
           if [ ! -f "$LOG" ]; then
             emit "[fatal] $LOG 不存在 —— ./gradlew 未能启动"
-            ls -la | head -50 | while IFS= read -r l; do emit "ls: $l"; done
+            emit "PWD=$(pwd)"
+            emit "ROOT=[$(ls -A | tr '\n' ' ')]"
+            emit "TOTAL=$(ls -la | head -1)"
+            emit "GRADLEW=[$(ls -l gradlew 2>&1)]"
+            emit "SETTINGS=[$(ls -l settings.gradle.kts 2>&1)]"
+            emit "APPDIR=[$(ls -A app 2>&1 | tr '\n' ' ')]"
             exit 0
           fi
           emit "[info] $LOG 共 $(wc -l < "$LOG") 行"
-          # 尾部优先：Gradle 的失败原因（What went wrong）在日志末尾
-          tail -22 "$LOG" | while IFS= read -r l; do emit "LOG: $l"; done
-          awk '/FAILURE: Build failed/{f=1} f' "$LOG" | head -14 \
-            | while IFS= read -r l; do emit "ERR: $l"; done
+          emit "TAIL=[$(tail -25 "$LOG" | tr '\n' '⏎')]"
+          emit "HEAD=[$(head -12 "$LOG" | tr '\n' '⏎')]"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
