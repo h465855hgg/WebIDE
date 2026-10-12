@@ -8,6 +8,8 @@ name: Build APK
 #   - tag 构建会自动把 APK 发布到 GitHub Release（Release 名称 = tag）
 #
 # 产物：每个变体一个 artifact；tag 构建会汇总到 Release。
+# 发布说明：若仓库里存在 .github/release-notes/<tag>.md，就把它作为 Release 正文
+#       （双语格式，见 .trae/skills/release-notes/SKILL.md）；没有则用 --generate-notes。
 # 注意：paths-ignore 对 tag 推送同样生效——若发版 tag 指向的提交只改了被忽略的
 #       文件（纯文档等），构建与 Release 都不会触发；发版提交务必包含非文档改动
 #       （例如 app/build.gradle.kts 里的版本号提升）。
@@ -162,6 +164,10 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     needs: build
     runs-on: ubuntu-latest
+    # gh release create/upload 需要写权限；不显式声明时若仓库默认权限是只读会失败
+    # （Settings → Actions → General → Workflow permissions 需为 Read and write）
+    permissions:
+      contents: write
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -176,10 +182,20 @@ jobs:
           tag="${GITHUB_REF#refs/tags/}"
           ls -lh artifacts/
           # 仓库约定：Release 名称就是 tag 本身（如 0.4.0）
+          # 若提交了 .github/release-notes/<tag>.md，则用它作为 Release 正文
+          # （双语格式，见 .trae/skills/release-notes/SKILL.md）；否则退回自动生成
+          NOTES_FILE=".github/release-notes/${tag}.md"
+          if [ -f "$NOTES_FILE" ]; then
+            echo "使用发布说明文件: $NOTES_FILE"
+            NOTES_ARGS=(--notes-file "$NOTES_FILE")
+          else
+            echo "未找到 $NOTES_FILE，改用 --generate-notes"
+            NOTES_ARGS=(--generate-notes)
+          fi
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" artifacts/*.apk --clobber
           else
             gh release create "$tag" artifacts/*.apk \
               --title "$tag" \
-              --generate-notes
+              "${NOTES_ARGS[@]}"
           fi
