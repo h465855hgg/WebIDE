@@ -169,6 +169,11 @@ jobs:
     permissions:
       contents: write
     steps:
+      # 必须 checkout：gh 需要从 git remote 推断仓库，同时发布说明文件也在仓库里
+      # （早期没有这一步，gh release create 直接报 "not a git repository" 退出 1）
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -192,10 +197,13 @@ jobs:
             echo "未找到 $NOTES_FILE，改用 --generate-notes"
             NOTES_ARGS=(--generate-notes)
           fi
-          if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" artifacts/*.apk --clobber
+          # --repo 显式指定，避免依赖当前目录的 git remote
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$tag" artifacts/*.apk \
+              --clobber --repo "$GITHUB_REPOSITORY"
           else
             gh release create "$tag" artifacts/*.apk \
               --title "$tag" \
+              --repo "$GITHUB_REPOSITORY" \
               "${NOTES_ARGS[@]}"
           fi
