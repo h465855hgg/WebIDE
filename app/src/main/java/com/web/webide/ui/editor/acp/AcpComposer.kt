@@ -230,7 +230,8 @@ internal fun AcpComposer(
                     } else {
                         FilledIconButton(
                             onClick = onSend,
-                            enabled = connected && !readOnlyReplay && value.text.isNotBlank(),
+                            enabled = connected && !readOnlyReplay &&
+                                value.text.isNotBlank() && value.text.trim() != "/",
                             modifier = Modifier.size(38.dp)
                         ) {
                             Icon(

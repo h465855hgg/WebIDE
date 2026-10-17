@@ -73,12 +73,14 @@ internal fun AcpModelChip(viewModel: AcpViewModel, onClick: () -> Unit) {
     val rawLabel = model?.currentDisplayName
         ?: viewModel.usage.model
         ?: stringResource(R.string.acp_config_model)
-    // "OpenCode/DeepSeek-4.1-Flash Free" 这种供应商前缀太长，胶囊里只显示模型名本身。
-    val label = rawLabel.substringAfterLast('/').ifBlank { rawLabel }
     ConfigChip(
-        label = label,
-        maxTextWidth = 124.dp,
-        maxLines = 2,
+        label = rawLabel,
+        maxTextWidth = 158.dp,
+        fontSize = when {
+            rawLabel.length > 28 -> 8.sp
+            rawLabel.length > 22 -> 9.5.sp
+            else -> 11.sp
+        },
         onClick = onClick
     )
 }
@@ -95,8 +97,8 @@ internal fun AcpModeChip(viewModel: AcpViewModel, onClick: () -> Unit) {
         ?: stringResource(R.string.acp_config_mode)
     ConfigChip(
         label = label,
-        maxTextWidth = 88.dp,
-        maxLines = 1,
+        maxTextWidth = 68.dp,
+        fontSize = 9.sp,
         onClick = onClick
     )
 }
@@ -105,7 +107,7 @@ internal fun AcpModeChip(viewModel: AcpViewModel, onClick: () -> Unit) {
 private fun ConfigChip(
     label: String,
     maxTextWidth: androidx.compose.ui.unit.Dp,
-    maxLines: Int,
+    fontSize: androidx.compose.ui.unit.TextUnit,
     onClick: () -> Unit
 ) {
     Surface(
@@ -115,16 +117,13 @@ private fun ConfigChip(
     ) {
         Text(
             text = label,
-            style = if (maxLines > 1) {
-                MaterialTheme.typography.labelSmall.copy(lineHeight = 13.sp)
-            } else {
-                MaterialTheme.typography.labelMedium
-            },
-            maxLines = maxLines,
-            overflow = TextOverflow.Ellipsis,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = fontSize),
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Clip,
             modifier = Modifier
                 .widthIn(max = maxTextWidth)
-                .padding(horizontal = 11.dp, vertical = 5.dp)
+                .padding(horizontal = 10.dp, vertical = 6.dp)
         )
     }
 }

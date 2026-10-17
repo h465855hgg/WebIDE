@@ -60,6 +60,9 @@ internal class AcpConnection(
     private val nextId = AtomicLong(1)
     private val pending = ConcurrentHashMap<Long, CompletableDeferred<JSONObject>>()
 
+    private fun loc(zh: String, en: String): String =
+        if (java.util.Locale.getDefault().language.startsWith("zh")) zh else en
+
     /**
      * 发送请求并挂起等待结果。
      *
@@ -93,7 +96,13 @@ internal class AcpConnection(
                 deferred.await()
             }
         } catch (e: TimeoutCancellationException) {
-            throw AcpException(Acp.ERR_INTERNAL, "请求超时（${timeoutMillis / 1000}s）：$method")
+            throw AcpException(
+                Acp.ERR_INTERNAL,
+                loc(
+                    "请求超时（${timeoutMillis / 1000}s）：$method",
+                    "Request timeout (${timeoutMillis / 1000}s): $method"
+                )
+            )
         } finally {
             pending.remove(id)
         }
@@ -137,7 +146,7 @@ internal class AcpConnection(
             deferred.completeExceptionally(
                 AcpException(
                     code = error.optInt("code", Acp.ERR_INTERNAL),
-                    message = error.strOrNull("message").orEmpty().ifEmpty { "Agent 返回错误" },
+                    message = error.strOrNull("message").orEmpty().ifEmpty { loc("Agent 返回错误", "Agent returned an error") },
                     data = error.opt("data")
                 )
             )
@@ -154,7 +163,7 @@ internal class AcpConnection(
                 val result = if (handler != null) {
                     handler(method, params)
                 } else {
-                    throw AcpException(Acp.ERR_METHOD_NOT_FOUND, "未实现的方法: $method")
+                    throw AcpException(Acp.ERR_METHOD_NOT_FOUND, loc("未实现的方法: $method", "Unsupported method: $method"))
                 }
                 safeSend(resultResponse(idValue, result))
             } catch (e: AcpException) {

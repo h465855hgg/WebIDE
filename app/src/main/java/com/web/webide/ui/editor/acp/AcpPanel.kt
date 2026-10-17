@@ -18,6 +18,10 @@
 package com.web.webide.ui.editor.acp
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -72,6 +76,10 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.automirrored.filled.CallSplit
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.PictureInPictureAlt
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.CloseFullscreen
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -158,7 +166,11 @@ import java.io.File
  * ACP 面板：替代原先的 AI 聊天面板，改为驱动外部 ACP Agent
  * （Claude Code / Gemini CLI / Qwen Code 等）。
  */
-@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@OptIn(
+    ExperimentalLayoutApi::class,
+    ExperimentalMaterial3Api::class,
+    ExperimentalSharedTransitionApi::class
+)
 @Composable
 internal fun AcpPanel(
     onHide: () -> Unit,
@@ -234,17 +246,19 @@ internal fun AcpPanel(
         state.persist(localContext)
     }
 
-    BoxWithConstraints(
-        modifier = Modifier
-            .fillMaxSize()
-            .zIndex(100f)
-            .imePadding(),
-        contentAlignment = if (state.dockSide == AcpDockSide.RIGHT) {
-            Alignment.BottomEnd
-        } else {
-            Alignment.BottomStart
-        }
-    ) {
+    SharedTransitionLayout {
+        val sharedScope = this
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxSize()
+                .zIndex(100f)
+                .imePadding(),
+            contentAlignment = if (state.dockSide == AcpDockSide.RIGHT) {
+                Alignment.BottomEnd
+            } else {
+                Alignment.BottomStart
+            }
+        ) {
         val availableWidth = maxWidth
         val availableHeight = maxHeight
 
@@ -289,6 +303,7 @@ internal fun AcpPanel(
                 animationSpec = tween(200, easing = FastOutSlowInEasing)
             )
         ) {
+            val avScope = this
             Surface(
                 modifier = Modifier
                     .padding(margin)
@@ -304,6 +319,10 @@ internal fun AcpPanel(
                     AcpHeader(
                         viewModel = viewModel,
                         state = state,
+                        brandModifier = Modifier.sharedElement(
+                            sharedScope.rememberSharedContentState("acp-brand"),
+                            avScope
+                        ),
                         onNewSession = { viewModel.newSession() },
                         onOpenSessions = { showSessions = true },
                         onOpenSearch = { showSearch = true },
@@ -313,6 +332,7 @@ internal fun AcpPanel(
                         },
                         onOpenSkills = { showSkills = true },
                         onOpenMcp = { showMcp = true },
+                        onDisconnect = { viewModel.disconnect() },
                         onHide = onHide
                     )
                     HorizontalDivider(
@@ -516,12 +536,17 @@ internal fun AcpPanel(
                 animationSpec = tween(140, easing = FastOutSlowInEasing)
             )
         ) {
+            val avScope = this
             Box(modifier = Modifier.fillMaxSize()) {
                 AcpDraggableFab(
                     containerWidth = availableWidth,
                     containerHeight = availableHeight,
                     side = state.fabSide,
                     yFraction = state.fabYFraction,
+                    brandModifier = Modifier.sharedElement(
+                        sharedScope.rememberSharedContentState("acp-brand"),
+                        avScope
+                    ),
                     connectionState = viewModel.connectionState,
                     isPrompting = viewModel.isPrompting,
                     hasPendingPermission = viewModel.permissionPrompt != null,
@@ -530,6 +555,7 @@ internal fun AcpPanel(
                     onClick = { state.isCollapsed = false }
                 )
             }
+        }
         }
     }
 
@@ -684,12 +710,14 @@ private fun AcpCollapsedBubble(
 private fun AcpHeader(
     viewModel: AcpViewModel,
     state: AcpPanelState,
+    brandModifier: Modifier = Modifier,
     onNewSession: () -> Unit,
     onOpenSessions: () -> Unit,
     onOpenSearch: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSkills: () -> Unit,
     onOpenMcp: () -> Unit,
+    onDisconnect: () -> Unit,
     onHide: () -> Unit
 ) {
     var menu by remember { mutableStateOf(false) }
@@ -715,30 +743,35 @@ private fun AcpHeader(
                 .padding(start = 12.dp, end = 2.dp, top = 2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                painter = painterResource(R.drawable.acp_logo),
-                contentDescription = null,
-                modifier = Modifier.size(18.dp, 7.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.width(5.dp))
-            Text(
-                text = "ACP",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Row(
+                modifier = brandModifier,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.acp_logo),
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp, 7.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.width(5.dp))
+                Text(
+                    text = "ACP",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             Spacer(Modifier.weight(1f))
             IconButton(
                 onClick = { state.isMaximized = !state.isMaximized },
                 modifier = Modifier.size(28.dp)
             ) {
                 Icon(
-                    if (state.isMaximized) Icons.Default.CloseFullscreen else Icons.Default.OpenInFull,
+                    if (state.isMaximized) Icons.Default.CloseFullscreen else Icons.Default.Fullscreen,
                     contentDescription = stringResource(
                         if (state.isMaximized) R.string.acp_restore else R.string.acp_maximize
                     ),
-                    modifier = Modifier.size(15.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.primary
                 )
             }
             IconButton(
@@ -746,9 +779,9 @@ private fun AcpHeader(
                 modifier = Modifier.size(28.dp)
             ) {
                 Icon(
-                    Icons.Default.Minimize,
+                    Icons.Default.PictureInPictureAlt,
                     contentDescription = stringResource(R.string.acp_action_minimize),
-                    modifier = Modifier.size(15.dp),
+                    modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -757,10 +790,10 @@ private fun AcpHeader(
                 modifier = Modifier.size(28.dp)
             ) {
                 Icon(
-                    Icons.Default.Close,
+                    Icons.Default.Cancel,
                     contentDescription = stringResource(R.string.acp_action_hide),
-                    modifier = Modifier.size(15.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.error
                 )
             }
         }
@@ -862,6 +895,21 @@ private fun AcpHeader(
                         onClick = {
                             menu = false
                             onOpenMcp()
+                        }
+                    )
+                    HorizontalDivider()
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.acp_action_disconnect)) },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.LinkOff,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        },
+                        onClick = {
+                            menu = false
+                            onDisconnect()
                         }
                     )
                 }
@@ -1833,7 +1881,7 @@ private fun AcpAgentBubble(item: AcpAgentMessage) {
     ) {
         Surface(
             shape = RoundedCornerShape(7.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            color = Color(0xFF26262B),
             modifier = Modifier.size(34.dp, 24.dp)
         ) {
             Box(contentAlignment = Alignment.Center) {
@@ -1841,7 +1889,7 @@ private fun AcpAgentBubble(item: AcpAgentMessage) {
                     painter = painterResource(R.drawable.acp_logo),
                     contentDescription = null,
                     modifier = Modifier.size(28.dp, 10.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = Color(0xFFEDEDED)
                 )
             }
         }

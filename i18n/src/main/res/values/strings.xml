@@ -822,6 +822,7 @@
     <string name="acp_diag_copy_done">诊断信息已复制</string>
     <string name="acp_diag_saved">诊断已保存：%1$s</string>
     <string name="acp_status_auth_requested">已向 Agent 发送登录请求；是否成功以 Agent 终端输出为准。</string>
+    <string name="acp_codex_auth_hint">Codex 需要认证：在下方环境变量填 CODEX_API_KEY=sk-...，或先完成 ChatGPT 登录。</string>
     <string name="acp_auth_pending_hint">已发起登录请求，客户端无法确认结果。</string>
     <string name="acp_skills_title">技能</string>
     <string name="acp_skills_open">技能管理</string>

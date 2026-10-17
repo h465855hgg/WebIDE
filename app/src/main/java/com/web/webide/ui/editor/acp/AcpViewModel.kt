@@ -501,7 +501,7 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
                 }
 
                 is BinaryProbe.Failed -> {
-                    appendStderr("环境预检未完成：${probe.reason}（继续尝试启动）")
+                    appendStderr(loc("环境预检未完成：${probe.reason}（继续尝试启动）", "Environment precheck incomplete: ${probe.reason} (continuing)"))
                     startAgent(ctx, command)
                     return
                 }
@@ -534,7 +534,7 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
         connection = null
         sessionId = null
 
-        appendStderr("$reason；改用候选命令重试：$next")
+        appendStderr(loc("$reason；改用候选命令重试：$next", "$reason; retrying with candidate: $next"))
         connectionState = AcpConnectionState.CONNECTING
         statusMessage = s(R.string.acp_status_trying_alternative, next)
         viewModelScope.launch { startNextCandidate() }
@@ -762,9 +762,10 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
 
     /** 断开连接并清理资源。 */
     fun disconnect() {
+        if (connection == null && transport == null) return
         teardown()
         connectionState = AcpConnectionState.DISCONNECTED
-        statusMessage = null
+        statusMessage = s(R.string.acp_state_disconnected)
         if (timeline.isNotEmpty()) isReadOnlyReplay = true
         addNotice(s(R.string.acp_status_disconnected))
     }
@@ -772,7 +773,7 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
     /** 发送一轮用户消息。 */
     fun sendPrompt(raw: String) {
         val text = raw.trim()
-        if (text.isEmpty() || !canPrompt()) return
+        if (text.isEmpty() || text == "/" || !canPrompt()) return
 
         // 首轮注入项目技能清单；UI 只显示用户原文（注入块在历史重放时会被裁掉）。
         // 斜杠命令必须保持 prompt 以 "/" 开头，否则 Agent 不会当命令执行。
@@ -1719,17 +1720,11 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
             }
         } ?: emptyList()
 
-        authMethods.firstOrNull()?.let { method ->
-            runCatching {
-                acpConnection.request(
-                    Acp.M_AUTHENTICATE,
-                    JSONObject().put("methodId", method.id)
-                )
-                isAuthenticated = false
-                authRequested = true
-                activeAuthMethodId = method.id
-            }
-        }
+        // 不自动调用 authenticate：Codex 等 Agent 的首个认证方式是浏览器/ChatGPT 登录，
+        // 静默调用会卡在会话创建前，还会让人误以为已经登录。让用户在设置里主动认证，
+        // 或在环境变量里填 API Key。
+        authRequested = false
+        activeAuthMethodId = null
 
         statusMessage = s(R.string.acp_status_creating_session)
 
@@ -1802,7 +1797,7 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
     private fun onAgentExited(exitCode: Int) {
         // 还没握手成功就退出 —— 多半是启动参数不对，换候选命令再试一次
         if (sessionId == null &&
-            retryWithNextCandidate("Agent 进程退出（退出码 $exitCode）")
+            retryWithNextCandidate(loc("Agent 进程退出（退出码 $exitCode）", "Agent exited (code $exitCode)"))
         ) {
             return
         }
@@ -1812,7 +1807,7 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
         pendingPermission = null
         permissionPrompt = null
         isPrompting = false
-        connection?.failAllPending(AcpConnectionLostException("Agent 进程已退出"))
+        connection?.failAllPending(AcpConnectionLostException(loc("Agent 进程已退出", "Agent process exited")))
         terminals?.shutdown()
 
         val detail = stderrTail.trim().lineSequence()
@@ -2310,7 +2305,10 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
-    private fun addNotice(text: String, isError: Boolean = false) {
+    private fun loc(zh: String, en: String): String =
+        if (java.util.Locale.getDefault().language.startsWith("zh")) zh else en
+
+private fun addNotice(text: String, isError: Boolean = false) {
         timeline.add(AcpNoticeMessage(newId("notice"), text, isError))
     }
 }

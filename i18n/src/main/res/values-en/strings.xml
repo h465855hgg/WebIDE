@@ -806,6 +806,7 @@
     <string name="acp_diag_copy_done">Diagnostics copied</string>
     <string name="acp_diag_saved">Diagnostics saved: %1$s</string>
     <string name="acp_status_auth_requested">Sign-in request sent; check the agent terminal to see whether it succeeded.</string>
+    <string name="acp_codex_auth_hint">Codex needs auth: add CODEX_API_KEY=sk-... below, or finish ChatGPT sign-in first.</string>
     <string name="acp_auth_pending_hint">Sign-in requested; the client cannot confirm the result.</string>
     <string name="acp_skills_title">Skills</string>
     <string name="acp_skills_open">Skills</string>

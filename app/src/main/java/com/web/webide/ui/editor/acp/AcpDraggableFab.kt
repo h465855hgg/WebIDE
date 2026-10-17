@@ -78,6 +78,7 @@ internal fun AcpDraggableFab(
     containerHeight: Dp,
     side: AcpDockSide,
     yFraction: Float,
+    brandModifier: Modifier = Modifier,
     connectionState: AcpConnectionState,
     isPrompting: Boolean,
     hasPendingPermission: Boolean,
@@ -202,6 +203,25 @@ internal fun AcpDraggableFab(
                     .padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                Row(
+                    modifier = brandModifier,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.acp_logo),
+                        contentDescription = stringResource(R.string.acp_action_expand),
+                        modifier = Modifier.size(24.dp, 10.dp),
+                        tint = chipContent
+                    )
+                    Spacer(Modifier.width(7.dp))
+                    Text(
+                        text = "ACP",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = chipContent
+                    )
+                }
+                Spacer(Modifier.weight(1f))
                 when {
                     isPrompting -> CircularProgressIndicator(
                         modifier = Modifier.size(14.dp),
@@ -211,32 +231,18 @@ internal fun AcpDraggableFab(
 
                     hasPendingPermission -> Icon(
                         Icons.Default.Warning,
-                        contentDescription = stringResource(R.string.acp_action_expand),
+                        contentDescription = null,
                         modifier = Modifier.size(15.dp),
                         tint = Color(0xFFF59E0B)
                     )
 
-                    else -> Icon(
-                        painter = painterResource(R.drawable.acp_logo),
-                        contentDescription = stringResource(R.string.acp_action_expand),
-                        modifier = Modifier.size(24.dp, 10.dp),
-                        tint = chipContent
+                    else -> Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .clip(CircleShape)
+                            .background(statusColor)
                     )
                 }
-                Spacer(Modifier.width(7.dp))
-                Text(
-                    text = "ACP",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = chipContent
-                )
-                Spacer(Modifier.weight(1f))
-                Box(
-                    modifier = Modifier
-                        .size(7.dp)
-                        .clip(CircleShape)
-                        .background(statusColor)
-                )
             }
         }
     }

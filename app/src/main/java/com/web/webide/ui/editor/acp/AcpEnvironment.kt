@@ -51,6 +51,10 @@ internal object AcpEnvironment {
     private const val MARKER_MISSING = "__ACP_MISSING__"
     private const val MARKER_OK = "__ACP_OK__"
 
+    /** 自检报告 / 安装日志会直接显示在 UI 上，按应用语言输出。 */
+    private fun t(zhText: String, enText: String): String =
+        if (java.util.Locale.getDefault().language.startsWith("zh")) zhText else enText
+
     /** 探测类命令的默认超时。proot 首次启动要解压/挂载，给得宽松一些。 */
     const val PROBE_TIMEOUT_MILLIS = 20_000L
 
@@ -337,7 +341,7 @@ internal object AcpEnvironment {
         )
         if (probe.output.contains(MARKER_OK)) return true
 
-        onLine("未检测到 npm，正在通过 apk 安装 Node.js…")
+        onLine(t("未检测到 npm，正在通过 apk 安装 Node.js…", "npm not found, installing Node.js via apk…"))
         val install = execStreaming(
             context = context,
             shellCommand = "apk add --no-cache nodejs npm 2>&1",
@@ -346,7 +350,12 @@ internal object AcpEnvironment {
             onLine = onLine
         )
         if (install.exitCode != 0) {
-            onLine("安装 Node.js 失败（退出码 ${install.exitCode}）")
+            onLine(
+                t(
+                    "安装 Node.js 失败（退出码 ${install.exitCode}）",
+                    "Node.js install failed (exit ${install.exitCode})"
+                )
+            )
             return false
         }
         val verify = exec(
@@ -366,7 +375,7 @@ internal object AcpEnvironment {
     ): CommandResult {
         if (packages.isEmpty()) return CommandResult(0, "", timedOut = false)
         if (!ensureNpm(context, onLine)) {
-            return CommandResult(-1, "npm 不可用", timedOut = false)
+            return CommandResult(-1, t("npm 不可用", "npm unavailable"), timedOut = false)
         }
         val list = packages.joinToString(" ") { shellQuote(it) }
         onLine("$ npm install -g $list")
@@ -403,7 +412,7 @@ internal object AcpEnvironment {
             timeoutMillis = timeoutMillis
         )
 
-        if (result.timedOut) return BinaryProbe.Failed("探测超时")
+        if (result.timedOut) return BinaryProbe.Failed(t("探测超时", "probe timed out"))
         val output = result.output.trim()
 
         if (isPath) {
@@ -433,7 +442,7 @@ internal object AcpEnvironment {
         ).joinToString(" ") { shellQuote(it) }
         val command = "for f in " + candidates + "; do [ -f \"\$f\" ] && tail -n " + maxLines + " \"\$f\"; done"
         val result = exec(context, command, "/root", timeoutMillis = 15_000L)
-        if (result.timedOut) return listOf("读取日志超时")
+        if (result.timedOut) return listOf(t("读取日志超时", "read log timed out"))
         return result.output.lineSequence().filter { it.isNotBlank() }.toList()
     }
 
@@ -450,44 +459,56 @@ internal object AcpEnvironment {
         val lines = mutableListOf<String>()
 
         val resolvedWorkDir = if (File(workDir).isDirectory) workDir else "/root"
-        lines += "工作目录: $workDir"
+        lines += t("工作目录: $workDir", "Working dir: $workDir")
         if (resolvedWorkDir != workDir) {
-            lines += "  ⚠ 宿主机上不存在，将回退到 /root"
+            lines += t("  ⚠ 宿主机上不存在，将回退到 /root", "  ⚠ not present on host, falling back to /root")
         } else {
             val pwd = exec(context, "pwd", resolvedWorkDir, timeoutMillis = 15_000L)
             if (pwd.timedOut) {
-                lines += "  ⚠ 容器内进入该目录超时"
+                lines += t("  ⚠ 容器内进入该目录超时", "  ⚠ entering this directory in container timed out")
             } else if (pwd.isSuccess) {
-                lines += "  容器内可访问: ${pwd.output.trim()}"
+                lines += t(
+                    "  容器内可访问: ${pwd.output.trim()}",
+                    "  accessible in container: ${pwd.output.trim()}"
+                )
             } else {
-                lines += "  ⚠ 容器内不可访问（退出码 ${pwd.exitCode}）：${pwd.output.trim().take(160)}"
+                lines += t(
+                    "  ⚠ 容器内不可访问（退出码 ${pwd.exitCode}）：${pwd.output.trim().take(160)}",
+                    "  ⚠ not accessible in container (exit ${pwd.exitCode}): ${pwd.output.trim().take(160)}"
+                )
             }
         }
 
         if (binary.isNotBlank() && !binary.contains('/')) {
             val path = which(context, binary)
             lines += if (path != null) {
-                "命令 $binary: $path"
+                t("命令 $binary: $path", "Command $binary: $path")
             } else {
-                "命令 $binary: 未找到 —— 需要先在终端里安装"
+                t(
+                    "命令 $binary: 未找到 —— 需要先在终端里安装",
+                    "Command $binary: not found — install it in the terminal first"
+                )
             }
         } else if (binary.isNotBlank()) {
-            lines += "命令路径: $binary（${if (File(binary).exists()) "存在" else "不存在"}）"
+            lines += t(
+                "命令路径: $binary（${if (File(binary).exists()) "存在" else "不存在"}）",
+                "Command path: $binary (${if (File(binary).exists()) "exists" else "missing"})"
+            )
         }
 
         listOf("node", "npm", "npx").forEach { tool ->
             val result = exec(context, "$tool -v 2>&1 || echo $MARKER_MISSING", "/root", timeoutMillis = 15_000L)
             val output = result.output.trim().lineSequence().firstOrNull { it.isNotBlank() }.orEmpty()
             lines += when {
-                result.timedOut -> "$tool: 检测超时"
-                output.isEmpty() || output.contains(MARKER_MISSING) -> "$tool: 未安装"
+                result.timedOut -> t("$tool: 检测超时", "$tool: probe timed out")
+                output.isEmpty() || output.contains(MARKER_MISSING) -> t("$tool: 未安装", "$tool: not installed")
                 else -> "$tool: $output"
             }
         }
 
         // 网络连通性：ACP Agent 大多要访问模型服务，容器内 DNS / 代理不通会导致
         // 会话创建失败或对话一直无响应（Agent 往往只写自己的日志，不回报协议错误）。
-        lines += "网络连通性："
+        lines += t("网络连通性：", "Network connectivity:")
         listOf(
             "models.opencode.ai" to "https://models.opencode.ai/api.json",
             "opencode.ai" to "https://opencode.ai/",
@@ -501,9 +522,12 @@ internal object AcpEnvironment {
             )
             val code = Regex("EXIT=(\\d+)").find(probe.output)?.groupValues?.get(1)
             lines += when {
-                probe.timedOut -> "  " + name + ": 连接超时"
-                code == "0" -> "  " + name + ": 可达"
-                else -> "  " + name + ": 不可达（wget exit " + (code ?: "?") + "）—— 检查代理 / DNS"
+                probe.timedOut -> t("  $name: 连接超时", "  $name: timed out")
+                code == "0" -> t("  $name: 可达", "  $name: reachable")
+                else -> t(
+                    "  $name: 不可达（wget exit ${code ?: "?"}）—— 检查代理 / DNS",
+                    "  $name: unreachable (wget exit ${code ?: "?"}) — check proxy / DNS"
+                )
             }
         }
 

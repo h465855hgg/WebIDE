@@ -50,6 +50,10 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import com.web.webide.core.utils.AppLanguageManager
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -110,6 +114,17 @@ internal fun AcpAgentSettingsDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
+        // Dialog 的窗口资源可能仍是系统语言；显式把应用内选择的语言压进 CompositionLocal，
+        // 否则英文模式下设置页会继续显示中文。
+        val baseContext = LocalContext.current
+        val languageOption by AppLanguageManager.currentOption.collectAsState()
+        val localizedContext = remember(baseContext, languageOption) {
+            AppLanguageManager.createLocalizedContext(baseContext, languageOption)
+        }
+        CompositionLocalProvider(
+            LocalContext provides localizedContext,
+            LocalConfiguration provides localizedContext.resources.configuration
+        ) {
         Surface(
             modifier = Modifier
                 .fillMaxSize()
@@ -203,6 +218,14 @@ internal fun AcpAgentSettingsDialog(
                                         maxLines = 2
                                     )
                                     Spacer(Modifier.height(8.dp))
+                                    if (selected.id == "codex") {
+                                        Text(
+                                            text = stringResource(R.string.acp_codex_auth_hint),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.tertiary
+                                        )
+                                        Spacer(Modifier.height(4.dp))
+                                    }
                                     OutlinedTextField(
                                         value = envText,
                                         onValueChange = {
@@ -452,6 +475,7 @@ internal fun AcpAgentSettingsDialog(
                         )
                     }
                 }
+            }
             }
         }
     }
