@@ -150,7 +150,8 @@ internal fun AcpTopStatusBar(
 @Composable
 internal fun AcpComposerToolbar(
     viewModel: AcpViewModel,
-    onConfigMenuOpenChange: (Boolean) -> Unit
+    onOpenModel: () -> Unit,
+    onOpenMode: () -> Unit
 ) {
     val hasModel = viewModel.configOptions.any {
         it.category == Acp.CAT_MODEL ||
@@ -168,14 +169,8 @@ internal fun AcpComposerToolbar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp)
     ) {
-        AcpModelChip(
-            viewModel = viewModel,
-            onMenuOpenChange = onConfigMenuOpenChange
-        )
-        AcpModeChip(
-            viewModel = viewModel,
-            onMenuOpenChange = onConfigMenuOpenChange
-        )
+        AcpModelChip(viewModel = viewModel, onClick = onOpenModel)
+        AcpModeChip(viewModel = viewModel, onClick = onOpenMode)
     }
 }
 

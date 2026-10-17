@@ -45,6 +45,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -95,9 +96,8 @@ internal fun AcpComposer(
     connected: Boolean,
     readOnlyReplay: Boolean,
     commands: List<AcpSlashCommand>,
-    isHalfExpanded: Boolean,
-    onToggleHalf: () -> Unit,
     onFullscreen: () -> Unit,
+    onOpenTasks: () -> Unit,
     onSend: () -> Unit,
     onCancel: () -> Unit
 ) {
@@ -166,11 +166,35 @@ internal fun AcpComposer(
             }
         }
 
+        // 文件夹标签式入口：任务清单 + 全屏，贴在输入卡片右上角外侧并与其同色融合。
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(end = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End)
+        ) {
+            FolderTab(
+                icon = Icons.AutoMirrored.Filled.List,
+                label = stringResource(R.string.acp_tasks_title),
+                onClick = onOpenTasks
+            )
+            FolderTab(
+                icon = Icons.Default.OpenInFull,
+                label = stringResource(R.string.acp_input_fullscreen_tab),
+                onClick = onFullscreen
+            )
+        }
+
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-            shape = RoundedCornerShape(18.dp),
+                .padding(start = 8.dp, end = 8.dp, bottom = 6.dp),
+            shape = RoundedCornerShape(
+                topStart = 16.dp,
+                topEnd = 0.dp,
+                bottomStart = 16.dp,
+                bottomEnd = 16.dp
+            ),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             tonalElevation = 1.dp
         ) {
@@ -182,10 +206,7 @@ internal fun AcpComposer(
                     onValueChange = onValueChange,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(
-                            min = 40.dp,
-                            max = if (isHalfExpanded) 170.dp else 40.dp
-                        ),
+                        .heightIn(min = 40.dp, max = 40.dp),
                     placeholder = {
                         Text(
                             text = stringResource(R.string.acp_composer_hint),
@@ -194,7 +215,7 @@ internal fun AcpComposer(
                         )
                     },
                     textStyle = MaterialTheme.typography.bodyMedium,
-                    maxLines = if (isHalfExpanded) 8 else 1,
+                    maxLines = 1,
                     shape = RoundedCornerShape(12.dp),
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Text,
@@ -214,24 +235,6 @@ internal fun AcpComposer(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Spacer(Modifier.weight(1f))
-                    IconButton(onClick = onToggleHalf, modifier = Modifier.size(30.dp)) {
-                        Icon(
-                            if (isHalfExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
-                            contentDescription = stringResource(
-                                if (isHalfExpanded) R.string.acp_input_collapse else R.string.acp_input_half
-                            ),
-                            modifier = Modifier.size(17.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    IconButton(onClick = onFullscreen, modifier = Modifier.size(30.dp)) {
-                        Icon(
-                            Icons.Default.OpenInFull,
-                            contentDescription = stringResource(R.string.acp_input_fullscreen),
-                            modifier = Modifier.size(17.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
                     if (isPrompting) {
                         FilledIconButton(
                             onClick = onCancel,
@@ -375,6 +378,45 @@ internal fun approvalModeDescription(mode: AcpApprovalMode): Int = when (mode) {
     AcpApprovalMode.SMART -> R.string.acp_permission_mode_smart_desc
     AcpApprovalMode.AUTO -> R.string.acp_permission_mode_auto_desc
     AcpApprovalMode.READ_ONLY -> R.string.acp_permission_mode_readonly_desc
+}
+
+@Composable
+private fun FolderTab(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(
+            topStart = 10.dp,
+            topEnd = 10.dp,
+            bottomStart = 0.dp,
+            bottomEnd = 0.dp
+        ),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh
+    ) {
+        Row(
+            modifier = Modifier
+                .height(24.dp)
+                .padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                modifier = Modifier.size(12.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
+            )
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

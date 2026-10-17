@@ -839,4 +839,5 @@
     <string name="acp_input_half">半屏输入</string>
     <string name="acp_input_collapse">收起输入</string>
     <string name="acp_input_fullscreen">全屏输入</string>
+    <string name="acp_input_fullscreen_tab">全屏</string>
 </resources>

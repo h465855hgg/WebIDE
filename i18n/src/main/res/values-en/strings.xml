@@ -823,4 +823,5 @@
     <string name="acp_input_half">Expand input</string>
     <string name="acp_input_collapse">Collapse input</string>
     <string name="acp_input_fullscreen">Fullscreen input</string>
+    <string name="acp_input_fullscreen_tab">Full</string>
 </resources>

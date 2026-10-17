@@ -173,13 +173,12 @@ internal fun AcpPanel(
     var showTasks by remember { mutableStateOf(false) }
     var showMcp by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
-    var configMenuOpen by remember { mutableStateOf(false) }
+    var configMenu by remember { mutableStateOf<AcpConfigMenu?>(null) }
     var highlightedId by remember { mutableStateOf<String?>(null) }
     var fullDiff by remember { mutableStateOf<AcpToolContent.Diff?>(null) }
     var input by rememberSaveable(viewModel.sessionId, stateSaver = TextFieldValue.Saver) {
         mutableStateOf(TextFieldValue(""))
     }
-    var inputHalfExpanded by remember { mutableStateOf(false) }
     var inputFullscreen by remember { mutableStateOf(false) }
     var contextWarningDismissed by remember(viewModel.sessionId) { mutableStateOf(false) }
     val listState = rememberLazyListState()
@@ -225,17 +224,9 @@ internal fun AcpPanel(
     }
 
     // 软键盘弹出时把面板顶到键盘上方并临时展开，否则浮层会被输入法盖住。
-    // 切换模型/模式会短暂丢焦点导致 IME 隐藏；菜单打开期间冻结布局，
-    // 关闭后再等一个防抖窗口，避免面板在两种尺寸之间来回弹。
     val density = LocalDensity.current
     val imeVisible = WindowInsets.ime.getBottom(density) > 0
-    var imeExpanded by remember { mutableStateOf(false) }
-    LaunchedEffect(imeVisible, configMenuOpen) {
-        if (configMenuOpen) return@LaunchedEffect
-        delay(260)
-        imeExpanded = imeVisible
-    }
-    val expanded = state.isMaximized || imeExpanded
+    val expanded = state.isMaximized || imeVisible
     val localContext = androidx.compose.ui.platform.LocalContext.current
 
     LaunchedEffect(state.panelWidth, state.panelHeight, state.dockSide, state.fabSide, state.fabYFraction) {
@@ -307,6 +298,7 @@ internal fun AcpPanel(
                 tonalElevation = 3.dp,
                 shadowElevation = 10.dp
             ) {
+                Box(modifier = Modifier.fillMaxSize()) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     AcpHeader(
                         viewModel = viewModel,
@@ -319,7 +311,6 @@ internal fun AcpPanel(
                             showSettings = true
                         },
                         onOpenSkills = { showSkills = true },
-                        onOpenTasks = { showTasks = true },
                         onOpenMcp = { showMcp = true },
                         onHide = onHide
                     )
@@ -481,7 +472,8 @@ internal fun AcpPanel(
                     )
                     AcpComposerToolbar(
                         viewModel = viewModel,
-                        onConfigMenuOpenChange = { configMenuOpen = it }
+                        onOpenModel = { configMenu = AcpConfigMenu.MODEL },
+                        onOpenMode = { configMenu = AcpConfigMenu.MODE }
                     )
 
                     AcpComposer(
@@ -491,9 +483,8 @@ internal fun AcpPanel(
                         connected = viewModel.connectionState == AcpConnectionState.READY,
                         readOnlyReplay = viewModel.isReadOnlyReplay,
                         commands = viewModel.availableCommands,
-                        isHalfExpanded = inputHalfExpanded,
-                        onToggleHalf = { inputHalfExpanded = !inputHalfExpanded },
                         onFullscreen = { inputFullscreen = true },
+                        onOpenTasks = { showTasks = true },
                         onSend = {
                             val text = input.text
                             input = TextFieldValue("")
@@ -502,6 +493,14 @@ internal fun AcpPanel(
                         onCancel = { viewModel.cancel() }
                     )
                 }
+                configMenu?.let { menu ->
+                    AcpConfigOverlay(
+                        viewModel = viewModel,
+                        menu = menu,
+                        onDismiss = { configMenu = null }
+                    )
+                }
+            }
             }
         }
 
@@ -689,7 +688,6 @@ private fun AcpHeader(
     onOpenSearch: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSkills: () -> Unit,
-    onOpenTasks: () -> Unit,
     onOpenMcp: () -> Unit,
     onHide: () -> Unit
 ) {
@@ -796,14 +794,6 @@ private fun AcpHeader(
                         )
                     }
                 }
-            }
-            IconButton(onClick = onOpenTasks, modifier = Modifier.size(30.dp)) {
-                Icon(
-                    Icons.AutoMirrored.Filled.List,
-                    contentDescription = stringResource(R.string.acp_tasks_title),
-                    modifier = Modifier.size(17.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
             IconButton(onClick = onOpenSearch, modifier = Modifier.size(30.dp)) {
                 Icon(
