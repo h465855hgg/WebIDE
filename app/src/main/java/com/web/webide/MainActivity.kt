@@ -49,6 +49,18 @@ import com.web.webide.ui.welcome.WelcomeScreen
 
 class MainActivity : ComponentActivity() {
 
+    /**
+     * 在 Activity 的 base context 上直接应用应用内语言。
+     *
+     * 只在 Compose 里提供 LocalContext 不够：Dialog / ModalBottomSheet 会创建新的
+     * Window，窗口资源会回落到系统语言，于是英文模式下设置页、技能、MCP、会话
+     * 管理等弹层仍显示中文。这里让 Activity 本身的 resources 就是目标语言。
+     */
+    override fun attachBaseContext(newBase: android.content.Context) {
+        val option = AppLanguageManager.getSavedOption(newBase)
+        super.attachBaseContext(AppLanguageManager.createLocalizedContext(newBase, option))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         getExternalFilesDir("logs")

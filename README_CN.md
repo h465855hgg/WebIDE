@@ -1,6 +1,6 @@
 # WebIDE ![Stone Badge](https://stone.professorlee.work/api/stone/h465855hgg/WebIDE)
 
-![Version](https://img.shields.io/badge/version-0.4.0-blue?style=flat-square)
+![Version](https://img.shields.io/badge/version-0.4.1-blue?style=flat-square)
 [![Language](https://img.shields.io/badge/Language-Kotlin-blue?style=flat-square)](https://kotlinlang.org/)
 [![UI](https://img.shields.io/badge/UI-Jetpack_Compose-green?style=flat-square)](https://developer.android.com/jetpack/compose)
 [![License](https://img.shields.io/badge/License-GPLv3-orange?style=flat-square)](LICENSE)
@@ -59,6 +59,7 @@ com.web.webide
 *   **终端模拟器**: 内嵌 Alpine Linux 环境（基于 proot），提供终端、多会话管理以及 Ctrl/Alt/Shift/Fn 虚拟按键。
 *   **现代化 UI**: 100% 使用 Kotlin 和 Jetpack Compose 编写，支持动态主题。
 *   **Git 集成**: 内置 Git 版本控制，提供可视化提交历史图谱，支持克隆、提交、推送、拉取和分支管理。自动忽略敏感文件和构建产物。
+*   **AI 编程助手 (ACP)**: 内置 [Agent Client Protocol](https://agentclientprotocol.com) 客户端，可在编辑器内接入外部编码 Agent（Gemini CLI、Qwen Code、Claude Code、Codex、OpenCode、Cline、Crush 或自定义命令）。通过配置栏切换模型 / 模式 / 思考等级，内联查看执行计划、工具调用与 diff，并对文件写入和命令执行进行授权。详见 [docs/ACP.md](docs/ACP.md)。
 *   **国际化 (i18n)**: 字符串资源已抽离至独立的 `:i18n` 模块，当前内置中文与英文。新增语言只需放入 `values-<语言>/strings.xml`，欢迎社区贡献翻译。
 
 ## 构建

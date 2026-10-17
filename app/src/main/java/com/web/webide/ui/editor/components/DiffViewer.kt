@@ -188,7 +188,8 @@ data class AlignedDiffResult(
 fun DiffViewer(
     viewModel: EditorViewModel,
     state: DiffEditorState,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    readOnly: Boolean = false
 ) {
     // 异步计算差异
     // 使用 state 作为 key，确保切换文件时重置，但修改内容时不重置 (防止闪烁)
@@ -223,9 +224,9 @@ fun DiffViewer(
         } else {
             val data = diffData!!
             if (state.viewMode == DiffViewMode.UNIFIED) {
-                UnifiedDiffView(state, viewModel, data)
+                UnifiedDiffView(state, viewModel, data, readOnly)
             } else {
-                SplitDiffView(state, viewModel, data)
+                SplitDiffView(state, viewModel, data, readOnly)
             }
         }
     }
@@ -287,7 +288,8 @@ fun DiffToolbar(state: DiffEditorState, data: AlignedDiffResult?) {
 fun SplitDiffView(
     state: DiffEditorState,
     viewModel: EditorViewModel,
-    data: AlignedDiffResult
+    data: AlignedDiffResult,
+    readOnly: Boolean = false
 ) {
     // 保持 Synchronizer 实例
     val synchronizer = remember { ScrollSynchronizer() }
@@ -329,14 +331,14 @@ fun SplitDiffView(
                     highlights = data.rightHighlights,
                     fileName = state.file.name,
                     viewModel = viewModel,
-                    readOnly = false,
+                    readOnly = readOnly,
                     onEditorCreated = { 
                         rightEditorRef = it
                         state.activeDiffEditor = it
                     },
-                    onContentChanged = { newContent ->
+                    onContentChanged = if (readOnly) null else { { newContent ->
                         viewModel.updateDiffContent(state, newContent)
-                    }
+                    } }
                 )
             }
         }
@@ -362,14 +364,14 @@ fun SplitDiffView(
                     highlights = data.rightHighlights,
                     fileName = state.file.name,
                     viewModel = viewModel,
-                    readOnly = false,
+                    readOnly = readOnly,
                     onEditorCreated = { 
                         rightEditorRef = it
                         state.activeDiffEditor = it
                     },
-                    onContentChanged = { newContent ->
+                    onContentChanged = if (readOnly) null else { { newContent ->
                         viewModel.updateDiffContent(state, newContent)
-                    }
+                    } }
                 )
             }
         }
@@ -377,18 +379,23 @@ fun SplitDiffView(
 }
 
 @Composable
-fun UnifiedDiffView(state: DiffEditorState, viewModel: EditorViewModel, data: AlignedDiffResult) {
+fun UnifiedDiffView(
+    state: DiffEditorState,
+    viewModel: EditorViewModel,
+    data: AlignedDiffResult,
+    readOnly: Boolean = false
+) {
     Column(modifier = Modifier.fillMaxSize()) {
         DiffEditorInstance(
             content = data.rightContent,
             highlights = data.rightHighlights,
             fileName = state.file.name,
             viewModel = viewModel,
-            readOnly = false,
+            readOnly = readOnly,
             onEditorCreated = { state.activeDiffEditor = it },
-            onContentChanged = { newContent ->
+            onContentChanged = if (readOnly) null else { { newContent ->
                 viewModel.updateDiffContent(state, newContent)
-            }
+            } }
         )
     }
 }

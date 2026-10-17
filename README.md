@@ -1,6 +1,6 @@
 # WebIDE ![Stone Badge](https://stone.professorlee.work/api/stone/h465855hgg/WebIDE)
 
-![Version](https://img.shields.io/badge/version-0.4.0-blue?style=flat-square)
+![Version](https://img.shields.io/badge/version-0.4.1-blue?style=flat-square)
 [![Language](https://img.shields.io/badge/Language-Kotlin-blue?style=flat-square)](https://kotlinlang.org/)
 [![UI](https://img.shields.io/badge/UI-Jetpack_Compose-green?style=flat-square)](https://developer.android.com/jetpack/compose)
 [![License](https://img.shields.io/badge/License-GPLv3-orange?style=flat-square)](LICENSE)
@@ -59,6 +59,7 @@ com.web.webide
 *   **Terminal Emulator**: Embedded Alpine Linux environment (via proot) with a terminal, multi-session management, and virtual keys for Ctrl/Alt/Shift/Fn.
 *   **Modern UI**: Written 100% in Kotlin and Jetpack Compose, supporting dynamic themes.
 *   **Git Integration**: Built-in Git version control with a visual commit history graph, supporting Clone, Commit, Push, Pull, and Branch management. Automatically ignores sensitive files and build artifacts.
+*   **AI Coding Agent (ACP)**: Built-in [Agent Client Protocol](https://agentclientprotocol.com) client. Connect external coding agents (Gemini CLI, Qwen Code, Claude Code, Codex, OpenCode, Cline, Crush, or a custom command) right inside the editor. Switch model / mode / thought level from a config bar, review plans, tool calls and diffs inline, and approve file writes or commands. See [docs/ACP.md](docs/ACP.md).
 *   **Localization (i18n)**: Strings live in a dedicated `:i18n` module, currently shipping Chinese and English. Adding a language only requires dropping a new `values-<locale>/strings.xml` — contributions are welcome.
 
 ## Building

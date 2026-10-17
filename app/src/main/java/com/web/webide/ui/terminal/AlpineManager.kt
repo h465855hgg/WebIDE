@@ -42,12 +42,19 @@ object AlpineManager {
 
     /**
      * 构建 Proot 命令列表
-     * 用于启动 LSP 后台进程 (ProotStreamConnectionProvider)
+     * 用于启动 LSP 后台进程 (ProotStreamConnectionProvider) 与 ACP Agent 子进程
      *
      * @param context 安卓上下文
      * @param command 要在 Alpine 内部执行的命令数组，例如 ["vscode-html-language-server", "--stdio"]
+     * @param workDir 容器内的工作目录（绝对路径，必须已存在）；默认 /root
+     * @param extraEnv 追加到 `env -i` 之后的环境变量（如 ACP terminal/create 传入的 env）
      */
-    fun buildProotCommand(context: Context, command: Array<String>): List<String> {
+    fun buildProotCommand(
+        context: Context,
+        command: Array<String>,
+        workDir: String = "/root",
+        extraEnv: Map<String, String> = emptyMap()
+    ): List<String> {
         val prefixDir = getPrefixDir(context)
         val alpineDir = File(prefixDir, "local/alpine")
 
@@ -99,7 +106,7 @@ object AlpineManager {
         args.add(alpineDir.absolutePath)
 
         args.add("-w")
-        args.add("/root")
+        args.add(workDir)
 
         args.add("/usr/bin/env")
         args.add("-i")
@@ -113,6 +120,9 @@ object AlpineManager {
         args.add("LANG=C.UTF-8")
         args.add("TERM=xterm-256color")
         args.add("TMPDIR=/tmp")
+
+        // ACP terminal/create 等场景传入的额外环境变量
+        extraEnv.forEach { (key, value) -> args.add("$key=$value") }
 
 
 

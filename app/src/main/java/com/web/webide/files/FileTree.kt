@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.web.webide.R
+import com.web.webide.core.utils.FileChangeBus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -183,6 +184,7 @@ private fun FileTreeImpl(
     var showInstallApkDialog by remember { mutableStateOf<File?>(null) }
     var rootFiles by remember { mutableStateOf<List<FileNode>>(emptyList()) }
     val scope = rememberCoroutineScope()
+    var externalRefreshTrigger by remember { mutableLongStateOf(0L) }
     
     // Sort logic
     fun sortFiles(files: List<File>): List<File> {
@@ -366,6 +368,16 @@ private fun FileTreeImpl(
         }
     }
 
+    // 外部文件变更（ACP Agent / 终端等直接改磁盘）：统一转换为刷新触发器，
+    // 根目录与所有已展开目录都会重新计算。
+    LaunchedEffect(Unit) {
+        FileChangeBus.events.collect { paths ->
+            if (paths.any { path -> rootPaths.any { root -> path.startsWith(root + File.separator) || path == root } }) {
+                externalRefreshTrigger += 1
+            }
+        }
+    }
+
     val sheetState = rememberModalBottomSheetState()
     var showBottomSheet by remember { mutableStateOf(false) }
     var selectedFileNode by remember { mutableStateOf<FileNode?>(null) }
@@ -397,7 +409,7 @@ private fun FileTreeImpl(
     }
 
     // Initial load & Refresh
-    LaunchedEffect(rootPaths, refreshTrigger) {
+    LaunchedEffect(rootPaths, refreshTrigger, externalRefreshTrigger) {
         withContext(Dispatchers.IO) {
             val nodes = rootPaths.mapNotNull { path ->
                 val file = File(path)
@@ -439,7 +451,7 @@ private fun FileTreeImpl(
                     selectedPath = treeSelection,
                     config = config,
                     fileSorter = fileSorter,
-                    refreshTrigger = refreshTrigger,
+                    refreshTrigger = refreshTrigger + externalRefreshTrigger,
                     depth = 0,
                     expandedNodes = expandedNodes,
                     minWidth = minItemWidth,

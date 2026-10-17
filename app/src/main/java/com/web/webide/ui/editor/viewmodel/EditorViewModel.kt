@@ -25,6 +25,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import com.web.webide.core.utils.FileChangeBus
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -621,6 +622,74 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             
             failCount == 0
         }
+    }
+
+    // ------------------------------------------------------------------
+    // 外部文件变更同步（ACP Agent / 终端等直接改磁盘后）
+    // ------------------------------------------------------------------
+
+    /**
+     * 处理外部进程造成的文件/目录变更：
+     *
+     * - **文件**：若已作为代码标签打开且**未修改**，从磁盘重载内容（含实时编辑器视图）；
+     *   已修改的标签保留用户编辑，不覆盖。
+     * - **目录**：该目录下已被删除的已打开文件标签自动关闭。
+     *
+     * 这样 ACP Agent 写完文件后，用户无需关闭再重开标签即可看到最新内容。
+     */
+    fun handleExternalChange(paths: Set<String>) {
+        if (paths.isEmpty()) return
+        val normalized = paths.map { File(it).absolutePath }.toSet()
+        viewModelScope.launch {
+            // 1. 目录变更：清理已被删除的标签
+            val missing = openFiles.filter { tab ->
+                val p = tab.file.absolutePath
+                val inTouchedDir = normalized.any { dir -> p == dir || p.startsWith(dir + File.separator) }
+                inTouchedDir && !tab.file.exists()
+            }
+            missing.forEach { tab ->
+                val index = openFiles.indexOf(tab)
+                if (index >= 0) closeFile(index)
+            }
+
+            // 2. 文件变更：未修改的标签从磁盘重载（已修改的保留用户编辑）
+            val candidates = openFiles.filterIsInstance<CodeEditorState>().filter { state ->
+                state.file.absolutePath in normalized && state.file.isFile && !state.isModified
+            }
+            val freshContents = withContext(Dispatchers.IO) {
+                candidates.associateWith { state ->
+                    try { state.file.readText() } catch (_: Exception) { null }
+                }
+            }
+            val reloaded = mutableListOf<CodeEditorState>()
+            candidates.forEach { state ->
+                val fresh = freshContents[state] ?: return@forEach
+                if (fresh != state.savedContent) {
+                    state.onContentLoaded(fresh)
+                    reloaded += state
+                }
+            }
+
+            // 3. 刷新实时编辑器视图（保留光标位置）
+            reloaded.forEach { state ->
+                val editor = editorInstances[state.file.absolutePath] ?: return@forEach
+                if (editor.text.toString() != state.content) {
+                    val line = editor.cursor.leftLine
+                    val column = editor.cursor.leftColumn
+                    editor.setText(state.content)
+                    try {
+                        if (line < editor.text.lineCount) {
+                            editor.setSelection(line, column.coerceAtMost(editor.text.getColumnCount(line)))
+                        }
+                    } catch (_: Exception) {}
+                }
+            }
+        }
+    }
+    /** 打开文件并跳转到指定行（供 Agent 工具调用 / 位置跳转使用）。 */
+    fun openFileAt(file: File, line: Int?) {
+        openFile(file)
+        if (line != null && line > 0) jumpToLine(line.toString())
     }
 
     fun closeFile(indexToClose: Int) {
