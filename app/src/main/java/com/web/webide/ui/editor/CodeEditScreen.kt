@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -129,6 +130,12 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
         val editorPrefs =
             context.getSharedPreferences("WebIDE_Editor_Settings", Context.MODE_PRIVATE)
         mutableStateOf(editorPrefs.getBoolean("editor_ai_enabled", false))
+    }
+    // 面板可见性是「本次编辑会话」的 UI 状态，不再和设置开关共用同一个持久化值：
+    // 设置开关只决定「AI 功能是否启用」，面板永远默认收起，由用户显式打开。
+    var isAcpPanelVisible by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(isAiEnabled) {
+        if (!isAiEnabled) isAcpPanelVisible = false
     }
     val lifecycleOwner = LocalLifecycleOwner.current
     // 2. 监听生命周期：当从设置页返回时，重新读取 SharedPreferences
@@ -567,21 +574,17 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                                 navController.safeNavigate("js_interface_doc")
                                             }
                                         )
-                                        // ACP 助手开关：就地切换，不必跳到设置页
-                                        DropdownMenuItem(
-                                            text = { Text(if (isAiEnabled) acpHideText else acpShowText) },
-                                            onClick = {
-                                                val next = !isAiEnabled
-                                                isAiEnabled = next
-                                                context.getSharedPreferences(
-                                                    "WebIDE_Editor_Settings",
-                                                    Context.MODE_PRIVATE
-                                                ).edit()
-                                                    .putBoolean("editor_ai_enabled", next)
-                                                    .apply()
-                                                isMoreMenuExpanded = false
-                                            }
-                                        )
+                                        // ACP 助手显隐：只在设置里启用了 AI 功能时才显示入口；
+                                        // 打开/关闭只影响本次 UI，不再写回设置开关。
+                                        if (isAiEnabled) {
+                                            DropdownMenuItem(
+                                                text = { Text(if (isAcpPanelVisible) acpHideText else acpShowText) },
+                                                onClick = {
+                                                    isAcpPanelVisible = !isAcpPanelVisible
+                                                    isMoreMenuExpanded = false
+                                                }
+                                            )
+                                        }
 
                                         // 只有文件存在且路径属于当前项目(可选逻辑)时才显示
                                         if (viewModel.lastBuiltApk != null && viewModel.lastBuiltApk!!.exists()) {
@@ -781,15 +784,10 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                         // Removed duplicate button from here
 
 
-                        if (isAiEnabled) {
+                        if (isAiEnabled && isAcpPanelVisible) {
                             AcpPanel(
-                                onHide = {
-                                    isAiEnabled = false
-                                    context.getSharedPreferences("WebIDE_Editor_Settings", Context.MODE_PRIVATE)
-                                        .edit()
-                                        .putBoolean("editor_ai_enabled", false)
-                                        .apply()
-                                }
+                                onHide = { isAcpPanelVisible = false },
+                                editorViewModel = viewModel
                             )
                         }
                     }

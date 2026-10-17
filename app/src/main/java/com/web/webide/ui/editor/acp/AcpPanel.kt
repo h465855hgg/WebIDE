@@ -19,6 +19,10 @@ package com.web.webide.ui.editor.acp
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -32,6 +36,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,14 +44,18 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -56,11 +65,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.automirrored.filled.CallSplit
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.CloseFullscreen
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -109,17 +120,27 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -127,6 +148,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.web.webide.R
+import com.web.webide.ui.editor.viewmodel.EditorViewModel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import java.io.File
 
 /**
  * ACP 面板：替代原先的 AI 聊天面板，改为驱动外部 ACP Agent
@@ -136,20 +161,60 @@ import com.web.webide.R
 @Composable
 internal fun AcpPanel(
     onHide: () -> Unit,
+    editorViewModel: EditorViewModel? = null,
     state: AcpPanelState = rememberAcpPanelState(),
     viewModel: AcpViewModel = viewModel()
 ) {
     var showSettings by remember { mutableStateOf(false) }
-    var showConfigSheet by remember { mutableStateOf(false) }
+    var settingsTab by remember { mutableIntStateOf(0) }
     var showSessions by remember { mutableStateOf(false) }
-    var configTargetId by remember { mutableStateOf<String?>(null) }
-    var input by remember { mutableStateOf("") }
+    var showStats by remember { mutableStateOf(false) }
+    var showSkills by remember { mutableStateOf(false) }
+    var showTasks by remember { mutableStateOf(false) }
+    var showMcp by remember { mutableStateOf(false) }
+    var showSearch by remember { mutableStateOf(false) }
+    var configMenuOpen by remember { mutableStateOf(false) }
+    var highlightedId by remember { mutableStateOf<String?>(null) }
+    var fullDiff by remember { mutableStateOf<AcpToolContent.Diff?>(null) }
+    var input by rememberSaveable(viewModel.sessionId, stateSaver = TextFieldValue.Saver) {
+        mutableStateOf(TextFieldValue(""))
+    }
+    var inputHalfExpanded by remember { mutableStateOf(false) }
+    var inputFullscreen by remember { mutableStateOf(false) }
+    var contextWarningDismissed by remember(viewModel.sessionId) { mutableStateOf(false) }
     val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+
+    // 最后一条用户消息之后还没有 Agent 产出时，允许「重试」
+    val retryableUserId = remember(viewModel.timeline.size, viewModel.timeline.lastOrNull()?.id) {
+        val lastUserIndex = viewModel.timeline.indexOfLast { it is AcpUserMessage }
+        if (lastUserIndex >= 0 &&
+            viewModel.timeline.drop(lastUserIndex + 1)
+                .none { it is AcpAgentMessage || it is AcpToolCallItem }
+        ) {
+            viewModel.timeline[lastUserIndex].id
+        } else {
+            null
+        }
+    }
+    val canStartNewSession = viewModel.connectionState == AcpConnectionState.READY &&
+        !viewModel.isPrompting
+
+    LaunchedEffect(Unit) {
+        viewModel.ensureWorkspaceLoaded()
+    }
 
     LaunchedEffect(viewModel.timeline.size, viewModel.isPrompting) {
         if (viewModel.timeline.isNotEmpty()) {
             listState.animateScrollToItem(viewModel.timeline.lastIndex)
         }
+    }
+
+    // 搜索跳转后高亮 2.4 秒，帮助定位
+    LaunchedEffect(highlightedId) {
+        val target = highlightedId ?: return@LaunchedEffect
+        delay(2_400)
+        if (highlightedId == target) highlightedId = null
     }
 
     // 连上后拉一次会话列表；切换/新建/分叉后也会刷新。
@@ -159,10 +224,29 @@ internal fun AcpPanel(
         }
     }
 
+    // 软键盘弹出时把面板顶到键盘上方并临时展开，否则浮层会被输入法盖住。
+    // 切换模型/模式会短暂丢焦点导致 IME 隐藏；菜单打开期间冻结布局，
+    // 关闭后再等一个防抖窗口，避免面板在两种尺寸之间来回弹。
+    val density = LocalDensity.current
+    val imeVisible = WindowInsets.ime.getBottom(density) > 0
+    var imeExpanded by remember { mutableStateOf(false) }
+    LaunchedEffect(imeVisible, configMenuOpen) {
+        if (configMenuOpen) return@LaunchedEffect
+        delay(260)
+        imeExpanded = imeVisible
+    }
+    val expanded = state.isMaximized || imeExpanded
+    val localContext = androidx.compose.ui.platform.LocalContext.current
+
+    LaunchedEffect(state.panelWidth, state.panelHeight, state.dockSide, state.fabSide, state.fabYFraction) {
+        state.persist(localContext)
+    }
+
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .zIndex(100f),
+            .zIndex(100f)
+            .imePadding(),
         contentAlignment = if (state.dockSide == AcpDockSide.RIGHT) {
             Alignment.BottomEnd
         } else {
@@ -175,35 +259,42 @@ internal fun AcpPanel(
         // 边距 / 尺寸 / 圆角统一走动画，避免最大化时生硬跳变
         val resizeSpec: AnimationSpec<Dp> = tween(durationMillis = 260, easing = FastOutSlowInEasing)
         val margin by animateDpAsState(
-            targetValue = if (state.isMaximized) 0.dp else 10.dp,
+            targetValue = if (expanded) 0.dp else 10.dp,
             animationSpec = resizeSpec,
             label = "acpMargin"
         )
         val panelW by animateDpAsState(
-            targetValue = if (state.isMaximized) availableWidth else state.panelWidth,
+            targetValue = if (expanded) availableWidth else state.panelWidth.coerceAtMost(availableWidth - 20.dp),
             animationSpec = resizeSpec,
             label = "acpWidth"
         )
         val panelH by animateDpAsState(
-            targetValue = if (state.isMaximized) availableHeight else state.panelHeight,
+            targetValue = if (expanded) availableHeight else state.panelHeight.coerceAtMost(availableHeight - 20.dp),
             animationSpec = resizeSpec,
             label = "acpHeight"
         )
         val corner by animateDpAsState(
-            targetValue = if (state.isMaximized) 0.dp else 14.dp,
+            targetValue = if (expanded) 0.dp else 16.dp,
             animationSpec = resizeSpec,
             label = "acpCorner"
         )
 
+        val fabOrigin = TransformOrigin(
+            if (state.fabSide == AcpDockSide.RIGHT) 1f else 0f,
+            state.fabYFraction.coerceIn(0.08f, 0.92f)
+        )
+
         AnimatedVisibility(
             visible = !state.isCollapsed,
-            enter = fadeIn(tween(160)) + scaleIn(
-                initialScale = 0.9f,
-                animationSpec = tween(240, easing = FastOutSlowInEasing)
+            enter = fadeIn(tween(140)) + scaleIn(
+                initialScale = 0.5f,
+                transformOrigin = fabOrigin,
+                animationSpec = tween(260, easing = FastOutSlowInEasing)
             ),
-            exit = fadeOut(tween(120)) + scaleOut(
-                targetScale = 0.9f,
-                animationSpec = tween(180, easing = FastOutSlowInEasing)
+            exit = fadeOut(tween(140)) + scaleOut(
+                targetScale = 0.55f,
+                transformOrigin = fabOrigin,
+                animationSpec = tween(200, easing = FastOutSlowInEasing)
             )
         ) {
             Surface(
@@ -220,40 +311,133 @@ internal fun AcpPanel(
                     AcpHeader(
                         viewModel = viewModel,
                         state = state,
-                        onOpenSettings = { showSettings = true },
+                        onNewSession = { viewModel.newSession() },
                         onOpenSessions = { showSessions = true },
+                        onOpenSearch = { showSearch = true },
+                        onOpenSettings = {
+                            settingsTab = 0
+                            showSettings = true
+                        },
+                        onOpenSkills = { showSkills = true },
+                        onOpenTasks = { showTasks = true },
+                        onOpenMcp = { showMcp = true },
                         onHide = onHide
                     )
-                    HorizontalDivider()
-                    AcpStatusRow(viewModel)
-                    AcpConfigBar(
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+                    AcpTopStatusBar(
                         viewModel = viewModel,
-                        onOpenConfig = { id ->
-                            configTargetId = id
-                            showConfigSheet = true
+                        onOpenStats = { showStats = true },
+                        onOpenPermissions = {
+                            settingsTab = 1
+                            showSettings = true
                         }
                     )
+                    if (viewModel.connectionState != AcpConnectionState.READY || viewModel.statusMessage != null) {
+                        AcpStatusRow(viewModel)
+                    }
+                    if (viewModel.isReadOnlyReplay) {
+                        AcpReplayBanner(
+                            onResume = { viewModel.resumeLocalSession() },
+                            onNewSession = { viewModel.newSession() },
+                            canResume = viewModel.connectionState == AcpConnectionState.READY
+                        )
+                    }
 
                     AcpUndoBanner(viewModel)
                     Box(modifier = Modifier.weight(1f)) {
                         if (viewModel.timeline.isEmpty()) {
-                            Text(
-                                text = stringResource(R.string.acp_empty_hint),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier
-                                    .align(Alignment.Center)
-                                    .padding(horizontal = 24.dp)
+                            AcpEmptyState(
+                                enabled = viewModel.connectionState == AcpConnectionState.READY,
+                                onSuggestion = { text ->
+                                    input = TextFieldValue(text)
+                                }
                             )
                         } else {
                             LazyColumn(
                                 state = listState,
                                 modifier = Modifier.fillMaxSize(),
-                                contentPadding = androidx.compose.foundation.layout.PaddingValues(10.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                    start = 12.dp,
+                                    end = 12.dp,
+                                    top = 12.dp,
+                                    bottom = 12.dp
+                                ),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 items(viewModel.timeline, key = { it.id }) { item ->
-                                    AcpTimelineRow(item)
+                                    val highlighted = item.id == highlightedId
+                                    val turnTop = when (item) {
+                                        is AcpUserMessage -> 10.dp
+                                        is AcpAgentMessage -> 8.dp
+                                        else -> 0.dp
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = turnTop)
+                                            .then(
+                                                if (highlighted) {
+                                                    Modifier
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .background(
+                                                            MaterialTheme.colorScheme.primaryContainer
+                                                                .copy(alpha = 0.28f)
+                                                        )
+                                                        .padding(4.dp)
+                                                } else {
+                                                    Modifier
+                                                }
+                                            )
+                                    ) {
+                                        AcpTimelineRow(
+                                            item = item,
+                                            retryableUserId = retryableUserId,
+                                            canStartNewSession = canStartNewSession,
+                                            onRetry = { viewModel.retryLastTurn() },
+                                            onNewSessionFrom = { viewModel.startNewSessionWithText(it) },
+                                            onOpenDiff = { fullDiff = it },
+                                            onOpenFile = { path, line ->
+                                                editorViewModel?.openFileAt(File(path), line)
+                                                state.isCollapsed = true
+                                            }
+                                        )
+                                    }
+                                }
+                                if (viewModel.isPrompting) {
+                                    item(key = "acp-running") {
+                                        AcpRunningRow()
+                                    }
+                                }
+                            }
+
+                            if (listState.canScrollForward) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    shadowElevation = 4.dp,
+                                    modifier = Modifier
+                                        .align(Alignment.BottomEnd)
+                                        .padding(10.dp)
+                                        .size(34.dp)
+                                        .clip(CircleShape)
+                                        .clickable {
+                                            scope.launch {
+                                                if (viewModel.timeline.isNotEmpty()) {
+                                                    listState.animateScrollToItem(viewModel.timeline.lastIndex)
+                                                }
+                                            }
+                                        }
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            Icons.Default.KeyboardArrowDown,
+                                            contentDescription = stringResource(R.string.acp_action_scroll_bottom),
+                                            modifier = Modifier.size(18.dp),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -262,19 +446,57 @@ internal fun AcpPanel(
                     viewModel.permissionPrompt?.let { prompt ->
                         AcpPermissionCard(
                             prompt = prompt,
-                            onSelect = { viewModel.respondPermission(it) }
+                            approvalMode = viewModel.permissions.mode,
+                            onSelect = { viewModel.respondPermission(it) },
+                            onRememberAllow = {
+                                viewModel.rememberPermission(prompt.kind, allow = true)
+                                prompt.options.firstOrNull { it.kind.startsWith("allow_") }
+                                    ?.let { viewModel.respondPermission(it.optionId) }
+                            },
+                            onRememberDeny = {
+                                viewModel.rememberPermission(prompt.kind, allow = false)
+                                prompt.options.firstOrNull { it.kind.startsWith("reject_") }
+                                    ?.let { viewModel.respondPermission(it.optionId) }
+                                    ?: viewModel.respondPermission(null)
+                            }
                         )
                     }
 
-                    AcpInputBar(
+                    if (!contextWarningDismissed &&
+                        viewModel.usage.contextFraction >= 0.85f &&
+                        viewModel.timeline.isNotEmpty()
+                    ) {
+                        AcpContextWarning(
+                            percent = (viewModel.usage.contextFraction * 100).toInt(),
+                            onNewSession = {
+                                contextWarningDismissed = true
+                                viewModel.newSession()
+                            },
+                            onDismiss = { contextWarningDismissed = true }
+                        )
+                    }
+
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+                    )
+                    AcpComposerToolbar(
+                        viewModel = viewModel,
+                        onConfigMenuOpenChange = { configMenuOpen = it }
+                    )
+
+                    AcpComposer(
                         value = input,
                         onValueChange = { input = it },
                         isPrompting = viewModel.isPrompting,
-                        enabled = viewModel.connectionState == AcpConnectionState.READY,
+                        connected = viewModel.connectionState == AcpConnectionState.READY,
+                        readOnlyReplay = viewModel.isReadOnlyReplay,
                         commands = viewModel.availableCommands,
+                        isHalfExpanded = inputHalfExpanded,
+                        onToggleHalf = { inputHalfExpanded = !inputHalfExpanded },
+                        onFullscreen = { inputFullscreen = true },
                         onSend = {
-                            val text = input
-                            input = ""
+                            val text = input.text
+                            input = TextFieldValue("")
                             viewModel.sendPrompt(text)
                         },
                         onCancel = { viewModel.cancel() }
@@ -285,45 +507,114 @@ internal fun AcpPanel(
 
         AnimatedVisibility(
             visible = state.isCollapsed,
-            enter = fadeIn(tween(160)) + scaleIn(
-                initialScale = 0.5f,
+            enter = fadeIn(tween(120)) + scaleIn(
+                initialScale = 0.4f,
                 animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy)
             ),
-            exit = fadeOut(tween(110)) + scaleOut(
-                targetScale = 0.5f,
-                animationSpec = tween(150, easing = FastOutSlowInEasing)
+            exit = fadeOut(tween(120)) + scaleOut(
+                targetScale = 0.4f,
+                animationSpec = tween(140, easing = FastOutSlowInEasing)
             )
         ) {
-            AcpCollapsedBubble(
-                connectionState = viewModel.connectionState,
-                isPrompting = viewModel.isPrompting,
-                hasPendingPermission = viewModel.permissionPrompt != null,
-                onClick = { state.isCollapsed = false }
-            )
+            Box(modifier = Modifier.fillMaxSize()) {
+                AcpDraggableFab(
+                    containerWidth = availableWidth,
+                    containerHeight = availableHeight,
+                    side = state.fabSide,
+                    yFraction = state.fabYFraction,
+                    connectionState = viewModel.connectionState,
+                    isPrompting = viewModel.isPrompting,
+                    hasPendingPermission = viewModel.permissionPrompt != null,
+                    onSideChange = { state.fabSide = it },
+                    onYFractionChange = { state.fabYFraction = it },
+                    onClick = { state.isCollapsed = false }
+                )
+            }
         }
     }
 
     if (showSettings) {
-        AcpSettingsDialog(
+        AcpAgentSettingsDialog(
             viewModel = viewModel,
             state = state,
+            initialTab = settingsTab,
             onDismiss = { showSettings = false }
         )
     }
 
-    if (showConfigSheet) {
-        AcpConfigSheet(
-            viewModel = viewModel,
-            focusOptionId = configTargetId,
-            onDismiss = { showConfigSheet = false }
-        )
-    }
-
     if (showSessions) {
-        AcpSessionsSheet(
+        AcpHistorySheet(
             viewModel = viewModel,
             onDismiss = { showSessions = false }
         )
+    }
+
+    if (showStats) {
+        AcpStatsSheet(
+            viewModel = viewModel,
+            onDismiss = { showStats = false }
+        )
+    }
+
+    if (showSkills) {
+        AcpSkillsSheet(
+            viewModel = viewModel,
+            onDismiss = { showSkills = false }
+        )
+    }
+
+    if (inputFullscreen) {
+        AcpFullscreenInputDialog(
+            initial = input,
+            isPrompting = viewModel.isPrompting,
+            onDismiss = { value ->
+                input = value
+                inputFullscreen = false
+            },
+            onSend = { text ->
+                input = TextFieldValue("")
+                inputFullscreen = false
+                viewModel.sendPrompt(text)
+            }
+        )
+    }
+
+    if (showTasks) {
+        AcpTasksSheet(
+            viewModel = viewModel,
+            onDismiss = { showTasks = false }
+        )
+    }
+
+    if (showMcp) {
+        AcpMcpSheet(
+            viewModel = viewModel,
+            onDismiss = { showMcp = false }
+        )
+    }
+
+    if (showSearch) {
+        AcpConversationSearchSheet(
+            viewModel = viewModel,
+            onJumpTo = { index ->
+                showSearch = false
+                viewModel.timeline.getOrNull(index)?.let { target ->
+                    highlightedId = target.id
+                    scope.launch { listState.animateScrollToItem(index) }
+                }
+            },
+            onDismiss = { showSearch = false }
+        )
+    }
+
+    fullDiff?.let { diff ->
+        if (editorViewModel != null) {
+            AcpDiffDialog(
+                diff = diff,
+                editorViewModel = editorViewModel,
+                onDismiss = { fullDiff = null }
+            )
+        }
     }
 }
 
@@ -393,88 +684,198 @@ private fun AcpCollapsedBubble(
 private fun AcpHeader(
     viewModel: AcpViewModel,
     state: AcpPanelState,
-    onOpenSettings: () -> Unit,
+    onNewSession: () -> Unit,
     onOpenSessions: () -> Unit,
+    onOpenSearch: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenSkills: () -> Unit,
+    onOpenTasks: () -> Unit,
+    onOpenMcp: () -> Unit,
     onHide: () -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        StatusDot(viewModel.connectionState)
-        Spacer(Modifier.width(8.dp))
-        Column(modifier = Modifier.weight(1f)) {
+    var menu by remember { mutableStateOf(false) }
+    val name = viewModel.agentInfo ?: viewModel.preset.displayName
+    val statusText = when (viewModel.connectionState) {
+        AcpConnectionState.READY -> stringResource(R.string.acp_state_ready)
+        AcpConnectionState.CONNECTING -> stringResource(R.string.acp_state_connecting)
+        AcpConnectionState.ERROR -> stringResource(R.string.acp_state_error)
+        AcpConnectionState.DISCONNECTED -> stringResource(R.string.acp_state_disconnected)
+    }
+    val statusColor = when (viewModel.connectionState) {
+        AcpConnectionState.READY -> Color(0xFF2E7D32)
+        AcpConnectionState.ERROR -> Color(0xFFC62828)
+        AcpConnectionState.CONNECTING -> Color(0xFFF9A825)
+        AcpConnectionState.DISCONNECTED -> MaterialTheme.colorScheme.outline
+    }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        // 第一层：窗口管理
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 12.dp, end = 2.dp, top = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Text(
-                text = stringResource(R.string.acp_panel_title),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = viewModel.agentInfo ?: viewModel.preset.displayName,
+                text = "ACP",
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-        }
-        if (viewModel.isPrompting) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(16.dp),
-                strokeWidth = 2.dp
-            )
-            Spacer(Modifier.width(6.dp))
-        }
-        if (viewModel.supportsSessionList) {
+            Spacer(Modifier.weight(1f))
             IconButton(
-                onClick = onOpenSessions,
-                modifier = Modifier.size(32.dp)
+                onClick = { state.isMaximized = !state.isMaximized },
+                modifier = Modifier.size(28.dp)
             ) {
                 Icon(
-                    Icons.Default.History,
-                    contentDescription = stringResource(R.string.acp_action_sessions),
-                    tint = if (viewModel.isPrompting) {
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    }
+                    if (state.isMaximized) Icons.Default.CloseFullscreen else Icons.Default.OpenInFull,
+                    contentDescription = stringResource(
+                        if (state.isMaximized) R.string.acp_restore else R.string.acp_maximize
+                    ),
+                    modifier = Modifier.size(15.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            IconButton(
+                onClick = { state.isCollapsed = true },
+                modifier = Modifier.size(28.dp)
+            ) {
+                Icon(
+                    Icons.Default.Minimize,
+                    contentDescription = stringResource(R.string.acp_action_minimize),
+                    modifier = Modifier.size(15.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            IconButton(
+                onClick = onHide,
+                modifier = Modifier.size(28.dp)
+            ) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = stringResource(R.string.acp_action_hide),
+                    modifier = Modifier.size(15.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
-        IconButton(onClick = onOpenSettings, modifier = Modifier.size(32.dp)) {
-            Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.acp_settings_title))
-        }
-        IconButton(
-            onClick = { state.isMaximized = !state.isMaximized },
-            modifier = Modifier.size(32.dp)
+
+        // 第二层：会话管理
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 12.dp, end = 2.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                if (state.isMaximized) Icons.Default.CloseFullscreen else Icons.Default.OpenInFull,
-                contentDescription = stringResource(
-                    if (state.isMaximized) R.string.acp_restore else R.string.acp_maximize
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = name,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
-            )
-        }
-        IconButton(
-            onClick = { state.isCollapsed = true },
-            modifier = Modifier.size(32.dp)
-        ) {
-            Icon(
-                Icons.Default.Minimize,
-                contentDescription = stringResource(R.string.acp_action_minimize)
-            )
-        }
-        IconButton(onClick = onHide, modifier = Modifier.size(32.dp)) {
-            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.acp_action_hide))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(statusColor)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = statusText,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
+                    )
+                    if (viewModel.isPrompting) {
+                        Spacer(Modifier.width(6.dp))
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(10.dp),
+                            strokeWidth = 1.5.dp
+                        )
+                    }
+                }
+            }
+            IconButton(onClick = onOpenTasks, modifier = Modifier.size(30.dp)) {
+                Icon(
+                    Icons.AutoMirrored.Filled.List,
+                    contentDescription = stringResource(R.string.acp_tasks_title),
+                    modifier = Modifier.size(17.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            IconButton(onClick = onOpenSearch, modifier = Modifier.size(30.dp)) {
+                Icon(
+                    Icons.Default.Search,
+                    contentDescription = stringResource(R.string.acp_search_menu),
+                    modifier = Modifier.size(17.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            IconButton(onClick = onOpenSessions, modifier = Modifier.size(30.dp)) {
+                Icon(
+                    Icons.Default.History,
+                    contentDescription = stringResource(R.string.acp_action_sessions),
+                    modifier = Modifier.size(17.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            IconButton(
+                onClick = onNewSession,
+                enabled = viewModel.connectionState == AcpConnectionState.READY && !viewModel.isPrompting,
+                modifier = Modifier.size(30.dp)
+            ) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = stringResource(R.string.acp_action_new_session),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            Box {
+                IconButton(onClick = { menu = true }, modifier = Modifier.size(28.dp)) {
+                    Icon(
+                        Icons.Default.MoreVert,
+                        contentDescription = stringResource(R.string.acp_action_more),
+                        modifier = Modifier.size(17.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.acp_settings_title)) },
+                        leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                        onClick = {
+                            menu = false
+                            onOpenSettings()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.acp_skills_open)) },
+                        leadingIcon = { Icon(Icons.Default.Tune, contentDescription = null) },
+                        onClick = {
+                            menu = false
+                            onOpenSkills()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.acp_mcp_menu)) },
+                        leadingIcon = { Icon(Icons.Default.Terminal, contentDescription = null) },
+                        onClick = {
+                            menu = false
+                            onOpenMcp()
+                        }
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun StatusDot(state: AcpConnectionState) {
+private fun StatusDot
+
+(state: AcpConnectionState, modifier: Modifier = Modifier) {
     val color = when (state) {
         AcpConnectionState.READY -> MaterialTheme.colorScheme.primary
         AcpConnectionState.CONNECTING -> MaterialTheme.colorScheme.tertiary
@@ -482,11 +883,148 @@ private fun StatusDot(state: AcpConnectionState) {
         AcpConnectionState.DISCONNECTED -> MaterialTheme.colorScheme.outline
     }
     Box(
-        modifier = Modifier
-            .size(9.dp)
+        modifier = modifier
             .clip(CircleShape)
             .background(color)
     )
+}
+
+@Composable
+private fun AcpContextWarning(
+    percent: Int,
+    onNewSession: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.85f),
+        shape = RoundedCornerShape(10.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 10.dp, vertical = 4.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 10.dp, end = 2.dp, top = 2.dp, bottom = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Default.Warning,
+                contentDescription = null,
+                modifier = Modifier.size(15.dp),
+                tint = MaterialTheme.colorScheme.onErrorContainer
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = stringResource(R.string.acp_context_warning, percent),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.acp_action_dismiss), style = MaterialTheme.typography.labelSmall)
+            }
+            TextButton(onClick = onNewSession) {
+                Text(stringResource(R.string.acp_action_new_session), style = MaterialTheme.typography.labelSmall)
+            }
+        }
+    }
+}
+
+/** 本地回放提示：可以继续会话，或干脆开新的。 */@Composable
+private fun AcpReplayBanner(
+    onResume: () -> Unit,
+    onNewSession: () -> Unit,
+    canResume: Boolean
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
+        shape = RoundedCornerShape(10.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 10.dp, vertical = 4.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 10.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Default.Info,
+                contentDescription = null,
+                modifier = Modifier.size(15.dp),
+                tint = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = stringResource(R.string.acp_readonly_banner),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(onClick = onResume, enabled = canResume) {
+                Text(stringResource(R.string.acp_resume_session), style = MaterialTheme.typography.labelSmall)
+            }
+            TextButton(onClick = onNewSession, enabled = canResume) {
+                Text(stringResource(R.string.acp_action_new_session), style = MaterialTheme.typography.labelSmall)
+            }
+        }
+    }
+}
+
+/** 空状态：给出三个可直接试的任务，而不是一句干巴巴的提示。 */
+@Composable
+private fun AcpEmptyState(
+    enabled: Boolean,
+    onSuggestion: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 22.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primaryContainer,
+            modifier = Modifier.size(52.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    Icons.Default.SmartToy,
+                    contentDescription = null,
+                    modifier = Modifier.size(26.dp),
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+        Text(
+            text = stringResource(R.string.acp_empty_title),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Medium
+        )
+        Spacer(Modifier.height(18.dp))
+        listOf(
+            stringResource(R.string.acp_suggestion_read),
+            stringResource(R.string.acp_suggestion_fix),
+            stringResource(R.string.acp_suggestion_test)
+        ).forEach { suggestion ->
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier
+                    .padding(vertical = 3.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .clickable(enabled = enabled) { onSuggestion(suggestion) }
+            ) {
+                Text(
+                    text = suggestion,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -1137,152 +1675,378 @@ private fun formatSessionTime(raw: String?): String? {
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun AcpTimelineRow(item: AcpTimelineItem) {
+private fun AcpTimelineRow(
+    item: AcpTimelineItem,
+    retryableUserId: String?,
+    canStartNewSession: Boolean,
+    onRetry: () -> Unit,
+    onNewSessionFrom: (String) -> Unit,
+    onOpenDiff: (AcpToolContent.Diff) -> Unit,
+    onOpenFile: (String, Int?) -> Unit
+) {
     when (item) {
-        is AcpUserMessage -> AcpUserBubble(item)
+        is AcpUserMessage -> AcpUserBubble(
+            item = item,
+            canRetry = item.id == retryableUserId,
+            canStartNewSession = canStartNewSession,
+            onRetry = onRetry,
+            onNewSessionFrom = onNewSessionFrom
+        )
+
         is AcpAgentMessage -> AcpAgentBubble(item)
         is AcpThoughtMessage -> AcpThoughtBlock(item)
         is AcpNoticeMessage -> AcpNoticeRow(item)
         is AcpPlanItem -> AcpPlanCard(item)
-        is AcpToolCallItem -> AcpToolCallCard(item)
+        is AcpToolCallItem -> AcpToolCallCard(item, onOpenDiff, onOpenFile)
     }
 }
 
 @Composable
-private fun AcpUserBubble(item: AcpUserMessage) {
+private fun AcpRunningRow() {
+    val transition = rememberInfiniteTransition(label = "acp-running")
+    val alpha by transition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "acp-running-alpha"
+    )
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.End
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 32.dp, top = 6.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Surface(
-            color = MaterialTheme.colorScheme.primaryContainer,
-            shape = RoundedCornerShape(10.dp)
-        ) {
-            Text(
-                text = item.text,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
-            )
+        CircularProgressIndicator(
+            modifier = Modifier.size(12.dp),
+            strokeWidth = 1.5.dp,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = stringResource(R.string.acp_status_working),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.alpha(alpha)
+        )
+    }
+}
+
+@Composable
+private fun AcpUserBubble(
+    item: AcpUserMessage,
+    canRetry: Boolean,
+    canStartNewSession: Boolean,
+    onRetry: () -> Unit,
+    onNewSessionFrom: (String) -> Unit
+) {
+    val clipboard = LocalClipboardManager.current
+    var showMenu by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.End
+    ) {
+        Box {
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shape = RoundedCornerShape(18.dp),
+                modifier = Modifier
+                    .widthIn(max = 300.dp)
+                    .pointerInput(item.id) {
+                        detectTapGestures(onLongPress = { showMenu = true })
+                    }
+            ) {
+                Text(
+                    text = item.text,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                )
+            }
+            DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.acp_action_copy)) },
+                    onClick = {
+                        clipboard.setText(AnnotatedString(item.text))
+                        showMenu = false
+                    }
+                )
+                if (canRetry) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.acp_action_retry)) },
+                        onClick = {
+                            showMenu = false
+                            onRetry()
+                        }
+                    )
+                }
+                if (canStartNewSession) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.acp_action_new_session_from)) },
+                        onClick = {
+                            showMenu = false
+                            onNewSessionFrom(item.text)
+                        }
+                    )
+                }
+            }
         }
+        CopyIconButton(item.text)
+    }
+}
+
+@Composable
+private fun CopyIconButton(text: String) {
+    val clipboard = LocalClipboardManager.current
+    var copied by remember { mutableStateOf(false) }
+    LaunchedEffect(copied) {
+        if (copied) {
+            delay(1_200)
+            copied = false
+        }
+    }
+    IconButton(
+        onClick = {
+            clipboard.setText(AnnotatedString(text))
+            copied = true
+        },
+        modifier = Modifier.size(26.dp)
+    ) {
+        Icon(
+            imageVector = if (copied) Icons.Default.Check else Icons.Default.ContentCopy,
+            contentDescription = stringResource(R.string.acp_action_copy),
+            modifier = Modifier.size(14.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
 @Composable
 private fun AcpAgentBubble(item: AcpAgentMessage) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(10.dp),
-        modifier = Modifier.fillMaxWidth()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 2.dp)
     ) {
-        AcpMarkdownText(
-            text = item.text,
-            textColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
-        )
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            modifier = Modifier.size(24.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    Icons.Default.SmartToy,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Spacer(Modifier.width(8.dp))
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            shape = RoundedCornerShape(4.dp, 16.dp, 16.dp, 16.dp),
+            modifier = Modifier.weight(1f)
+        ) {
+            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                AcpRichText(text = item.text)
+                CopyIconButton(item.text)
+            }
+        }
     }
 }
 
 @Composable
 private fun AcpThoughtBlock(item: AcpThoughtMessage) {
     var expanded by remember { mutableStateOf(false) }
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-        shape = RoundedCornerShape(8.dp),
-        modifier = Modifier.fillMaxWidth()
+    val preview = remember(item.text) {
+        item.text.lineSequence()
+            .firstOrNull { it.isNotBlank() }
+            ?.trim()
+            ?.take(90)
+            .orEmpty()
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 32.dp)
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
                 .clickable { expanded = !expanded }
-                .padding(horizontal = 10.dp, vertical = 7.dp)
+                .padding(vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Default.Star,
-                    contentDescription = null,
-                    modifier = Modifier.size(13.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    text = stringResource(R.string.acp_thinking),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f)
-                )
-                Icon(
-                    if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                    contentDescription = null,
-                    modifier = Modifier.size(15.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            if (expanded) {
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = item.text,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f),
-                    lineHeight = 16.sp
-                )
-            }
+            Icon(
+                Icons.Default.Star,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.tertiary
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = stringResource(R.string.acp_thinking),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(Modifier.width(8.dp))
+            DotSeparator()
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = preview,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        if (expanded) {
+            Text(
+                text = item.text,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 19.sp,
+                modifier = Modifier.padding(start = 22.dp, top = 2.dp, bottom = 4.dp)
+            )
         }
     }
 }
 
 @Composable
 private fun AcpNoticeRow(item: AcpNoticeMessage) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            if (item.isError) Icons.Default.Warning else Icons.Default.Info,
-            contentDescription = null,
-            modifier = Modifier.size(13.dp),
-            tint = if (item.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.width(6.dp))
-        Text(
-            text = item.text,
-            style = MaterialTheme.typography.labelSmall,
-            color = if (item.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
-        )
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 32.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (item.isError) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.outline
+                        }
+                    )
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = item.text,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (item.isError) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
+        }
     }
 }
 
 @Composable
-private fun AcpPlanCard(item: AcpPlanItem) {
+private fun AcpPlanCard
+(item: AcpPlanItem) {
+    val done = item.entries.count { it.status == Acp.STATUS_COMPLETED }
+    val total = item.entries.size.coerceAtLeast(1)
     Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-        shape = RoundedCornerShape(8.dp),
-        modifier = Modifier.fillMaxWidth()
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 32.dp)
     ) {
-        Column(modifier = Modifier.padding(10.dp)) {
-            Text(
-                text = stringResource(R.string.acp_plan_title),
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Medium
-            )
-            Spacer(Modifier.height(4.dp))
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = stringResource(R.string.acp_plan_title),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = "$done/${item.entries.size}",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.height(6.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                if (done > 0) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(done.toFloat() / total)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(50))
+                            .background(MaterialTheme.colorScheme.primary)
+                    )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
             item.entries.forEach { entry ->
                 Row(
-                    modifier = Modifier.padding(vertical = 1.dp),
+                    modifier = Modifier.padding(vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = when (entry.status) {
-                            Acp.STATUS_COMPLETED -> "[x]"
-                            Acp.STATUS_IN_PROGRESS -> "[~]"
-                            else -> "[ ]"
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.width(6.dp))
+                    val completed = entry.status == Acp.STATUS_COMPLETED
+                    val inProgress = entry.status == Acp.STATUS_IN_PROGRESS
+                    Box(
+                        modifier = Modifier
+                            .size(14.dp)
+                            .clip(CircleShape)
+                            .background(
+                                when {
+                                    completed -> MaterialTheme.colorScheme.primary
+                                    inProgress -> MaterialTheme.colorScheme.tertiary
+                                    else -> MaterialTheme.colorScheme.surfaceContainerHighest
+                                }
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (completed) {
+                            Icon(
+                                Icons.Default.Check,
+                                contentDescription = null,
+                                modifier = Modifier.size(10.dp),
+                                tint = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
+                    }
+                    Spacer(Modifier.width(8.dp))
                     Text(
                         text = entry.content,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (completed) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        }
                     )
                 }
             }
@@ -1295,105 +2059,207 @@ private fun AcpPlanCard(item: AcpPlanItem) {
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun AcpToolCallCard(item: AcpToolCallItem) {
+private fun AcpToolCallCard(
+    item: AcpToolCallItem,
+    onOpenDiff: (AcpToolContent.Diff) -> Unit,
+    onOpenFile: (String, Int?) -> Unit
+) {
     var expanded by remember { mutableStateOf(false) }
     val hasDetail = item.contents.isNotEmpty() ||
         item.locations.isNotEmpty() ||
         !item.rawInput.isNullOrBlank() ||
         !item.rawOutput.isNullOrBlank()
 
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-        shape = RoundedCornerShape(8.dp),
+    // 失败的工具调用直接展开，省得用户还要点一下才知道错在哪
+    LaunchedEffect(item.status) {
+        if (item.status == Acp.STATUS_FAILED) expanded = true
+    }
+    val summary = remember(item.toolCallId, item.locations, item.contents, item.rawInput) {
+        toolCallSummary(item)
+    }
+
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(enabled = hasDetail) { expanded = !expanded }
+            .padding(start = 32.dp)
     ) {
-        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = toolKindIcon(item.kind),
-                    contentDescription = null,
-                    modifier = Modifier.size(14.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    text = item.title.ifBlank { item.kind },
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-                Spacer(Modifier.width(6.dp))
-                ToolStatusChip(item.status)
-                if (hasDetail) {
-                    Icon(
-                        if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                        contentDescription = null,
-                        modifier = Modifier.size(15.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .clickable(enabled = hasDetail) { expanded = !expanded }
+                .padding(vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = toolKindIcon(item.kind),
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = if (item.status == Acp.STATUS_FAILED) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = item.title.ifBlank { item.kind },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 132.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+            DotSeparator()
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = summary,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(Modifier.width(6.dp))
+            ToolStateDot(item.status)
+            item.finishedAt?.let { finished ->
+                if (item.startedAt > 0L && finished >= item.startedAt) {
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = formatToolDuration(finished - item.startedAt),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
+            if (hasDetail) {
+                Spacer(Modifier.width(2.dp))
+                Icon(
+                    if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
 
-            if (expanded) {
-                Spacer(Modifier.height(6.dp))
-                item.locations.forEach { location ->
-                    Text(
-                        text = buildString {
-                            append(location.path)
-                            location.line?.let { append(":").append(it) }
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                item.contents.forEach { content ->
-                    when (content) {
-                        is AcpToolContent.Text -> {
-                            Spacer(Modifier.height(4.dp))
-                            AcpMarkdownText(
-                                text = content.text,
-                                textColor = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+        if (expanded) {
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp, bottom = 2.dp)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    item.locations.forEach { location ->
+                        Text(
+                            text = buildString {
+                                append(location.path)
+                                location.line?.let { append(":").append(it) }
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(5.dp))
+                                .clickable { onOpenFile(location.path, location.line) }
+                                .padding(vertical = 2.dp)
+                        )
+                    }
+                    item.contents.forEach { content ->
+                        when (content) {
+                            is AcpToolContent.Text -> {
+                                Spacer(Modifier.height(4.dp))
+                                AcpMarkdownText(
+                                    text = content.text,
+                                    textColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
 
-                        is AcpToolContent.Diff -> {
-                            Spacer(Modifier.height(4.dp))
-                            AcpDiffView(content)
-                        }
+                            is AcpToolContent.Diff -> {
+                                Spacer(Modifier.height(4.dp))
+                                AcpDiffView(content, onOpenDiff)
+                            }
 
-                        is AcpToolContent.TerminalRef -> {
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = content.terminalId,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontFamily = FontFamily.Monospace,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            is AcpToolContent.TerminalRef -> {
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    text = content.terminalId,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
-                }
-                item.rawInput?.takeIf { it.isNotBlank() }?.let { raw ->
-                    Spacer(Modifier.height(4.dp))
-                    RawBlock(title = stringResource(R.string.acp_raw_input), body = raw)
-                }
-                item.rawOutput?.takeIf { it.isNotBlank() }?.let { raw ->
-                    Spacer(Modifier.height(4.dp))
-                    RawBlock(title = stringResource(R.string.acp_raw_output), body = raw)
+                    item.rawInput?.takeIf { it.isNotBlank() }?.let { raw ->
+                        Spacer(Modifier.height(4.dp))
+                        RawBlock(title = stringResource(R.string.acp_raw_input), body = raw)
+                    }
+                    item.rawOutput?.takeIf { it.isNotBlank() }?.let { raw ->
+                        Spacer(Modifier.height(4.dp))
+                        RawBlock(title = stringResource(R.string.acp_raw_output), body = raw)
+                    }
                 }
             }
         }
     }
 }
 
+private fun toolCallSummary(item: AcpToolCallItem): String {
+    item.locations.firstOrNull()?.let { location ->
+        return buildString {
+            append(location.path)
+            location.line?.let { append(":").append(it) }
+        }
+    }
+    item.contents.filterIsInstance<AcpToolContent.Diff>().firstOrNull()?.path?.let { return it }
+    item.contents.filterIsInstance<AcpToolContent.Text>()
+        .firstOrNull { it.text.isNotBlank() }
+        ?.text
+        ?.lineSequence()
+        ?.firstOrNull { it.isNotBlank() }
+        ?.trim()
+        ?.take(120)
+        ?.let { return it }
+    item.rawInput?.lineSequence()?.firstOrNull { it.isNotBlank() }?.trim()?.take(120)?.let { return it }
+    return ""
+}
+
 @Composable
-private fun RawBlock(title: String, body: String) {
+private fun DotSeparator() {
+    Box(
+        modifier = Modifier
+            .size(2.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.outline)
+    )
+}
+
+@Composable
+private fun ToolStateDot(status: String) {
+    val color = when (status) {
+        Acp.STATUS_COMPLETED -> MaterialTheme.colorScheme.primary
+        Acp.STATUS_FAILED -> MaterialTheme.colorScheme.error
+        Acp.STATUS_IN_PROGRESS -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.outline
+    }
+    Box(
+        modifier = Modifier
+            .size(6.dp)
+            .clip(CircleShape)
+            .background(color)
+    )
+}
+
+@Composable
+private fun RawBlock
+(title: String, body: String) {
     Column {
         Text(
             text = title,
@@ -1454,6 +2320,12 @@ private fun ToolStatusChip(status: String) {
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
         )
     }
+}
+
+private fun formatToolDuration(millis: Long): String = when {
+    millis < 1_000L -> "${millis}ms"
+    millis < 60_000L -> String.format(java.util.Locale.US, "%.1fs", millis / 1_000.0)
+    else -> "${millis / 60_000L}m ${(millis % 60_000L) / 1_000L}s"
 }
 
 private fun toolKindIcon(kind: String): ImageVector = when (kind) {
@@ -1537,21 +2409,36 @@ private fun unifiedDiff(oldText: String?, newText: String): List<AcpDiffLine> {
 }
 
 @Composable
-private fun AcpDiffView(diff: AcpToolContent.Diff) {
+private fun AcpDiffView(
+    diff: AcpToolContent.Diff,
+    onOpenDiff: (AcpToolContent.Diff) -> Unit
+) {
     val lines = remember(diff.oldText, diff.newText) { unifiedDiff(diff.oldText, diff.newText) }
     val visible = lines.take(400)
     val removedColor = MaterialTheme.colorScheme.errorContainer
     val addedColor = MaterialTheme.colorScheme.primaryContainer
 
     Column {
-        Text(
-            text = diff.path,
-            style = MaterialTheme.typography.labelSmall,
-            fontFamily = FontFamily.Monospace,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = diff.path,
+                style = MaterialTheme.typography.labelSmall,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(
+                onClick = { onOpenDiff(diff) },
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp, vertical = 0.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.acp_action_open_diff),
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+        }
         Spacer(Modifier.height(2.dp))
         Surface(
             color = MaterialTheme.colorScheme.surface,
@@ -1597,57 +2484,83 @@ private fun AcpDiffView(diff: AcpToolContent.Diff) {
 // 授权卡片
 // ---------------------------------------------------------------------------
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AcpPermissionCard(
     prompt: AcpPermissionPrompt,
-    onSelect: (String?) -> Unit
+    approvalMode: AcpApprovalMode,
+    onSelect: (String?) -> Unit,
+    onRememberAllow: () -> Unit,
+    onRememberDeny: () -> Unit
 ) {
     Surface(
-        color = MaterialTheme.colorScheme.tertiaryContainer,
-        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(14.dp),
+        tonalElevation = 3.dp,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 10.dp, vertical = 4.dp)
+            .padding(horizontal = 10.dp, vertical = 6.dp)
     ) {
-        Column(modifier = Modifier.padding(10.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     Icons.Default.Warning,
                     contentDescription = null,
-                    modifier = Modifier.size(15.dp),
-                    tint = MaterialTheme.colorScheme.onTertiaryContainer
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.tertiary
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
                     text = stringResource(R.string.acp_permission_title),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                    modifier = Modifier.weight(1f)
                 )
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = MaterialTheme.colorScheme.tertiaryContainer
+                ) {
+                    Text(
+                        text = permissionKindLabel(prompt.kind),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
             }
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(6.dp))
             Text(
                 text = prompt.title,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onTertiaryContainer
+                style = MaterialTheme.typography.bodySmall
             )
             prompt.rawInput?.takeIf { it.isNotBlank() }?.let { raw ->
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = raw.take(500),
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 10.sp,
-                    lineHeight = 14.sp,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.85f),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 110.dp)
-                )
+                Spacer(Modifier.height(6.dp))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surface
+                ) {
+                    Text(
+                        text = raw.take(800),
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp,
+                        lineHeight = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 110.dp)
+                            .verticalScroll(rememberScrollState())
+                            .padding(8.dp)
+                    )
+                }
             }
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Spacer(Modifier.height(10.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
                 prompt.options.forEach { option ->
-                    val isReject = option.kind == Acp.PERM_REJECT_ONCE || option.kind == Acp.PERM_REJECT_ALWAYS
+                    val isReject = option.kind == Acp.PERM_REJECT_ONCE ||
+                        option.kind == Acp.PERM_REJECT_ALWAYS
                     if (isReject) {
                         TextButton(onClick = { onSelect(option.optionId) }) {
                             Text(option.name)
@@ -1657,6 +2570,32 @@ private fun AcpPermissionCard(
                             Text(option.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
+                }
+            }
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 6.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = stringResource(R.string.acp_permission_inline_hint, approvalModeLabel(approvalMode)),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                TextButton(onClick = onRememberDeny) {
+                    Text(
+                        text = stringResource(R.string.acp_permission_always_deny),
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+                TextButton(onClick = onRememberAllow) {
+                    Text(
+                        text = stringResource(R.string.acp_permission_always_allow),
+                        style = MaterialTheme.typography.labelSmall
+                    )
                 }
             }
         }
@@ -1789,6 +2728,7 @@ private fun AcpSettingsDialog(
     var expanded by remember { mutableStateOf(false) }
     var command by remember { mutableStateOf(viewModel.agentCommand) }
     var selected by remember { mutableStateOf(viewModel.preset) }
+    var envText by remember(selected.id) { mutableStateOf(viewModel.envTextFor(selected.id)) }
 
     // 打开设置、或切换预设时查一次版本（只查当前选中的预设，避免串版本号）
     LaunchedEffect(selected.id) { viewModel.refreshVersions(selected, command) }
@@ -1864,6 +2804,33 @@ private fun AcpSettingsDialog(
                     modifier = Modifier.fillMaxWidth(),
                     textStyle = MaterialTheme.typography.bodySmall
                 )
+
+                // ---- 环境变量（API Key / Base URL） ----
+                OutlinedTextField(
+                    value = envText,
+                    onValueChange = { envText = it },
+                    label = { Text(stringResource(R.string.acp_env_title)) },
+                    placeholder = { Text(stringResource(R.string.acp_env_hint)) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 72.dp, max = 150.dp),
+                    textStyle = MaterialTheme.typography.labelSmall.copy(
+                        fontFamily = FontFamily.Monospace
+                    ),
+                    minLines = 2,
+                    maxLines = 6
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = stringResource(R.string.acp_env_desc),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(onClick = { viewModel.saveAgentEnv(selected.id, envText) }) {
+                        Text(stringResource(R.string.action_save))
+                    }
+                }
 
                 // ---- 版本 / 一键安装 ----
                 if (selected.primaryPackage != null) {
@@ -1965,22 +2932,60 @@ private fun AcpSettingsDialog(
                     }
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.acp_auto_approve),
-                            style = MaterialTheme.typography.bodySmall
+                HorizontalDivider()
+
+                Text(
+                    text = stringResource(R.string.acp_permission_mode_title),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+                AcpApprovalMode.entries.forEach { mode ->
+                    val selected = viewModel.permissions.mode == mode
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { viewModel.updateApprovalMode(mode) }
+                            .padding(vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = selected,
+                            onClick = { viewModel.updateApprovalMode(mode) }
                         )
-                        Text(
-                            text = stringResource(R.string.acp_auto_approve_desc),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = approvalModeLabel(mode),
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal
+                            )
+                            Text(
+                                text = stringResource(approvalModeDescription(mode)),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
-                    Switch(
-                        checked = viewModel.autoApprove,
-                        onCheckedChange = { viewModel.updateAutoApprove(it) }
-                    )
+                }
+                val savedRules = viewModel.permissions.alwaysAllowKinds +
+                    viewModel.permissions.alwaysDenyKinds
+                if (savedRules.isNotEmpty()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = stringResource(R.string.acp_permission_rules) +
+                                ": " + savedRules.size,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(onClick = { viewModel.permissions.clearRules() }) {
+                            Text(
+                                text = stringResource(R.string.acp_permission_clear_rules),
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                    }
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {

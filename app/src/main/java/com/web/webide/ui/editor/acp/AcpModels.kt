@@ -89,7 +89,11 @@ internal data class AcpToolCallItem(
     val contents: List<AcpToolContent>,
     val locations: List<AcpToolLocation>,
     val rawInput: String?,
-    val rawOutput: String?
+    val rawOutput: String?,
+    /** 客户端收到 tool_call 的时间，用于展示耗时。 */
+    val startedAt: Long = 0L,
+    /** 进入 completed / failed 的时间。 */
+    val finishedAt: Long? = null
 ) : AcpTimelineItem
 
 internal sealed interface AcpToolContent {

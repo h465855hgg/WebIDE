@@ -34,8 +34,10 @@ import com.web.webide.core.utils.WorkspaceManager
 import com.web.webide.ui.terminal.AlpineManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -73,6 +75,12 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
 
     private val prefs = application.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
+    /** 记住每个 Agent 上次选择的配置项（模型 / 模式 / 思考等级）。 */
+    private val configPrefs = application.getSharedPreferences("acp_config", Context.MODE_PRIVATE)
+
+    /** 每个 Agent 的环境变量（API Key / Base URL 等），启动子进程时注入。 */
+    private val envPrefs = application.getSharedPreferences("acp_env", Context.MODE_PRIVATE)
+
     // ------------------------------------------------------------------
     // 配置
     // ------------------------------------------------------------------
@@ -85,8 +93,32 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
     )
         private set
 
-    var autoApprove by mutableStateOf(prefs.getBoolean(KEY_AUTO_APPROVE, false))
+    /** 当前 Agent 的环境变量（明文保存在私有 prefs，仅本机可见）。 */
+    var agentEnv by mutableStateOf(loadAgentEnv(agentPresetId))
         private set
+
+    /** 启动子进程时实际使用的环境变量快照，用于判断「设置改了但没重连」。 */
+    private var connectedEnv: Map<String, String> = emptyMap()
+
+    /** 兼容旧面板里的「自动授权」开关；真实策略由 [permissions] 管。 */
+    val autoApprove: Boolean get() = permissions.autoApprove
+
+    /** 工具权限策略（级别 + 记住的允许/拒绝类型 + 审计记录）。 */
+    val permissions = AcpPermissionController(application)
+
+    /** 当前会话的 token / 上下文统计。 */
+    val usage = AcpUsageTracker()
+
+    /** 项目记忆与行为指令（文件 + 首轮注入）。 */
+    val memory = AcpMemoryController(application)
+
+    /** 项目技能（.webide/skills 下的 Markdown）与管理状态。 */
+    val skills = AcpSkillsController(application)
+
+    /** MCP 服务器配置；新建/加载会话时随 `mcpServers` 下发给 Agent。 */
+    val mcp = AcpMcpController(application)
+
+    private val sessionStore = AcpSessionStore(application)
 
     val preset: AcpAgentPreset get() = AcpAgents.byId(agentPresetId)
 
@@ -107,6 +139,10 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
         private set
 
     var isPrompting by mutableStateOf(false)
+        private set
+
+    /** Agent 是否正在重放历史（session/load 期间）。 */
+    var isRestoringSession by mutableStateOf(false)
         private set
 
     var sessionId by mutableStateOf<String?>(null)
@@ -133,8 +169,12 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
     var activeAuthMethodId by mutableStateOf<String?>(null)
         private set
 
-    /** 是否已按 Agent 声明的认证方式完成登录。 */
+    /** 是否已按 Agent 声明的认证方式完成登录。客户端无法真正确认，仅作展示。 */
     var isAuthenticated by mutableStateOf(false)
+        private set
+
+    /** 已向 Agent 发起过登录请求；不代表登录真的完成。 */
+    var authRequested by mutableStateOf(false)
         private set
 
     var permissionPrompt by mutableStateOf<AcpPermissionPrompt?>(null)
@@ -168,6 +208,35 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
 
     /** 当前 Agent 是否支持会话列举（不同 CLI 能力不一）。 */
     var supportsSessionList by mutableStateOf(true)
+        private set
+
+    // ---- 本地会话（不依赖 Agent，离线可见） ----
+
+    /** 当前工作区的本地会话索引。 */
+    var localSessions by mutableStateOf<List<AcpSessionMeta>>(emptyList())
+        private set
+
+    var isLoadingLocalSessions by mutableStateOf(false)
+        private set
+
+    /** 当前工作区本地会话占用的字节数。 */
+    var storageBytes by mutableStateOf(0L)
+        private set
+
+    /** 当前会话的本地元数据。 */
+    var currentSessionMeta by mutableStateOf<AcpSessionMeta?>(null)
+        private set
+
+    /** 时间线来自本地回放、Agent 尚未接管这段上下文时为 true。 */
+    var isReadOnlyReplay by mutableStateOf(false)
+        private set
+
+    /** 本地会话搜索框内容（防抖后写入 [localSessions]）。 */
+    var localSearchQuery by mutableStateOf("")
+        private set
+
+    /** 当前解析出的工作区路径。 */
+    var workspacePath by mutableStateOf<String?>(null)
         private set
 
     /** 本轮对话中被 Agent 修改过的文件快照，用于「撤销修改」。 */
@@ -231,8 +300,30 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
     private var candidateCommands: List<String> = emptyList()
     private var candidateIndex = 0
 
+    /** 重连时优先尝试恢复的 Agent 会话 id（上次打开的对话）。 */
+    private var resumeSessionId: String? = null
+
     private val installBuffer = StringBuilder()
     private var installTicker: Job? = null
+
+    /** 会话落盘的防抖任务。 */
+    private var saveJob: Job? = null
+    private var searchJob: Job? = null
+    private var workspacePrepared = false
+
+    /** Agent 正在重放历史（session/load），此时不要落盘半成品。 */
+    private var isReplaying = false
+
+    /** 重放用户消息时的前缀裁剪状态。 */
+    private var replayUserBuffer: StringBuilder? = null
+    private var replayUserItemId: String? = null
+    private var replayPrefixStripped = false
+
+    init {
+        viewModelScope.launch {
+            runCatching { prepareWorkspace() }
+        }
+    }
 
     private fun s(@StringRes resId: Int, vararg args: Any): String =
         getApplication<Application>().getString(resId, *args)
@@ -248,6 +339,7 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
         if (preset.defaultCommand.isNotEmpty()) {
             agentCommand = preset.defaultCommand
         }
+        agentEnv = loadAgentEnv(agentPresetId)
         canInstallMissing = false
         prefs.edit {
             putString(KEY_AGENT_ID, agentPresetId)
@@ -261,15 +353,89 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
         prefs.edit { putString(KEY_COMMAND, command) }
     }
 
+    /**
+     * 应用设置页里的「Agent + 启动命令」。
+     *
+     * 与 [selectAgent] 的区别：不会用预设默认命令覆盖用户手改的命令。
+     * 环境变量由调用方先通过 [saveAgentEnv] 落盘，这里只负责切换到对应 Agent 的环境。
+     */
+    fun applyAgentConfig(preset: AcpAgentPreset, command: String) {
+        val presetChanged = preset.id != agentPresetId
+        agentPresetId = preset.id
+        val trimmed = command.trim()
+        agentCommand = trimmed.ifEmpty { preset.defaultCommand }
+        if (presetChanged) {
+            agentEnv = loadAgentEnv(preset.id)
+            canInstallMissing = false
+        }
+        prefs.edit {
+            putString(KEY_AGENT_ID, agentPresetId)
+            putString(KEY_COMMAND, agentCommand)
+        }
+        if (presetChanged) refreshVersions(preset, agentCommand)
+    }
+
+    // ---- 环境变量（API Key / Base URL） ----
+
+    fun envTextFor(presetId: String): String = envToText(loadAgentEnv(presetId))
+
+    fun saveAgentEnv(presetId: String, text: String) {
+        val parsed = parseEnvText(text)
+        saveEnvMap(presetId, parsed)
+        if (presetId == agentPresetId) agentEnv = parsed
+    }
+
+    private fun loadAgentEnv(agentId: String): Map<String, String> {
+        val raw = envPrefs.getString("env_$agentId", null) ?: return emptyMap()
+        return runCatching {
+            val json = JSONObject(raw)
+            json.keys().asSequence().associateWith { json.optString(it) }
+        }.getOrDefault(emptyMap())
+    }
+
+    private fun saveEnvMap(agentId: String, env: Map<String, String>) {
+        val json = JSONObject().apply { env.forEach { (key, value) -> put(key, value) } }
+        envPrefs.edit { putString("env_$agentId", json.toString()) }
+    }
+
+    private fun envToText(env: Map<String, String>): String =
+        env.entries.joinToString("\n") { "${it.key}=${it.value}" }
+
+    private fun parseEnvText(text: String): Map<String, String> {
+        val result = LinkedHashMap<String, String>()
+        text.lineSequence().forEach { rawLine ->
+            val line = rawLine.trim()
+            if (line.isEmpty() || line.startsWith("#")) return@forEach
+            val separator = line.indexOf('=')
+            if (separator <= 0) return@forEach
+            val key = line.substring(0, separator).trim()
+            if (!key.matches(Regex("[A-Za-z_][A-Za-z0-9_]*"))) return@forEach
+            var value = line.substring(separator + 1).trim()
+            if (value.length >= 2 &&
+                ((value.startsWith('"') && value.endsWith('"')) ||
+                    (value.startsWith('\'') && value.endsWith('\'')))
+            ) {
+                value = value.substring(1, value.length - 1)
+            }
+            result[key] = value
+        }
+        return result
+    }
+
     fun updateAutoApprove(enabled: Boolean) {
-        autoApprove = enabled
-        prefs.edit { putBoolean(KEY_AUTO_APPROVE, enabled) }
+        permissions.setAutoApprove(enabled)
+    }
+
+    fun updateApprovalMode(mode: AcpApprovalMode) {
+        permissions.applyMode(mode)
     }
 
     fun clearTimeline() {
         timeline.clear()
         currentAgentMessageItemId = null
         currentThoughtItemId = null
+        usage.reset()
+        isReadOnlyReplay = false
     }
 
     /**
@@ -280,6 +446,9 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
      */
     fun connect() {
         if (connectionState == AcpConnectionState.CONNECTING) return
+        // 重连时优先恢复上次的会话，而不是无脑开新会话
+        resumeSessionId = (currentSessionMeta?.id ?: sessionId)
+            ?.takeIf { timeline.isNotEmpty() && currentSessionMeta?.agentId == agentPresetId }
         teardown()
 
         val candidates = AcpAgents.candidatesFor(preset, agentCommand)
@@ -380,11 +549,12 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
         val terminalManager = AcpTerminalManager(context)
         terminals = terminalManager
 
+        connectedEnv = agentEnv
         val acpTransport = AcpTransport(
             context = context,
             command = command,
             workDir = resolveWorkDir(),
-            extraEnv = emptyMap(),
+            extraEnv = connectedEnv,
             listener = object : AcpTransport.Listener {
                 override fun onMessage(message: JSONObject) {
                     viewModelScope.launch { connection?.handleIncoming(message) }
@@ -421,7 +591,8 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
     fun isConnectedWith(presetId: String, command: String): Boolean =
         connectionState == AcpConnectionState.READY &&
             agentPresetId == presetId &&
-            agentCommand == command
+            agentCommand == command &&
+            agentEnv == connectedEnv
 
     /**
      * 读取 Agent 自身日志（模型 / 网络错误只写在这里，协议层看不到）。
@@ -439,6 +610,49 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
 
     /** 用于提示文案的 Agent 名称。 */
     private fun agentDisplayName(): String = agentInfo ?: preset.displayName
+
+    /** 诊断文本：自检 + Agent 日志 + stderr + 安装日志，供复制/保存。 */
+    fun diagnosticsText(): String = buildString {
+        appendLine("WebIDE ACP diagnostics")
+        appendLine("time: ${System.currentTimeMillis()}")
+        appendLine("agent: ${agentInfo ?: preset.displayName} (${agentPresetId})")
+        appendLine("command: $agentCommand")
+        appendLine("connection: $connectionState")
+        appendLine("session: ${sessionId ?: "-"}")
+        appendLine()
+        appendLine("=== self check ===")
+        if (selfCheckReport.isEmpty()) appendLine("(empty)") else selfCheckReport.forEach { appendLine(it) }
+        appendLine()
+        appendLine("=== agent log ===")
+        if (agentLog.isEmpty()) appendLine("(empty)") else agentLog.forEach { appendLine(it) }
+        appendLine()
+        appendLine("=== stderr ===")
+        appendLine(stderrTail.ifBlank { "(empty)" })
+        appendLine()
+        appendLine("=== install log ===")
+        appendLine(installLog.ifBlank { "(empty)" })
+    }
+
+    /** 把诊断信息写到项目 `.webide/logs/`，方便直接分享。 */
+    fun exportDiagnostics() {
+        val text = diagnosticsText()
+        val ws = workspacePath ?: resolveWorkDir()
+        viewModelScope.launch {
+            val file = withContext(Dispatchers.IO) {
+                runCatching {
+                    val dir = File(ws, ".webide/logs").apply { mkdirs() }
+                    File(dir, "acp-diagnostics-${System.currentTimeMillis()}.txt").apply {
+                        writeText(text)
+                    }
+                }.getOrNull()
+            }
+            if (file != null) {
+                addNotice(s(R.string.acp_diag_saved, file.absolutePath))
+            } else {
+                addNotice(s(R.string.acp_export_failed, "IO"), isError = true)
+            }
+        }
+    }
 
 
     /** 运行环境自检并把结果写入 [selfCheckReport]。 */
@@ -551,34 +765,98 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
         teardown()
         connectionState = AcpConnectionState.DISCONNECTED
         statusMessage = null
+        if (timeline.isNotEmpty()) isReadOnlyReplay = true
         addNotice(s(R.string.acp_status_disconnected))
     }
 
     /** 发送一轮用户消息。 */
     fun sendPrompt(raw: String) {
         val text = raw.trim()
-        if (text.isEmpty()) return
+        if (text.isEmpty() || !canPrompt()) return
 
-        val acpConnection = connection
-        val sid = sessionId
-        if (acpConnection == null || sid == null || connectionState != AcpConnectionState.READY) {
-            addNotice(s(R.string.acp_error_not_connected), isError = true)
+        // 首轮注入项目技能清单；UI 只显示用户原文（注入块在历史重放时会被裁掉）
+        val isFirstUserTurn = timeline.none { it is AcpUserMessage }
+        val preamble = if (isFirstUserTurn) skills.buildPreamble() else null
+        val promptText = if (preamble.isNullOrBlank()) text else "$preamble$text"
+
+        timeline.add(AcpUserMessage(newId("user"), text))
+        usage.onPrompt(promptText)
+        beginTurn(promptText)
+    }
+
+    /**
+     * 重试最后一个没有产出的回合（Agent 报错 / 超时 / 被中断后）。
+     *
+     * ACP 没有「回滚 Agent 上下文」的能力，所以这里只重发最后一条用户消息，
+     * 且仅当它后面还没有 Agent 产出时才允许，避免把已有回答搞乱。
+     */
+    fun retryLastTurn() {
+        if (!canPrompt()) return
+        val lastUserIndex = timeline.indexOfLast { it is AcpUserMessage }
+        if (lastUserIndex < 0) return
+        val tail = timeline.drop(lastUserIndex + 1)
+        if (tail.any { it is AcpAgentMessage || it is AcpToolCallItem }) return
+
+        while (timeline.size > lastUserIndex + 1) {
+            timeline.removeAt(timeline.lastIndex)
+        }
+        val userText = (timeline[lastUserIndex] as AcpUserMessage).text
+        val isFirstUserTurn = timeline.count { it is AcpUserMessage } == 1
+        val preamble = if (isFirstUserTurn) skills.buildPreamble() else null
+        val promptText = if (preamble.isNullOrBlank()) userText else "$preamble$userText"
+        usage.onPrompt(promptText)
+        beginTurn(promptText)
+    }
+
+    /** 用某条历史提问开一个新会话（不带过去的上下文，等价于「干净地重开」）。 */
+    fun startNewSessionWithText(raw: String) {
+        val text = raw.trim()
+        if (text.isEmpty() ||
+            connection == null ||
+            connectionState != AcpConnectionState.READY ||
+            isPrompting
+        ) {
             return
+        }
+        viewModelScope.launch {
+            persistCurrentNow()
+            if (createNewSession()) {
+                sendPrompt(text)
+            }
+        }
+    }
+
+    /** 发送前的统一检查；失败时给出可读提示。 */
+    private fun canPrompt(): Boolean {
+        if (connection == null || sessionId == null || connectionState != AcpConnectionState.READY) {
+            addNotice(s(R.string.acp_error_not_connected), isError = true)
+            return false
         }
         if (isPrompting) {
             addNotice(s(R.string.acp_error_busy), isError = true)
-            return
+            return false
         }
+        if (isReadOnlyReplay) {
+            addNotice(s(R.string.acp_error_replay_readonly), isError = true)
+            return false
+        }
+        return true
+    }
 
-        timeline.add(AcpUserMessage(newId("user"), text))
+    /** 真正发起一轮 prompt（用户消息已由调用方写入时间线）。 */
+    private fun beginTurn(promptText: String) {
+        val acpConnection = connection ?: return
+        val sid = sessionId ?: return
+
+        sessionSnapshots.clear()
         currentAgentMessageItemId = null
         currentThoughtItemId = null
-        sessionSnapshots.clear()
         pendingSnapshots = emptyList()
         turnBaselineRoot = null
         turnBaselineSig = emptyMap()
         turnBaselineContent = emptyMap()
         isPrompting = true
+        schedulePersist()
 
         // 若长时间没有任何输出，提示用户去看 Agent 日志（Agent 出错时常常只写日志、不回协议）
         promptWatchJob?.cancel()
@@ -602,7 +880,7 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
                             JSONArray().put(
                                 JSONObject().apply {
                                     put("type", Acp.C_TEXT)
-                                    put("text", text)
+                                    put("text", promptText)
                                 }
                             )
                         )
@@ -616,6 +894,7 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
                     Acp.STOP_REFUSAL -> addNotice(s(R.string.acp_status_refusal), isError = true)
                     else -> Unit
                 }
+                usage.applyReported(usageFrom(result))
             } catch (e: CancellationException) {
                 // 用户中断：提示由 cancel() 负责，这里只需向上传播
                 throw e
@@ -629,6 +908,7 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
                 promptWatchJob = null
                 recordTurnSnapshots()
                 publishSnapshots()
+                schedulePersist()
             }
         }
     }
@@ -661,9 +941,35 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
     /** 回应用户授权请求；optionId 为 null 表示取消。 */
     fun respondPermission(optionId: String?) {
         val deferred = pendingPermission ?: return
+        val prompt = permissionPrompt
         pendingPermission = null
         permissionPrompt = null
+        if (prompt != null) {
+            val selected = prompt.options.firstOrNull { it.optionId == optionId }
+            val decision = when {
+                optionId == null -> "cancelled"
+                selected?.kind?.startsWith("allow") == true -> "allowed"
+                else -> "denied"
+            }
+            permissions.record(
+                kind = prompt.kind,
+                title = prompt.title,
+                decision = decision,
+                detail = selected?.name.orEmpty()
+            )
+        }
         deferred.complete(optionId)
+    }
+
+    /** 记住某类工具的授权偏好（授权卡片上的「总是允许 / 总是拒绝」）。 */
+    fun rememberPermission(kind: String, allow: Boolean) {
+        permissions.remember(kind, allow)
+        addNotice(
+            s(
+                if (allow) R.string.acp_permission_rule_allow else R.string.acp_permission_rule_deny,
+                AcpPermissionController.kindLabel(kind)
+            )
+        )
     }
 
     /**
@@ -690,6 +996,7 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
                     }
                 )
                 result.arrOrNull("configOptions")?.let { applyConfigOptions(Acp.parseConfigOptions(it)) }
+                saveConfigSelection(agentPresetId, configId, value)
             } catch (e: Throwable) {
                 addNotice(s(R.string.acp_error_set_config, e.message ?: e.toString()), isError = true)
             }
@@ -723,8 +1030,13 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
             try {
                 acpConnection.request(Acp.M_AUTHENTICATE, JSONObject().put("methodId", methodId))
                 activeAuthMethodId = methodId
-                isAuthenticated = true
-                addNotice(s(R.string.acp_status_authenticated))
+                // ACP 的 authenticate 只代表「请求已送达」，是否真的登录成功只有 Agent 自己知道。
+                // 不要再乐观地标记 isAuthenticated=true，否则会出现「点了登录、聊天里说已登录、
+                // 实际还是未登录」的假象。
+                isAuthenticated = false
+                authRequested = true
+                addNotice(s(R.string.acp_status_auth_requested))
+                refreshAgentLog()
             } catch (e: Throwable) {
                 addNotice(s(R.string.acp_error_auth, e.message ?: e.toString()), isError = true)
             }
@@ -777,50 +1089,99 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
 
     /** 新建会话（清空时间线）。 */
     fun newSession() {
-        val acpConnection = connection ?: return
-        if (connectionState != AcpConnectionState.READY) return
+        if (connection == null || connectionState != AcpConnectionState.READY) return
         viewModelScope.launch {
-            try {
-                val result = acpConnection.request(
-                    Acp.M_SESSION_NEW,
-                    JSONObject().apply {
-                        put("cwd", resolveWorkDir())
-                        put("mcpServers", JSONArray())
-                    }
-                )
-                applySessionResult(result)
-                timeline.clear()
+            persistCurrentNow()
+            if (createNewSession()) {
                 addNotice(s(R.string.acp_status_new_session))
-            } catch (e: Throwable) {
-                addNotice(s(R.string.acp_error_session_new, e.message ?: e.toString()), isError = true)
             }
+        }
+    }
+
+    /** 建立新会话并清空本地时间线；失败时保留现场并提示。 */
+    private suspend fun createNewSession(): Boolean {
+        val acpConnection = connection ?: return false
+        return try {
+            val result = acpConnection.request(
+                Acp.M_SESSION_NEW,
+                JSONObject().apply {
+                    put("cwd", resolveWorkDir())
+                    put("mcpServers", mcp.toJsonArray())
+                }
+            )
+            timeline.clear()
+            currentAgentMessageItemId = null
+            currentThoughtItemId = null
+            usage.reset()
+            isReadOnlyReplay = false
+            applySessionResult(result)
+            schedulePersist()
+            true
+        } catch (e: Throwable) {
+            addNotice(s(R.string.acp_error_session_new, e.message ?: e.toString()), isError = true)
+            false
         }
     }
 
     /** 切换（加载）到历史会话；Agent 会重放历史，据此重建时间线。 */
     fun loadSession(id: String) {
-        val acpConnection = connection ?: return
         if (connectionState != AcpConnectionState.READY) return
-        if (id == sessionId) return
-        viewModelScope.launch {
-            try {
-                timeline.clear()
-                currentAgentMessageItemId = null
-                currentThoughtItemId = null
-                val result = acpConnection.request(
-                    Acp.M_SESSION_LOAD,
-                    JSONObject().apply {
-                        put("sessionId", id)
-                        put("cwd", resolveWorkDir())
-                        put("mcpServers", JSONArray())
-                    },
-                    timeoutMillis = AcpConnection.DEFAULT_TIMEOUT_MILLIS
+        viewModelScope.launch { loadSessionInternal(id, force = false) }
+    }
+
+    /** 让 Agent 接管当前本地回放的会话（「继续此会话」）。 */
+    fun resumeLocalSession() {
+        val id = sessionId ?: return
+        if (connectionState != AcpConnectionState.READY) {
+            addNotice(s(R.string.acp_error_not_connected), isError = true)
+            return
+        }
+        viewModelScope.launch { loadSessionInternal(id, force = true) }
+    }
+
+    private suspend fun loadSessionInternal(id: String, force: Boolean) {
+        val acpConnection = connection ?: return
+        if (!force && id == sessionId && !isReadOnlyReplay) return
+        persistCurrentNow()
+        timeline.clear()
+        currentAgentMessageItemId = null
+        currentThoughtItemId = null
+        usage.reset()
+        isReplaying = true
+        isRestoringSession = true
+        replayUserBuffer = null
+        replayUserItemId = null
+        replayPrefixStripped = false
+        try {
+            val result = acpConnection.request(
+                Acp.M_SESSION_LOAD,
+                JSONObject().apply {
+                    put("sessionId", id)
+                    put("cwd", resolveWorkDir())
+                    put("mcpServers", mcp.toJsonArray())
+                },
+                timeoutMillis = AcpConnection.DEFAULT_TIMEOUT_MILLIS
+            )
+            applySessionResult(result, forcedId = id)
+            isReadOnlyReplay = false
+            currentSessionMeta?.let { meta ->
+                usage.restore(
+                    input = meta.inputTokens,
+                    output = meta.outputTokens,
+                    turns = meta.turns,
+                    toolCalls = timeline.count { it is AcpToolCallItem },
+                    items = timeline.toList()
                 )
-                applySessionResult(result, forcedId = id)
-                addNotice(s(R.string.acp_status_session_loaded))
-            } catch (e: Throwable) {
-                addNotice(s(R.string.acp_error_session_load, e.message ?: e.toString()), isError = true)
             }
+            addNotice(s(R.string.acp_status_session_loaded))
+        } catch (e: Throwable) {
+            addNotice(s(R.string.acp_error_session_load, e.message ?: e.toString()), isError = true)
+            // Agent 不认这个 session：退回本地副本，至少对话内容还在
+            restoreLocalInto(id)
+        } finally {
+            isReplaying = false
+            isRestoringSession = false
+            schedulePersist()
         }
     }
 
@@ -836,7 +1197,7 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
                     JSONObject().apply {
                         put("sessionId", sid)
                         put("cwd", resolveWorkDir())
-                        put("mcpServers", JSONArray())
+                        put("mcpServers", mcp.toJsonArray())
                     }
                 )
                 applySessionResult(result)
@@ -849,13 +1210,287 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
 
     private fun applySessionResult(result: JSONObject, forcedId: String? = null) {
         val sid = forcedId ?: result.strOrNull("sessionId")
-        if (sid != null) sessionId = sid
+        if (sid != null) {
+            sessionId = sid
+            bindSessionMeta(sid)
+        }
         applyModes(result.objOrNull("modes"))
         if (result.has("configOptions")) {
             applyConfigOptions(Acp.parseConfigOptions(result.arrOrNull("configOptions")))
         }
         connectionState = AcpConnectionState.READY
         statusMessage = null
+        // 恢复上次选择的模型 / 模式（不同 Agent 支持程度不一，失败就静默忽略）
+        viewModelScope.launch { restoreConfigPreferences() }
+    }
+
+    /** 把一个 Agent sessionId 绑定到本地会话元数据上。 */
+    private fun bindSessionMeta(sid: String) {
+        val existing = localSessions.firstOrNull { it.id == sid }
+        currentSessionMeta = existing ?: AcpSessionMeta(
+            id = sid,
+            workspace = workspacePath ?: resolveWorkDir(),
+            agentId = agentPresetId,
+            agentName = agentInfo ?: preset.displayName,
+            title = "",
+            preview = "",
+            createdAt = System.currentTimeMillis(),
+            updatedAt = System.currentTimeMillis()
+        )
+        if (existing?.model != null) usage.applyModel(existing.model)
+        isReadOnlyReplay = false
+    }
+
+    // ------------------------------------------------------------------
+    // 本地会话（落盘 / 搜索 / 恢复）
+    // ------------------------------------------------------------------
+
+    /** 面板第一次组合时调用；重复调用无副作用。 */
+    fun ensureWorkspaceLoaded() {
+        if (workspacePrepared) return
+        viewModelScope.launch { prepareWorkspace() }
+    }
+
+    private suspend fun prepareWorkspace() {
+        if (workspacePrepared) return
+        workspacePrepared = true
+        val ws = resolveWorkDir()
+        workspacePath = ws
+        localSessions = sessionStore.list(ws)
+        storageBytes = sessionStore.totalBytes(ws)
+        skills.load(ws)
+        // 面板一打开先恢复上次的对话，即使 Agent 还没连
+        if (timeline.isEmpty() && currentSessionMeta == null) {
+            sessionStore.lastSessionId(ws)?.let { openLocalSessionInternal(it) }
+        }
+    }
+
+    fun refreshLocalSessions() {
+        val ws = workspacePath ?: resolveWorkDir().also { workspacePath = it }
+        isLoadingLocalSessions = true
+        viewModelScope.launch {
+            try {
+                localSessions = sessionStore.list(ws)
+                storageBytes = sessionStore.totalBytes(ws)
+            } finally {
+                isLoadingLocalSessions = false
+            }
+        }
+    }
+
+    // ---- 记忆与行为 ----
+
+    fun refreshMemory() {
+        viewModelScope.launch { memory.load(workspacePath ?: resolveWorkDir()) }
+    }
+
+    fun saveMemoryText(text: String) {
+        viewModelScope.launch {
+            memory.updateMemoryText(text)
+        }
+    }
+
+    fun setBehaviorPreset(preset: AcpBehaviorPreset) {
+        memory.applyBehavior(preset)
+    }
+
+    fun setMemoryInjection(enabled: Boolean) {
+        memory.applyInjectOnNewSession(enabled)
+    }
+
+    /** 把记忆 + 行为写进项目 `AGENTS.md` 的受管区块。 */
+    fun writeMemoryToAgentsMd() {
+        viewModelScope.launch {
+            val ws = workspacePath ?: resolveWorkDir().also { workspacePath = it }
+            runCatching { memory.writeAgentsMd(ws) }
+                .onSuccess { addNotice(s(R.string.acp_memory_agents_written, it.absolutePath)) }
+                .onFailure { addNotice(s(R.string.acp_export_failed, it.message ?: ""), isError = true) }
+        }
+    }
+
+    // ---- 技能 ----
+
+    fun refreshSkills() {
+        viewModelScope.launch {
+            skills.load(workspacePath ?: resolveWorkDir().also { workspacePath = it })
+        }
+    }
+
+    fun saveSkill(skill: AcpSkill) {
+        viewModelScope.launch {
+            val ws = workspacePath ?: resolveWorkDir().also { workspacePath = it }
+            runCatching { skills.save(ws, skill) }
+        }
+    }
+
+    fun deleteSkill(id: String) {
+        viewModelScope.launch {
+            val ws = workspacePath ?: resolveWorkDir().also { workspacePath = it }
+            runCatching { skills.delete(ws, id) }
+        }
+    }
+
+    fun setSkillsInjection(enabled: Boolean) {
+        skills.applyInjectSkills(enabled)
+    }
+
+    /** 搜索本地会话（标题 / 摘要 / 正文），带 220ms 防抖。 */
+    fun updateLocalSearchQuery(query: String) {        localSearchQuery = query
+        searchJob?.cancel()
+        val ws = workspacePath ?: resolveWorkDir().also { workspacePath = it }
+        searchJob = viewModelScope.launch {
+            delay(220)
+            localSessions = sessionStore.search(ws, query)
+        }
+    }
+
+    /** 打开一条本地会话；即使离线也能查看全文。 */
+    fun openLocalSession(id: String) {
+        if (id == sessionId && timeline.isNotEmpty()) return
+        viewModelScope.launch { openLocalSessionInternal(id) }
+    }
+
+    private suspend fun openLocalSessionInternal(id: String) {
+        val ws = workspacePath ?: resolveWorkDir().also { workspacePath = it }
+        persistCurrentNow()
+        val stored = sessionStore.load(ws, id) ?: return
+        timeline.clear()
+        timeline.addAll(stored.items)
+        sessionId = id
+        currentSessionMeta = stored.meta
+        usage.reset()
+        usage.applyModel(stored.meta.model)
+        usage.restore(
+            input = stored.meta.inputTokens,
+            output = stored.meta.outputTokens,
+            turns = stored.meta.turns,
+            toolCalls = stored.items.count { it is AcpToolCallItem },
+            items = stored.items
+        )
+        isReadOnlyReplay = true
+    }
+
+    /** 从本地存储恢复某个会话到时间线（Agent 拒绝 session/load 时兜底）。 */
+    private suspend fun restoreLocalInto(id: String) {
+        val ws = workspacePath ?: resolveWorkDir().also { workspacePath = it }
+        val stored = sessionStore.load(ws, id) ?: return
+        timeline.clear()
+        timeline.addAll(stored.items)
+        sessionId = id
+        currentSessionMeta = stored.meta
+        usage.reset()
+        usage.applyModel(stored.meta.model)
+        usage.restore(
+            input = stored.meta.inputTokens,
+            output = stored.meta.outputTokens,
+            turns = stored.meta.turns,
+            toolCalls = stored.items.count { it is AcpToolCallItem },
+            items = stored.items
+        )
+        isReadOnlyReplay = true
+    }
+
+    fun renameLocalSession(id: String, title: String) {
+        val clean = title.trim()
+        if (clean.isEmpty()) return
+        val ws = workspacePath ?: resolveWorkDir().also { workspacePath = it }
+        viewModelScope.launch {
+            sessionStore.rename(ws, id, clean)
+            localSessions = sessionStore.list(ws)
+            if (currentSessionMeta?.id == id) {
+                currentSessionMeta = currentSessionMeta?.copy(title = clean)
+            }
+        }
+    }
+
+    fun toggleLocalSessionPin(id: String) {
+        val target = localSessions.firstOrNull { it.id == id } ?: return
+        val ws = workspacePath ?: return
+        viewModelScope.launch {
+            sessionStore.setPinned(ws, id, !target.pinned)
+            localSessions = sessionStore.list(ws)
+        }
+    }
+
+    fun deleteLocalSession(id: String) {
+        val ws = workspacePath ?: return
+        viewModelScope.launch {
+            sessionStore.delete(ws, id)
+            localSessions = sessionStore.list(ws)
+            if (currentSessionMeta?.id == id) {
+                // 当前会话被删掉：如果 Agent 还连着，直接开一条新会话，避免「连接着却没有 session」
+                val wasReady = connectionState == AcpConnectionState.READY
+                timeline.clear()
+                currentSessionMeta = null
+                sessionId = null
+                usage.reset()
+                isReadOnlyReplay = false
+                if (wasReady) newSession()
+            }
+        }
+    }
+
+    /** 导出为 Markdown，写进项目的 `.webide/exports/`，文件树里能直接看到。 */
+    fun exportLocalSession(id: String) {
+        val ws = workspacePath ?: return
+        viewModelScope.launch {
+            val stored = sessionStore.load(ws, id) ?: return@launch
+            val dir = File(ws, ".webide/exports")
+            val safe = stored.meta.title
+                .replace(Regex("[\\\\/:*?\"<>|]"), "_")
+                .trim()
+                .take(40)
+                .ifBlank { "acp-session" }
+            val file = File(dir, "$safe-${stored.meta.updatedAt}.md")
+            runCatching { sessionStore.exportMarkdown(stored, file) }
+                .onSuccess { addNotice(s(R.string.acp_export_done, it.absolutePath)) }
+                .onFailure { addNotice(s(R.string.acp_export_failed, it.message ?: ""), isError = true) }
+        }
+    }
+
+    // ---- 落盘 ----
+
+    /** 防抖保存：流式输出期间最多每 900ms 写一次盘。 */
+    private fun schedulePersist() {
+        if (sessionId == null || isReplaying) return
+        saveJob?.cancel()
+        saveJob = viewModelScope.launch {
+            delay(900)
+            persistCurrentNow()
+        }
+    }
+
+    private suspend fun persistCurrentNow() {
+        val sid = sessionId ?: return
+        val ws = workspacePath ?: resolveWorkDir().also { workspacePath = it }
+        val base = currentSessionMeta
+            ?.takeIf { it.id == sid }
+            ?: AcpSessionMeta(
+                id = sid,
+                workspace = ws,
+                agentId = agentPresetId,
+                agentName = agentInfo ?: preset.displayName,
+                title = "",
+                preview = "",
+                createdAt = System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis()
+            )
+        val modelName = usage.model
+            ?: configOptions.firstOrNull { it.category == Acp.CAT_MODEL }?.currentDisplayName
+        val saved = sessionStore.save(
+            base.copy(
+                workspace = ws,
+                agentId = agentPresetId,
+                agentName = agentInfo ?: preset.displayName,
+                model = modelName,
+                turns = usage.turns,
+                inputTokens = usage.inputTokens,
+                outputTokens = usage.outputTokens
+            ),
+            timeline.toList()
+        )
+        currentSessionMeta = saved
+        localSessions = sessionStore.list(ws)
     }
 
     // ------------------------------------------------------------------
@@ -956,6 +1591,16 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
     }
 
     override fun onCleared() {
+        saveJob?.cancel()
+        // onCleared 之后 viewModelScope 会被取消，最后一份快照用独立协程落盘
+        val sid = sessionId
+        val meta = currentSessionMeta
+        if (sid != null && meta != null && timeline.isNotEmpty()) {
+            val items = timeline.toList()
+            CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+                sessionStore.save(meta, items)
+            }
+        }
         teardown()
         super.onCleared()
     }
@@ -985,6 +1630,7 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
         authMethods = emptyList()
         activeAuthMethodId = null
         isAuthenticated = false
+        authRequested = false
         agentInfo = null
         sessions = emptyList()
         sessionSnapshots.clear()
@@ -1070,29 +1716,78 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
                     Acp.M_AUTHENTICATE,
                     JSONObject().put("methodId", method.id)
                 )
-                isAuthenticated = true
+                isAuthenticated = false
+                authRequested = true
                 activeAuthMethodId = method.id
             }
         }
 
         statusMessage = s(R.string.acp_status_creating_session)
+
+        val resume = resumeSessionId
+        resumeSessionId = null
+        var resumeError: String? = null
+        if (resume != null) {
+            val previousMeta = currentSessionMeta
+            isReplaying = true
+            isRestoringSession = true
+            replayUserBuffer = null
+            replayUserItemId = null
+            replayPrefixStripped = false
+            try {
+                timeline.clear()
+                val loaded = acpConnection.request(
+                    Acp.M_SESSION_LOAD,
+                    JSONObject().apply {
+                        put("sessionId", resume)
+                        put("cwd", resolveWorkDir())
+                        put("mcpServers", mcp.toJsonArray())
+                    },
+                    timeoutMillis = AcpConnection.DEFAULT_TIMEOUT_MILLIS
+                )
+                applySessionResult(loaded, forcedId = resume)
+                usage.restore(
+                    input = previousMeta?.inputTokens ?: 0L,
+                    output = previousMeta?.outputTokens ?: 0L,
+                    turns = previousMeta?.turns ?: 0,
+                    toolCalls = timeline.count { it is AcpToolCallItem },
+                    items = timeline.toList()
+                )
+                isReadOnlyReplay = false
+                addNotice(s(R.string.acp_status_session_resumed))
+                return
+            } catch (e: Throwable) {
+                // Agent 不支持 session/load 或会话已失效：本地记录仍在，开一个新会话继续
+                resumeError = s(R.string.acp_error_session_resume, e.message ?: e.toString())
+                timeline.clear()
+                usage.reset()
+            } finally {
+                isReplaying = false
+                isRestoringSession = false
+            }
+        }
+
         val newSession = acpConnection.request(
             Acp.M_SESSION_NEW,
             JSONObject().apply {
                 put("cwd", resolveWorkDir())
-                put("mcpServers", JSONArray())
+                put("mcpServers", mcp.toJsonArray())
             }
         )
 
         val sid = newSession.strOrNull("sessionId")
             ?: throw AcpException(Acp.ERR_INTERNAL, s(R.string.acp_error_no_session))
         sessionId = sid
+        currentSessionMeta = null
+        bindSessionMeta(sid)
         applyModes(newSession.objOrNull("modes"))
         applyConfigOptions(Acp.parseConfigOptions(newSession.arrOrNull("configOptions")))
 
         connectionState = AcpConnectionState.READY
         statusMessage = null
+        resumeError?.let { addNotice(it, isError = true) }
         addNotice(s(R.string.acp_status_connected, agentInfo ?: preset.displayName))
+        restoreConfigPreferences()
     }
 
     private fun onAgentExited(exitCode: Int) {
@@ -1164,6 +1859,18 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
         stderrTail = stderrLines.joinToString("\n")
     }
 
+    /** 从 `session/prompt` 响应里尽量挖出用量对象（不同 Agent 放的位置不一）。 */
+    private fun usageFrom(result: JSONObject): JSONObject? {
+        result.objOrNull("usage")?.let { return it }
+        result.objOrNull("_meta")?.let { meta ->
+            meta.objOrNull("usage")?.let { return it }
+            if (meta.has("inputTokens") || meta.has("outputTokens") || meta.has("totalTokens")) {
+                return meta
+            }
+        }
+        return null
+    }
+
     private fun appVersion(): String = try {
         val ctx = getApplication<Application>()
         ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName ?: "unknown"
@@ -1219,22 +1926,34 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
         }
         if (options.isEmpty()) return Acp.permissionCancelledResult()
 
-        if (autoApprove) {
-            val allow = options.firstOrNull {
-                it.kind == Acp.PERM_ALLOW_ONCE || it.kind == Acp.PERM_ALLOW_ALWAYS
-            } ?: options.first()
-            return Acp.permissionSelectedResult(allow.optionId)
+        val title = toolCall.strOrNull("title").orEmpty()
+            .ifEmpty { s(R.string.acp_permission_default_title) }
+        val kind = toolCall.strOrEmpty("kind")
+
+        when (val verdict = permissions.decide(kind, options)) {
+            is AcpPermissionVerdict.Select -> {
+                permissions.record(
+                    kind = kind,
+                    title = title,
+                    decision = if (verdict.allowed) "allowed" else "denied",
+                    detail = verdict.reason
+                )
+                return Acp.permissionSelectedResult(verdict.optionId)
+            }
+
+            is AcpPermissionVerdict.Ask -> Unit
         }
 
         val deferred = CompletableDeferred<String?>()
         pendingPermission = deferred
         permissionPrompt = AcpPermissionPrompt(
-            title = toolCall.strOrNull("title").orEmpty().ifEmpty { s(R.string.acp_permission_default_title) },
-            kind = toolCall.strOrEmpty("kind"),
+            title = title,
+            kind = kind,
             toolCallId = toolCall.strOrEmpty("toolCallId"),
             options = options,
             rawInput = jsonValueToDisplay(toolCall.opt("rawInput"))
         )
+        permissions.record(kind, title, "asked", "等待用户确认")
 
         val chosen = deferred.await()
         if (pendingPermission === deferred) pendingPermission = null
@@ -1292,7 +2011,7 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
         when (update.strOrNull("sessionUpdate")) {
             Acp.U_AGENT_MESSAGE_CHUNK -> appendChunk(update, agentMessage = true)
             Acp.U_AGENT_THOUGHT_CHUNK -> appendChunk(update, agentMessage = false)
-            Acp.U_USER_MESSAGE_CHUNK -> Unit
+            Acp.U_USER_MESSAGE_CHUNK -> if (isReplaying) appendReplayedUserChunk(update)
             Acp.U_TOOL_CALL -> upsertToolCall(update)
             Acp.U_TOOL_CALL_UPDATE -> upsertToolCall(update)
             Acp.U_PLAN -> applyPlan(update)
@@ -1307,12 +2026,61 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
             }
             else -> Unit
         }
+        update.objOrNull("_meta")?.let { usage.applyReported(it.objOrNull("usage") ?: it) }
+        schedulePersist()
+    }
+
+    /** `session/load` 重放历史时，Agent 也会重放用户消息；把它们补回时间线。 */
+    private fun appendReplayedUserChunk(update: JSONObject) {
+        val text = contentBlockToText(update.objOrNull("content")) ?: return
+        if (text.isEmpty()) return
+
+        // 新的用户消息（中间夹着 Agent 消息）重新开始一段缓冲
+        if (replayUserItemId == null || timeline.lastOrNull()?.id != replayUserItemId) {
+            replayUserBuffer = StringBuilder()
+            replayPrefixStripped = false
+            replayUserItemId = null
+        }
+        val buffer = replayUserBuffer ?: StringBuilder().also { replayUserBuffer = it }
+        buffer.append(text)
+
+        if (!replayPrefixStripped) {
+            val markerIndex = buffer.indexOf(AcpMemoryController.USER_PROMPT_MARKER)
+            when {
+                markerIndex >= 0 -> {
+                    buffer.delete(0, markerIndex + AcpMemoryController.USER_PROMPT_MARKER.length)
+                    replayPrefixStripped = true
+                }
+
+                buffer.contains(AcpMemoryController.PREAMBLE_START) -> return // 前缀还没收全，继续等
+
+                buffer.length < AcpMemoryController.PREAMBLE_START.length &&
+                    AcpMemoryController.PREAMBLE_START.startsWith(buffer.toString()) -> return
+
+                buffer.length > 32 -> replayPrefixStripped = true // 不是注入消息，按原文显示
+                else -> return
+            }
+        }
+
+        val visible = buffer.toString().trimStart('\n')
+        val existingId = replayUserItemId
+        if (existingId == null) {
+            val itemId = newId("user")
+            replayUserItemId = itemId
+            timeline.add(AcpUserMessage(itemId, visible))
+        } else {
+            val index = timeline.indexOfFirst { it.id == existingId }
+            if (index >= 0) {
+                timeline[index] = AcpUserMessage(existingId, visible)
+            }
+        }
     }
 
     private fun appendChunk(update: JSONObject, agentMessage: Boolean) {
         val text = contentBlockToText(update.objOrNull("content")) ?: return
         if (text.isEmpty()) return
         val messageId = update.strOrNull("messageId")
+        usage.onAgentText(text)
 
         if (agentMessage) {
             val key = messageId?.let { "agent:$it" } ?: currentAgentMessageItemId
@@ -1347,30 +2115,44 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
         val rawOutput = jsonValueToDisplay(update.opt("rawOutput"))
 
         val index = timeline.indexOfFirst { it is AcpToolCallItem && it.toolCallId == toolCallId }
+        val now = System.currentTimeMillis()
         if (index >= 0) {
             val old = timeline[index] as AcpToolCallItem
+            val newStatus = update.strOrNull("status") ?: old.status
+            val terminal = newStatus == Acp.STATUS_COMPLETED || newStatus == Acp.STATUS_FAILED
             timeline[index] = old.copy(
                 title = update.strOrNull("title") ?: old.title,
                 kind = update.strOrNull("kind") ?: old.kind,
-                status = update.strOrNull("status") ?: old.status,
+                status = newStatus,
                 contents = if (contents.isEmpty()) old.contents else contents,
                 locations = if (locations.isEmpty()) old.locations else locations,
                 rawInput = rawInput ?: old.rawInput,
-                rawOutput = rawOutput ?: old.rawOutput
+                rawOutput = rawOutput ?: old.rawOutput,
+                startedAt = old.startedAt.takeIf { it > 0L } ?: now,
+                finishedAt = old.finishedAt ?: now.takeIf { terminal }
             )
         } else {
+            val title = update.strOrNull("title").orEmpty()
+            val status = update.strOrEmpty("status").ifEmpty { Acp.STATUS_PENDING }
+            val terminal = status == Acp.STATUS_COMPLETED || status == Acp.STATUS_FAILED
             timeline.add(
                 AcpToolCallItem(
                     id = newId("tool"),
                     toolCallId = toolCallId,
-                    title = update.strOrNull("title").orEmpty(),
+                    title = title,
                     kind = update.strOrEmpty("kind").ifEmpty { Acp.KIND_OTHER },
-                    status = update.strOrEmpty("status").ifEmpty { Acp.STATUS_PENDING },
+                    status = status,
                     contents = contents,
                     locations = locations,
                     rawInput = rawInput,
-                    rawOutput = rawOutput
+                    rawOutput = rawOutput,
+                    startedAt = now,
+                    finishedAt = now.takeIf { terminal }
                 )
+            )
+            usage.onToolCall(
+                title = title,
+                detail = contents.filterIsInstance<AcpToolContent.Text>().joinToString("\n") { it.text }
             )
         }
     }
@@ -1448,6 +2230,56 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
         // 同步旧字段：部分 Agent 仅通过 configOptions 暴露模式
         options.firstOrNull { it.category == Acp.CAT_MODE }?.let { mode ->
             currentModeId = mode.currentValueString
+        }
+        val modelName = options.firstOrNull { it.category == Acp.CAT_MODEL }?.currentDisplayName
+        if (!modelName.isNullOrBlank()) usage.applyModel(modelName)
+    }
+
+    // ---- 配置项记忆（模型 / 模式 / 思考等级） ----
+
+    private fun loadConfigSelections(agentId: String): Map<String, String> {
+        val raw = configPrefs.getString("selections_$agentId", null) ?: return emptyMap()
+        return runCatching {
+            val json = JSONObject(raw)
+            json.keys().asSequence().associateWith { json.optString(it) }
+        }.getOrDefault(emptyMap())
+    }
+
+    private fun saveConfigSelection(agentId: String, configId: String, value: Any) {
+        val current = loadConfigSelections(agentId).toMutableMap()
+        current[configId] = value.toString()
+        val json = JSONObject().apply { current.forEach { (key, item) -> put(key, item) } }
+        configPrefs.edit { putString("selections_$agentId", json.toString()) }
+    }
+
+    /** 新会话建立后，把上次选择的模型 / 模式恢复回去。 */
+    private suspend fun restoreConfigPreferences() {
+        val acpConnection = connection ?: return
+        val sid = sessionId ?: return
+        if (connectionState != AcpConnectionState.READY) return
+        val stored = loadConfigSelections(agentPresetId)
+        if (stored.isEmpty()) return
+
+        configOptions.forEach { option ->
+            if (option.type != Acp.CTYPE_SELECT && option.type != Acp.CTYPE_BOOLEAN) return@forEach
+            val desired = stored[option.id] ?: return@forEach
+            if (option.currentValueString == desired) return@forEach
+
+            val payload = JSONObject().apply {
+                put("sessionId", sid)
+                put("configId", option.id)
+                if (option.type == Acp.CTYPE_BOOLEAN) {
+                    put("type", Acp.CTYPE_BOOLEAN)
+                    put("value", desired.toBoolean())
+                } else {
+                    put("value", desired)
+                }
+            }
+            runCatching {
+                val result = acpConnection.request(Acp.M_SESSION_SET_CONFIG_OPTION, payload)
+                result.arrOrNull("configOptions")
+                    ?.let { applyConfigOptions(Acp.parseConfigOptions(it)) }
+            }
         }
     }
 

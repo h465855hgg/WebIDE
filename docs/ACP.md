@@ -4,6 +4,8 @@ WebIDE 内置一个 **ACP 客户端**，把「外部编码 Agent」接进编辑�
 
 代码位置：`app/src/main/java/com/web/webide/ui/editor/acp/`（取代了旧的 `aicoding` 包）。
 
+> 2.0 的会话持久化、权限分级、token 计量与输入体验改造，见 [ACP-AGENT-2.0.md](ACP-AGENT-2.0.md)。
+
 ---
 
 ## 1. 快速开始
@@ -97,6 +99,7 @@ WebIDE 内置一个 **ACP 客户端**，把「外部编码 Agent」接进编辑�
   - `category`：`mode`、`model`、`model_config`、`thought_level`（其它值为自定义）
 - 切换：`session/set_config_option { sessionId, configId, value }`；布尔型额外带 `type: "boolean"`。Agent 在结果里回传**完整**配置状态。
 - 客户端需在 `initialize` 声明 `session.configOptions.boolean` 才能收到布尔型配置项。
+- 选择按 Agent 持久化；新会话建立后自动恢复上次的模型 / 模式 / 思考等级（`AcpViewModel.restoreConfigPreferences`）。
 
 ### UI 呈现
 
@@ -143,10 +146,21 @@ WebIDE 内置一个 **ACP 客户端**，把「外部编码 Agent」接进编辑�
 
 ## 7. 权限与安全
 
-- **自动授权**（设置里可开关，默认关）：直接同意 `allow_once` / `allow_always`。
-- 关闭时弹授权卡片，展示标题、kind、原始参数与可选项。
+权限分为四档（`AcpPermissionController`）：
+
+| 档位 | 行为 |
+| --- | --- |
+| 每次都问 | 任何工具调用都弹卡片 |
+| 智能放行 | 读文件 / 搜索 / 思考自动放行，写盘与执行仍询问（默认） |
+| 全部放行 | 自动同意所有请求（含写盘与命令） |
+| 只读模式 | 拒绝写文件、删文件、移动、执行命令 |
+
+- **按工具类型记忆**「总是允许 / 总是拒绝」，持久化在 `acp_permissions`；设置页可清空。
+- 旧版 `auto_approve` 布尔值会自动迁移到「全部放行 / 智能放行」。
+- 每次决策记录审计（类型、标题、结果、原因）。
+- 自动裁决优先选 `allow_once` / `reject_once`，把永久放行留给用户显式选择。
 - 会话取消时，挂起的授权请求必须回 `cancelled`。
-- 提示：自动授权会放行所有文件写与命令执行，请谨慎开启。
+- 提示：「全部放行」会放行所有文件写与命令执行，请谨慎开启。
 
 ---
 
@@ -154,9 +168,12 @@ WebIDE 内置一个 **ACP 客户端**，把「外部编码 Agent」接进编辑�
 
 - **Agent**：下拉选择预设。
 - **启动命令**：可编辑，保存后若与已连接配置不同则自动重连。
+- **环境变量**：每行一条 `KEY=VALUE`（API Key / Base URL 等），启动 Agent 子进程时注入；保存后需重新连接。
 - **版本 / 一键安装**：仅对有 npm 包的预设展示。
 - **登录**：Agent 声明了 `authMethods` 且正是当前已连接的那个时展示。
-- **自动授权**：见 §7。
+- **工具权限**：四档级别 + 已记住的规则；见 §7。
+- **记忆与行为**：项目记忆、协作风格、新会话首轮注入、写入 `AGENTS.md`（见 `docs/ACP-AGENT-2.0.md` §2.6）。
+- **MCP 服务器**：本地命令 / HTTP(SSE) 服务器列表，`session/new` 时下发；修改后需新建会话生效（见 `docs/ACP-AGENT-2.0.md` §2.9）。
 - **停靠到左侧**：面板停靠位置。
 - **环境自检**：输出工作目录可达性、命令解析路径、node/npm/npx 版本，并探测 `models.opencode.ai` / `opencode.ai` / `registry.npmjs.org` 的连通性。
 - **Agent 运行日志**：读取 Agent 自身日志（如 `~/.local/share/opencode/log/opencode.log`）的末尾若干行。
