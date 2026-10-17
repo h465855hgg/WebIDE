@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.SmartToy
@@ -47,6 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -208,9 +210,9 @@ internal fun AcpDraggableFab(
                     )
 
                     else -> Icon(
-                        Icons.Default.SmartToy,
+                        painter = painterResource(R.drawable.acp_logo),
                         contentDescription = stringResource(R.string.acp_action_expand),
-                        modifier = Modifier.size(25.dp),
+                        modifier = Modifier.size(30.dp, 12.dp),
                         tint = content
                     )
                 }

@@ -170,20 +170,17 @@ internal fun AcpComposer(
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 8.dp, end = 8.dp, bottom = 6.dp),
-                shape = RoundedCornerShape(
-                    topStart = 16.dp,
-                    topEnd = 0.dp,
-                    bottomStart = 16.dp,
-                    bottomEnd = 16.dp
-                ),
+                    .padding(horizontal = 8.dp)
+                    .padding(bottom = 6.dp),
+                shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 tonalElevation = 1.dp
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 12.dp, end = 10.dp, top = 6.dp, bottom = 6.dp),
+                        .heightIn(min = 48.dp)
+                        .padding(start = 14.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(modifier = Modifier.weight(1f)) {
@@ -191,7 +188,7 @@ internal fun AcpComposer(
                         if (!hasText) {
                             Text(
                                 text = stringResource(R.string.acp_composer_hint),
-                                style = MaterialTheme.typography.bodySmall,
+                                style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -214,7 +211,7 @@ internal fun AcpComposer(
                             )
                         )
                     }
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(10.dp))
                     if (isPrompting) {
                         FilledIconButton(
                             onClick = onCancel,

@@ -30,7 +30,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material.icons.filled.MoreVert
@@ -40,6 +41,8 @@ import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -168,24 +171,39 @@ internal fun AcpComposerToolbar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(24.dp)
-            .padding(start = 10.dp, end = 8.dp),
+            .padding(start = 10.dp, end = 8.dp, top = 2.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp)
     ) {
         if (hasModel) AcpModelChip(viewModel = viewModel, onClick = onOpenModel)
         if (hasMode) AcpModeChip(viewModel = viewModel, onClick = onOpenMode)
         Spacer(Modifier.weight(1f))
-        ToolbarTab(
-            icon = Icons.AutoMirrored.Filled.List,
-            label = stringResource(R.string.acp_tasks_title),
-            onClick = onOpenTasks
-        )
-        ToolbarTab(
-            icon = Icons.Default.OpenInFull,
-            label = stringResource(R.string.acp_input_fullscreen_tab),
-            onClick = onOpenFullscreen
-        )
+        FilledTonalIconButton(
+            onClick = onOpenTasks,
+            modifier = Modifier.size(38.dp),
+            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            )
+        ) {
+            Icon(
+                Icons.Default.Checklist,
+                contentDescription = stringResource(R.string.acp_tasks_title),
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        FilledTonalIconButton(
+            onClick = onOpenFullscreen,
+            modifier = Modifier.size(38.dp),
+            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            )
+        ) {
+            Icon(
+                Icons.Default.Fullscreen,
+                contentDescription = stringResource(R.string.acp_input_fullscreen),
+                modifier = Modifier.size(20.dp)
+            )
+        }
     }
 }
 

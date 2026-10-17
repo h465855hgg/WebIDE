@@ -73,9 +73,8 @@ internal fun AcpModelChip(viewModel: AcpViewModel, onClick: () -> Unit) {
         ?: viewModel.usage.model
         ?: stringResource(R.string.acp_config_model)
     ConfigChip(
-        icon = Icons.Default.SmartToy,
         label = label,
-        maxTextWidth = 96.dp,
+        maxTextWidth = 106.dp,
         onClick = onClick
     )
 }
@@ -91,44 +90,32 @@ internal fun AcpModeChip(viewModel: AcpViewModel, onClick: () -> Unit) {
         ?: viewModel.currentModeId
         ?: stringResource(R.string.acp_config_mode)
     ConfigChip(
-        icon = Icons.Default.Tune,
         label = label,
-        maxTextWidth = 84.dp,
+        maxTextWidth = 94.dp,
         onClick = onClick
     )
 }
 
 @Composable
 private fun ConfigChip(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
     maxTextWidth: androidx.compose.ui.unit.Dp,
     onClick: () -> Unit
 ) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(9.dp),
+        shape = RoundedCornerShape(10.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                modifier = Modifier.size(13.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.width(4.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.widthIn(max = maxTextWidth)
-            )
-        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .widthIn(max = maxTextWidth)
+                .padding(horizontal = 12.dp, vertical = 7.dp)
+        )
     }
 }
 
