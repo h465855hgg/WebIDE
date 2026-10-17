@@ -68,13 +68,15 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavController
 import com.web.webide.R
 import com.web.webide.build.ApkInstaller
+import com.web.webide.core.utils.FileChangeBus
+import com.web.webide.core.utils.WorkspaceWatcher
 import com.web.webide.core.utils.LogCatcher
 import com.web.webide.core.utils.WorkspaceManager
 import com.web.webide.files.FileTree
 import com.web.webide.safeNavigate
 import com.web.webide.ui.components.ColorPickerDialog
 import com.web.webide.ui.components.colorToHex
-import com.web.webide.ui.editor.aicoding.AICodingPanel
+import com.web.webide.ui.editor.acp.AcpPanel
 import com.web.webide.ui.editor.components.EditorPanelLayout
 import com.web.webide.ui.editor.components.EditorToolbar
 import com.web.webide.ui.editor.components.JumpLinePanel
@@ -193,6 +195,22 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
     LaunchedEffect(Unit) {
         viewModel.reloadEditorConfig(context)
     }
+    // 外部（ACP Agent / 终端等）改动磁盘后，自动同步已打开的标签页内容与文件树。
+    LaunchedEffect(Unit) {
+        FileChangeBus.events.collect { paths ->
+            viewModel.handleExternalChange(paths)
+        }
+    }
+
+    // 轮询工作区，兜住一切外部落盘（Agent 直接改盘 / 终端命令等），自动刷新文件树与标签页。
+    LaunchedEffect(projectPath) {
+        val watcherRoot = File(projectPath)
+        if (watcherRoot.isDirectory) {
+            WorkspaceWatcher.changes(watcherRoot).collect { paths ->
+                FileChangeBus.notifyChanged(paths)
+            }
+        }
+    }
     val editorConfig = viewModel.editorConfig
 
     // 初始加载进度条状态
@@ -294,6 +312,8 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
     val searchText = stringResource(R.string.action_search)
     val terminalText = stringResource(R.string.action_terminal)
     val jsDocsText = stringResource(R.string.editor_js_docs)
+    val acpShowText = stringResource(R.string.acp_menu_show)
+    val acpHideText = stringResource(R.string.acp_menu_hide)
     val installLastApkText = stringResource(R.string.editor_install_last_apk)
     val buildApkText = stringResource(R.string.editor_build_apk)
     val lastBuiltApkNameText = viewModel.lastBuiltApk
@@ -547,6 +567,21 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
                                                 navController.safeNavigate("js_interface_doc")
                                             }
                                         )
+                                        // ACP 助手开关：就地切换，不必跳到设置页
+                                        DropdownMenuItem(
+                                            text = { Text(if (isAiEnabled) acpHideText else acpShowText) },
+                                            onClick = {
+                                                val next = !isAiEnabled
+                                                isAiEnabled = next
+                                                context.getSharedPreferences(
+                                                    "WebIDE_Editor_Settings",
+                                                    Context.MODE_PRIVATE
+                                                ).edit()
+                                                    .putBoolean("editor_ai_enabled", next)
+                                                    .apply()
+                                                isMoreMenuExpanded = false
+                                            }
+                                        )
 
                                         // 只有文件存在且路径属于当前项目(可选逻辑)时才显示
                                         if (viewModel.lastBuiltApk != null && viewModel.lastBuiltApk!!.exists()) {
@@ -747,7 +782,15 @@ fun CodeEditScreen(folderName: String, navController: NavController, viewModel: 
 
 
                         if (isAiEnabled) {
-                            AICodingPanel()
+                            AcpPanel(
+                                onHide = {
+                                    isAiEnabled = false
+                                    context.getSharedPreferences("WebIDE_Editor_Settings", Context.MODE_PRIVATE)
+                                        .edit()
+                                        .putBoolean("editor_ai_enabled", false)
+                                        .apply()
+                                }
+                            )
                         }
                     }
                 }

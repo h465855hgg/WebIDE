@@ -15,7 +15,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-package com.web.webide.ui.editor.aicoding
+package com.web.webide.ui.editor.acp
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
@@ -23,30 +23,25 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.dp
 
-enum class DockSide {
-    Right,
-    Left
+internal enum class AcpDockSide {
+    RIGHT,
+    LEFT
 }
 
+/** ACP 面板的窗口状态（停靠侧、尺寸、最大化、收起为气泡）。 */
 @Stable
-class AICodingState {
-    var isExpanded by mutableStateOf(false)
-    var dockSide by mutableStateOf(DockSide.Right)
-    var windowWidth by mutableStateOf(300.dp)
-    var windowHeight by mutableStateOf(400.dp)
-    var windowOffset by mutableStateOf(Offset.Zero)
-    var lastFloatingPosition by mutableStateOf<Offset?>(null)
-    var isDragging by mutableStateOf(false)
-    
+internal class AcpPanelState {
+    var dockSide by mutableStateOf(AcpDockSide.RIGHT)
     var isMaximized by mutableStateOf(false)
-    internal var restoreWidth by mutableStateOf(300.dp)
-    internal var restoreHeight by mutableStateOf(400.dp)
+
+    /** 收起为悬浮气泡，面板主体隐藏但连接保持。 */
+    var isCollapsed by mutableStateOf(false)
+
+    var panelWidth by mutableStateOf(340.dp)
+    var panelHeight by mutableStateOf(460.dp)
 }
 
 @Composable
-fun rememberAICodingState(): AICodingState {
-    return remember { AICodingState() }
-}
+internal fun rememberAcpPanelState(): AcpPanelState = remember { AcpPanelState() }

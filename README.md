@@ -59,6 +59,7 @@ com.web.webide
 *   **Terminal Emulator**: Embedded Alpine Linux environment (via proot) with a terminal, multi-session management, and virtual keys for Ctrl/Alt/Shift/Fn.
 *   **Modern UI**: Written 100% in Kotlin and Jetpack Compose, supporting dynamic themes.
 *   **Git Integration**: Built-in Git version control with a visual commit history graph, supporting Clone, Commit, Push, Pull, and Branch management. Automatically ignores sensitive files and build artifacts.
+*   **AI Coding Agent (ACP)**: Built-in [Agent Client Protocol](https://agentclientprotocol.com) client. Connect external coding agents (Gemini CLI, Qwen Code, Claude Code, Codex, OpenCode, Cline, Crush, or a custom command) right inside the editor. Switch model / mode / thought level from a config bar, review plans, tool calls and diffs inline, and approve file writes or commands. See [docs/ACP.md](docs/ACP.md).
 *   **Localization (i18n)**: Strings live in a dedicated `:i18n` module, currently shipping Chinese and English. Adding a language only requires dropping a new `values-<locale>/strings.xml` — contributions are welcome.
 
 ## Building
