@@ -1,6 +1,6 @@
 # Agent 工作台 2.0：把「能连」变成「能用」
 
-> 分支：`feature/acp-agent-client`
+> 分支：`main`（0.4.1 起）
 > 代码：`app/src/main/java/com/web/webide/ui/editor/acp/`
 > 本文记录这次改造的产品判断、架构取舍与后续路线。
 
