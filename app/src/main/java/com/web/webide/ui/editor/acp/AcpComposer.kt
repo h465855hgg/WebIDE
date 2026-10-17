@@ -42,6 +42,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -70,6 +71,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
@@ -96,8 +98,6 @@ internal fun AcpComposer(
     connected: Boolean,
     readOnlyReplay: Boolean,
     commands: List<AcpSlashCommand>,
-    onFullscreen: () -> Unit,
-    onOpenTasks: () -> Unit,
     onSend: () -> Unit,
     onCancel: () -> Unit
 ) {
@@ -166,75 +166,55 @@ internal fun AcpComposer(
             }
         }
 
-        // 文件夹标签式入口：任务清单 + 全屏，贴在输入卡片右上角外侧并与其同色融合。
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(end = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End)
-        ) {
-            FolderTab(
-                icon = Icons.AutoMirrored.Filled.List,
-                label = stringResource(R.string.acp_tasks_title),
-                onClick = onOpenTasks
-            )
-            FolderTab(
-                icon = Icons.Default.OpenInFull,
-                label = stringResource(R.string.acp_input_fullscreen_tab),
-                onClick = onFullscreen
-            )
-        }
-
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 8.dp, end = 8.dp, bottom = 6.dp),
-            shape = RoundedCornerShape(
-                topStart = 16.dp,
-                topEnd = 0.dp,
-                bottomStart = 16.dp,
-                bottomEnd = 16.dp
-            ),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            tonalElevation = 1.dp
-        ) {
-            Column(
-                modifier = Modifier.padding(start = 10.dp, end = 6.dp, top = 4.dp, bottom = 2.dp)
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 8.dp, end = 8.dp, bottom = 6.dp),
+                shape = RoundedCornerShape(
+                    topStart = 16.dp,
+                    topEnd = 0.dp,
+                    bottomStart = 16.dp,
+                    bottomEnd = 16.dp
+                ),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                tonalElevation = 1.dp
             ) {
-                OutlinedTextField(
-                    value = value,
-                    onValueChange = onValueChange,
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 40.dp, max = 40.dp),
-                    placeholder = {
-                        Text(
-                            text = stringResource(R.string.acp_composer_hint),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    },
-                    textStyle = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
-                    shape = RoundedCornerShape(12.dp),
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Text,
-                        imeAction = ImeAction.Default
-                    ),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        disabledContainerColor = Color.Transparent,
-                        focusedBorderColor = Color.Transparent,
-                        unfocusedBorderColor = Color.Transparent,
-                        disabledBorderColor = Color.Transparent
-                    )
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
+                        .padding(start = 12.dp, end = 10.dp, top = 6.dp, bottom = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Spacer(Modifier.weight(1f))
+                    Box(modifier = Modifier.weight(1f)) {
+                        val hasText = value.text.isNotEmpty()
+                        if (!hasText) {
+                            Text(
+                                text = stringResource(R.string.acp_composer_hint),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        BasicTextField(
+                            value = value,
+                            onValueChange = onValueChange,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 24.dp),
+                            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                color = MaterialTheme.colorScheme.onSurface
+                            ),
+                            singleLine = true,
+                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Text,
+                                imeAction = ImeAction.Default
+                            )
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
                     if (isPrompting) {
                         FilledIconButton(
                             onClick = onCancel,

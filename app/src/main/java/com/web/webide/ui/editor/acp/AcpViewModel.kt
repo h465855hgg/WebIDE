@@ -2215,12 +2215,14 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
     private fun applyCommands(update: JSONObject) {
         availableCommands = update.arrOrEmpty("availableCommands").let { array ->
             (0 until array.length()).mapNotNull { index ->
-                array.optJSONObject(index)?.let { command ->
-                    AcpSlashCommand(
-                        name = command.strOrEmpty("name"),
-                        description = command.strOrEmpty("description")
-                    )
-                }
+                val command = array.optJSONObject(index) ?: return@mapNotNull null
+                val raw = command.strOrEmpty("name").trim()
+                if (raw.isEmpty()) return@mapNotNull null
+                AcpSlashCommand(
+                    // ACP 的 AvailableCommand.name 不带前导 /，补上才能被 "/" 补全匹配到。
+                    name = if (raw.startsWith("/")) raw else "/$raw",
+                    description = command.strOrEmpty("description")
+                )
             }
         }
     }

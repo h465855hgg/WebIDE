@@ -30,7 +30,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -151,7 +153,9 @@ internal fun AcpTopStatusBar(
 internal fun AcpComposerToolbar(
     viewModel: AcpViewModel,
     onOpenModel: () -> Unit,
-    onOpenMode: () -> Unit
+    onOpenMode: () -> Unit,
+    onOpenTasks: () -> Unit,
+    onOpenFullscreen: () -> Unit
 ) {
     val hasModel = viewModel.configOptions.any {
         it.category == Acp.CAT_MODEL ||
@@ -160,17 +164,67 @@ internal fun AcpComposerToolbar(
     }
     val hasMode = viewModel.configOptions.any { it.category == Acp.CAT_MODE } ||
         viewModel.sessionModes.isNotEmpty()
-    if (!hasModel && !hasMode) return
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 10.dp, end = 10.dp, top = 2.dp, bottom = 2.dp),
+            .height(24.dp)
+            .padding(start = 10.dp, end = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp)
     ) {
-        AcpModelChip(viewModel = viewModel, onClick = onOpenModel)
-        AcpModeChip(viewModel = viewModel, onClick = onOpenMode)
+        if (hasModel) AcpModelChip(viewModel = viewModel, onClick = onOpenModel)
+        if (hasMode) AcpModeChip(viewModel = viewModel, onClick = onOpenMode)
+        Spacer(Modifier.weight(1f))
+        ToolbarTab(
+            icon = Icons.AutoMirrored.Filled.List,
+            label = stringResource(R.string.acp_tasks_title),
+            onClick = onOpenTasks
+        )
+        ToolbarTab(
+            icon = Icons.Default.OpenInFull,
+            label = stringResource(R.string.acp_input_fullscreen_tab),
+            onClick = onOpenFullscreen
+        )
+    }
+}
+
+@Composable
+private fun ToolbarTab(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(
+            topStart = 10.dp,
+            topEnd = 10.dp,
+            bottomStart = 0.dp,
+            bottomEnd = 0.dp
+        ),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh
+    ) {
+        Row(
+            modifier = Modifier
+                .height(24.dp)
+                .padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                modifier = Modifier.size(12.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
+            )
+        }
     }
 }
 

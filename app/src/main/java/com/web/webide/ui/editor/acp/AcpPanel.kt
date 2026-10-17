@@ -473,7 +473,9 @@ internal fun AcpPanel(
                     AcpComposerToolbar(
                         viewModel = viewModel,
                         onOpenModel = { configMenu = AcpConfigMenu.MODEL },
-                        onOpenMode = { configMenu = AcpConfigMenu.MODE }
+                        onOpenMode = { configMenu = AcpConfigMenu.MODE },
+                        onOpenTasks = { showTasks = true },
+                        onOpenFullscreen = { inputFullscreen = true }
                     )
 
                     AcpComposer(
@@ -483,8 +485,6 @@ internal fun AcpPanel(
                         connected = viewModel.connectionState == AcpConnectionState.READY,
                         readOnlyReplay = viewModel.isReadOnlyReplay,
                         commands = viewModel.availableCommands,
-                        onFullscreen = { inputFullscreen = true },
-                        onOpenTasks = { showTasks = true },
                         onSend = {
                             val text = input.text
                             input = TextFieldValue("")
@@ -1816,6 +1816,8 @@ private fun CopyIconButton(text: String) {
 
 @Composable
 private fun AcpAgentBubble(item: AcpAgentMessage) {
+    var showMenu by remember(item.id) { mutableStateOf(false) }
+    val clipboard = LocalClipboardManager.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1836,14 +1838,29 @@ private fun AcpAgentBubble(item: AcpAgentMessage) {
             }
         }
         Spacer(Modifier.width(8.dp))
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-            shape = RoundedCornerShape(4.dp, 16.dp, 16.dp, 16.dp),
-            modifier = Modifier.weight(1f)
-        ) {
-            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                AcpRichText(text = item.text)
-                CopyIconButton(item.text)
+        Box(modifier = Modifier.weight(1f)) {
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                shape = RoundedCornerShape(4.dp, 16.dp, 16.dp, 16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .pointerInput(item.id) {
+                        detectTapGestures(onLongPress = { showMenu = true })
+                    }
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                    AcpRichText(text = item.text)
+                    CopyIconButton(item.text)
+                }
+            }
+            DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.acp_action_copy)) },
+                    onClick = {
+                        clipboard.setText(AnnotatedString(item.text))
+                        showMenu = false
+                    }
+                )
             }
         }
     }
