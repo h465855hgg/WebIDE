@@ -116,14 +116,24 @@ internal class AcpSkillsController(private val context: Context) {
         if (!injectSkills) return null
         val list = skills
         if (list.isEmpty()) return null
+        val chinese = java.util.Locale.getDefault().language.startsWith("zh")
         return buildString {
             appendLine(AcpMemoryController.PREAMBLE_START)
-            appendLine("【本项目可用技能】需要时读取下列文件，不要凭空假设内容：")
-            list.forEach { skill ->
-                appendLine("- ${skill.name}：${skill.description.ifBlank { "无描述" }}（${skill.path}）")
+            if (chinese) {
+                appendLine("【本项目可用技能】需要时读取下列文件，不要凭空假设内容：")
+                list.forEach { skill ->
+                    appendLine("- ${skill.name}：${skill.description.ifBlank { "无描述" }}（${skill.path}）")
+                }
+                appendLine()
+                appendLine("【用户请求】")
+            } else {
+                appendLine("[Project skills] Read the following files when relevant. Do not guess their content:")
+                list.forEach { skill ->
+                    appendLine("- ${skill.name}: ${skill.description.ifBlank { "no description" }} (${skill.path})")
+                }
+                appendLine()
+                appendLine("[User request]")
             }
-            appendLine()
-            appendLine("【用户请求】")
             append(AcpMemoryController.USER_PROMPT_MARKER)
         }
     }

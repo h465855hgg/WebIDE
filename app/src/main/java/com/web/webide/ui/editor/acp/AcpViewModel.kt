@@ -774,9 +774,14 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
         val text = raw.trim()
         if (text.isEmpty() || !canPrompt()) return
 
-        // 首轮注入项目技能清单；UI 只显示用户原文（注入块在历史重放时会被裁掉）
+        // 首轮注入项目技能清单；UI 只显示用户原文（注入块在历史重放时会被裁掉）。
+        // 斜杠命令必须保持 prompt 以 "/" 开头，否则 Agent 不会当命令执行。
         val isFirstUserTurn = timeline.none { it is AcpUserMessage }
-        val preamble = if (isFirstUserTurn) skills.buildPreamble() else null
+        val preamble = if (isFirstUserTurn && !text.startsWith("/")) {
+            skills.buildPreamble()
+        } else {
+            null
+        }
         val promptText = if (preamble.isNullOrBlank()) text else "$preamble$text"
 
         timeline.add(AcpUserMessage(newId("user"), text))
@@ -802,7 +807,11 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
         }
         val userText = (timeline[lastUserIndex] as AcpUserMessage).text
         val isFirstUserTurn = timeline.count { it is AcpUserMessage } == 1
-        val preamble = if (isFirstUserTurn) skills.buildPreamble() else null
+        val preamble = if (isFirstUserTurn && !userText.startsWith("/")) {
+            skills.buildPreamble()
+        } else {
+            null
+        }
         val promptText = if (preamble.isNullOrBlank()) userText else "$preamble$userText"
         usage.onPrompt(promptText)
         beginTurn(promptText)

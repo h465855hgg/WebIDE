@@ -52,6 +52,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.web.webide.R
 
@@ -69,12 +70,15 @@ internal fun AcpModelChip(viewModel: AcpViewModel, onClick: () -> Unit) {
     val options = viewModel.configOptions.filter { it.category in MODEL_CATEGORIES }
     if (options.isEmpty()) return
     val model = options.firstOrNull { it.category == Acp.CAT_MODEL }
-    val label = model?.currentDisplayName
+    val rawLabel = model?.currentDisplayName
         ?: viewModel.usage.model
         ?: stringResource(R.string.acp_config_model)
+    // "OpenCode/DeepSeek-4.1-Flash Free" 这种供应商前缀太长，胶囊里只显示模型名本身。
+    val label = rawLabel.substringAfterLast('/').ifBlank { rawLabel }
     ConfigChip(
         label = label,
-        maxTextWidth = 106.dp,
+        maxTextWidth = 124.dp,
+        maxLines = 2,
         onClick = onClick
     )
 }
@@ -91,7 +95,8 @@ internal fun AcpModeChip(viewModel: AcpViewModel, onClick: () -> Unit) {
         ?: stringResource(R.string.acp_config_mode)
     ConfigChip(
         label = label,
-        maxTextWidth = 94.dp,
+        maxTextWidth = 88.dp,
+        maxLines = 1,
         onClick = onClick
     )
 }
@@ -100,6 +105,7 @@ internal fun AcpModeChip(viewModel: AcpViewModel, onClick: () -> Unit) {
 private fun ConfigChip(
     label: String,
     maxTextWidth: androidx.compose.ui.unit.Dp,
+    maxLines: Int,
     onClick: () -> Unit
 ) {
     Surface(
@@ -109,12 +115,16 @@ private fun ConfigChip(
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelMedium,
-            maxLines = 1,
+            style = if (maxLines > 1) {
+                MaterialTheme.typography.labelSmall.copy(lineHeight = 13.sp)
+            } else {
+                MaterialTheme.typography.labelMedium
+            },
+            maxLines = maxLines,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
                 .widthIn(max = maxTextWidth)
-                .padding(horizontal = 12.dp, vertical = 7.dp)
+                .padding(horizontal = 11.dp, vertical = 5.dp)
         )
     }
 }

@@ -701,9 +701,9 @@ private fun AcpHeader(
         AcpConnectionState.DISCONNECTED -> stringResource(R.string.acp_state_disconnected)
     }
     val statusColor = when (viewModel.connectionState) {
-        AcpConnectionState.READY -> Color(0xFF2E7D32)
-        AcpConnectionState.ERROR -> Color(0xFFC62828)
-        AcpConnectionState.CONNECTING -> Color(0xFFF9A825)
+        AcpConnectionState.READY -> Color(0xFF22C55E)
+        AcpConnectionState.ERROR -> Color(0xFFEF4444)
+        AcpConnectionState.CONNECTING -> Color(0xFFF59E0B)
         AcpConnectionState.DISCONNECTED -> MaterialTheme.colorScheme.outline
     }
 
@@ -715,6 +715,13 @@ private fun AcpHeader(
                 .padding(start = 12.dp, end = 2.dp, top = 2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Icon(
+                painter = painterResource(R.drawable.acp_logo),
+                contentDescription = null,
+                modifier = Modifier.size(18.dp, 7.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.width(5.dp))
             Text(
                 text = "ACP",
                 style = MaterialTheme.typography.labelSmall,
@@ -1825,15 +1832,15 @@ private fun AcpAgentBubble(item: AcpAgentMessage) {
             .padding(top = 2.dp)
     ) {
         Surface(
-            shape = CircleShape,
+            shape = RoundedCornerShape(7.dp),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            modifier = Modifier.size(24.dp)
+            modifier = Modifier.size(34.dp, 24.dp)
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
-                    painter = painterResource(R.drawable.acp_mark),
+                    painter = painterResource(R.drawable.acp_logo),
                     contentDescription = null,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(28.dp, 10.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }

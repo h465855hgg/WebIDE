@@ -20,21 +20,25 @@ package com.web.webide.ui.editor.acp
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -46,10 +50,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -59,11 +65,12 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 /**
- * 收起后的悬浮球。
+ * 收起后的 ACP chip。
  *
+ * - 纯黑灰底、胶囊形，不跟随主题色；
  * - 垂直方向可拖动，松手后吸附到左右屏幕边缘；
- * - 吸附时只露出一半（半隐藏），点一下展开面板；
- * - 左右侧与垂直位置会记住，下次收起还是老地方。
+ * - 停留 3 秒自动吸附半隐藏，点一下展开面板；
+ * - 左右侧与垂直位置会记住。
  */
 @Composable
 internal fun AcpDraggableFab(
@@ -79,20 +86,22 @@ internal fun AcpDraggableFab(
     onClick: () -> Unit
 ) {
     val density = LocalDensity.current
-    val fabSize = 56.dp
-    val sizePx = with(density) { fabSize.toPx() }
+    val chipWidth = 96.dp
+    val chipHeight = 40.dp
     val widthPx = with(density) { containerWidth.toPx() }
     val heightPx = with(density) { containerHeight.toPx() }
+    val chipWpx = with(density) { chipWidth.toPx() }
+    val chipHpx = with(density) { chipHeight.toPx() }
 
     fun targetX(targetSide: AcpDockSide, snapped: Boolean): Float = when {
-        !snapped && targetSide == AcpDockSide.RIGHT -> (widthPx - sizePx - 8f).coerceAtLeast(0f)
+        !snapped && targetSide == AcpDockSide.RIGHT -> (widthPx - chipWpx - 8f).coerceAtLeast(0f)
         !snapped -> 8f
-        targetSide == AcpDockSide.RIGHT -> (widthPx - sizePx * 0.45f).coerceAtLeast(0f)
-        else -> -sizePx * 0.55f
+        targetSide == AcpDockSide.RIGHT -> (widthPx - chipWpx * 0.45f).coerceAtLeast(0f)
+        else -> -chipWpx * 0.55f
     }
 
     fun targetY(fraction: Float): Float {
-        val travel = (heightPx - sizePx).coerceAtLeast(0f)
+        val travel = (heightPx - chipHpx).coerceAtLeast(0f)
         return (travel * fraction.coerceIn(0f, 1f)).coerceIn(0f, travel)
     }
 
@@ -103,7 +112,6 @@ internal fun AcpDraggableFab(
     var snapped by remember { mutableStateOf(false) }
     var idleTick by remember { mutableIntStateOf(0) }
 
-    // 停留 3 秒没有操作才吸附到侧边；拖动期间与刚松手时保持完整可见。
     LaunchedEffect(idleTick) {
         delay(3_000)
         snapped = true
@@ -116,23 +124,20 @@ internal fun AcpDraggableFab(
         }
     }
 
-    val container = when {
-        hasPendingPermission -> MaterialTheme.colorScheme.tertiaryContainer
-        connectionState == AcpConnectionState.ERROR -> MaterialTheme.colorScheme.errorContainer
-        connectionState == AcpConnectionState.READY -> MaterialTheme.colorScheme.primaryContainer
-        else -> MaterialTheme.colorScheme.surfaceContainerHighest
+    val statusColor = when {
+        hasPendingPermission -> Color(0xFFF59E0B)
+        connectionState == AcpConnectionState.READY -> Color(0xFF22C55E)
+        connectionState == AcpConnectionState.ERROR -> Color(0xFFEF4444)
+        connectionState == AcpConnectionState.CONNECTING -> Color(0xFFF59E0B)
+        else -> Color(0xFF9CA3AF)
     }
-    val content = when {
-        hasPendingPermission -> MaterialTheme.colorScheme.onTertiaryContainer
-        connectionState == AcpConnectionState.ERROR -> MaterialTheme.colorScheme.onErrorContainer
-        connectionState == AcpConnectionState.READY -> MaterialTheme.colorScheme.onPrimaryContainer
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
+    val chipContainer = Color(0xFF26262B)
+    val chipContent = Color(0xFFF5F5F5)
 
     Box(
         modifier = Modifier
             .offset { IntOffset(offsetX.value.roundToInt(), offsetY.value.roundToInt()) }
-            .size(fabSize)
+            .size(width = chipWidth, height = chipHeight)
             .pointerInput(containerWidth, containerHeight) {
                 detectDragGestures(
                     onDragStart = {
@@ -145,22 +150,22 @@ internal fun AcpDraggableFab(
                         scope.launch {
                             offsetX.snapTo(
                                 (offsetX.value + dragAmount.x)
-                                    .coerceIn(-sizePx * 0.55f, widthPx - sizePx * 0.45f)
+                                    .coerceIn(-chipWpx * 0.55f, widthPx - chipWpx * 0.45f)
                             )
                             offsetY.snapTo(
                                 (offsetY.value + dragAmount.y)
-                                    .coerceIn(0f, (heightPx - sizePx).coerceAtLeast(0f))
+                                    .coerceIn(0f, (heightPx - chipHpx).coerceAtLeast(0f))
                             )
                         }
                     },
                     onDragEnd = {
                         dragging = false
-                        val newSide = if (offsetX.value + sizePx / 2 < widthPx / 2) {
+                        val newSide = if (offsetX.value + chipWpx / 2 < widthPx / 2) {
                             AcpDockSide.LEFT
                         } else {
                             AcpDockSide.RIGHT
                         }
-                        val travel = (heightPx - sizePx).coerceAtLeast(1f)
+                        val travel = (heightPx - chipHpx).coerceAtLeast(1f)
                         val fraction = (offsetY.value / travel).coerceIn(0f, 1f)
                         onSideChange(newSide)
                         onYFractionChange(fraction)
@@ -186,36 +191,52 @@ internal fun AcpDraggableFab(
         Surface(
             onClick = onClick,
             modifier = Modifier.fillMaxSize(),
-            shape = CircleShape,
-            color = container,
-            tonalElevation = 4.dp,
+            shape = RoundedCornerShape(chipHeight / 2),
+            color = chipContainer,
+            tonalElevation = 6.dp,
             shadowElevation = 10.dp
         ) {
-            Box(
-                modifier = Modifier.background(container, CircleShape),
-                contentAlignment = Alignment.Center
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 when {
                     isPrompting -> CircularProgressIndicator(
-                        modifier = Modifier.size(22.dp),
-                        strokeWidth = 2.dp,
-                        color = content
+                        modifier = Modifier.size(14.dp),
+                        strokeWidth = 1.8.dp,
+                        color = chipContent
                     )
 
                     hasPendingPermission -> Icon(
                         Icons.Default.Warning,
                         contentDescription = stringResource(R.string.acp_action_expand),
-                        modifier = Modifier.size(22.dp),
-                        tint = content
+                        modifier = Modifier.size(15.dp),
+                        tint = Color(0xFFF59E0B)
                     )
 
                     else -> Icon(
                         painter = painterResource(R.drawable.acp_logo),
                         contentDescription = stringResource(R.string.acp_action_expand),
-                        modifier = Modifier.size(30.dp, 12.dp),
-                        tint = content
+                        modifier = Modifier.size(24.dp, 10.dp),
+                        tint = chipContent
                     )
                 }
+                Spacer(Modifier.width(7.dp))
+                Text(
+                    text = "ACP",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = chipContent
+                )
+                Spacer(Modifier.weight(1f))
+                Box(
+                    modifier = Modifier
+                        .size(7.dp)
+                        .clip(CircleShape)
+                        .background(statusColor)
+                )
             }
         }
     }
