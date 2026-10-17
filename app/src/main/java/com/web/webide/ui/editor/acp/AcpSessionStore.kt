@@ -82,6 +82,31 @@ internal class AcpSessionStore(context: Context) {
         }
     }
 
+    /** 所有项目/工作区的会话，用于「全局会话」。 */
+    suspend fun listAll(): List<AcpSessionMeta> = withContext(Dispatchers.IO) {
+        synchronized(lock) {
+            val dirs = root.listFiles { file -> file.isDirectory } ?: return@synchronized emptyList()
+            dirs.flatMap { readIndex(it) }
+                .sortedWith(compareByDescending<AcpSessionMeta> { it.pinned }.thenByDescending { it.updatedAt })
+        }
+    }
+
+    /** 全局搜索：标题/摘要/Agent 名，先匹配索引，命中不足再深扫正文。 */
+    suspend fun searchAll(query: String): List<AcpSessionMeta> = withContext(Dispatchers.IO) {
+        val keyword = query.trim()
+        val all = listAll()
+        if (keyword.isEmpty()) return@withContext all
+        val metaHits = all.filter {
+            it.title.contains(keyword, ignoreCase = true) ||
+                it.preview.contains(keyword, ignoreCase = true) ||
+                it.agentName.contains(keyword, ignoreCase = true)
+        }
+        if (metaHits.isNotEmpty()) return@withContext metaHits
+        all.map { it.workspace }.distinct().flatMap { workspace ->
+            search(workspace, keyword)
+        }.sortedWith(compareByDescending<AcpSessionMeta> { it.pinned }.thenByDescending { it.updatedAt })
+    }
+
     suspend fun load(workspace: String, id: String): AcpStoredSession? = withContext(Dispatchers.IO) {
         synchronized(lock) {
             val file = sessionFile(workspaceDir(workspace), id)

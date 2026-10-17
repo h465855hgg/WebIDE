@@ -80,6 +80,9 @@ import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.PictureInPictureAlt
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.LinkOff
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.CropSquare
+import androidx.compose.material.icons.filled.FilterNone
 import androidx.compose.material.icons.filled.CloseFullscreen
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -527,14 +530,8 @@ internal fun AcpPanel(
 
         AnimatedVisibility(
             visible = state.isCollapsed,
-            enter = fadeIn(tween(120)) + scaleIn(
-                initialScale = 0.4f,
-                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy)
-            ),
-            exit = fadeOut(tween(120)) + scaleOut(
-                targetScale = 0.4f,
-                animationSpec = tween(140, easing = FastOutSlowInEasing)
-            )
+            enter = fadeIn(tween(150)),
+            exit = fadeOut(tween(120))
         ) {
             val avScope = this
             Box(modifier = Modifier.fillMaxSize()) {
@@ -762,26 +759,26 @@ private fun AcpHeader(
             }
             Spacer(Modifier.weight(1f))
             IconButton(
-                onClick = { state.isMaximized = !state.isMaximized },
-                modifier = Modifier.size(28.dp)
-            ) {
-                Icon(
-                    if (state.isMaximized) Icons.Default.CloseFullscreen else Icons.Default.Fullscreen,
-                    contentDescription = stringResource(
-                        if (state.isMaximized) R.string.acp_restore else R.string.acp_maximize
-                    ),
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
-            IconButton(
                 onClick = { state.isCollapsed = true },
                 modifier = Modifier.size(28.dp)
             ) {
                 Icon(
-                    Icons.Default.PictureInPictureAlt,
+                    Icons.Default.Remove,
                     contentDescription = stringResource(R.string.acp_action_minimize),
                     modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            IconButton(
+                onClick = { state.isMaximized = !state.isMaximized },
+                modifier = Modifier.size(28.dp)
+            ) {
+                Icon(
+                    if (state.isMaximized) Icons.Default.FilterNone else Icons.Default.CropSquare,
+                    contentDescription = stringResource(
+                        if (state.isMaximized) R.string.acp_restore else R.string.acp_maximize
+                    ),
+                    modifier = Modifier.size(15.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -790,7 +787,7 @@ private fun AcpHeader(
                 modifier = Modifier.size(28.dp)
             ) {
                 Icon(
-                    Icons.Default.Cancel,
+                    Icons.Default.Close,
                     contentDescription = stringResource(R.string.acp_action_hide),
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.error

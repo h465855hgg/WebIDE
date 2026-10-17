@@ -98,7 +98,10 @@ internal fun AcpHistorySheet(
         viewModel.refreshLocalSessions()
     }
     LaunchedEffect(tab) {
-        if (tab == 1) viewModel.refreshSessions()
+        when (tab) {
+            1 -> viewModel.refreshSessions()
+            2 -> viewModel.refreshGlobalSessions()
+        }
     }
 
     ModalBottomSheet(
@@ -158,12 +161,23 @@ internal fun AcpHistorySheet(
                     onClick = { tab = 1 },
                     label = { Text(stringResource(R.string.acp_sessions_agent)) }
                 )
+                FilterChip(
+                    selected = tab == 2,
+                    onClick = { tab = 2 },
+                    label = { Text(stringResource(R.string.acp_sessions_global)) }
+                )
             }
 
-            if (tab == 0) {
+            if (tab != 1) {
                 OutlinedTextField(
-                    value = viewModel.localSearchQuery,
-                    onValueChange = viewModel::updateLocalSearchQuery,
+                    value = if (tab == 0) viewModel.localSearchQuery else viewModel.globalSearchQuery,
+                    onValueChange = { query ->
+                        if (tab == 0) {
+                            viewModel.updateLocalSearchQuery(query)
+                        } else {
+                            viewModel.updateGlobalSearchQuery(query)
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     placeholder = {
@@ -201,10 +215,18 @@ internal fun AcpHistorySheet(
                     onDelete = { meta -> deleteTarget = meta }
                 )
 
-                else -> AgentSessionList(
+                1 -> AgentSessionList(
                     viewModel = viewModel,
                     onOpen = { id ->
                         viewModel.loadSession(id)
+                        onDismiss()
+                    }
+                )
+
+                else -> GlobalSessionList(
+                    viewModel = viewModel,
+                    onOpen = { meta ->
+                        viewModel.openGlobalSession(meta)
                         onDismiss()
                     }
                 )
@@ -450,6 +472,125 @@ private fun LocalSessionList(
                             )
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GlobalSessionList(
+    viewModel: AcpViewModel,
+    onOpen: (AcpSessionMeta) -> Unit
+) {
+    val sessions = viewModel.globalSessions
+    if (viewModel.isLoadingGlobalSessions && sessions.isEmpty()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(160.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+        }
+        return
+    }
+    if (sessions.isEmpty()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(160.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = stringResource(
+                    if (viewModel.globalSearchQuery.isBlank()) {
+                        R.string.acp_sessions_empty_global
+                    } else {
+                        R.string.acp_sessions_empty_search
+                    }
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        return
+    }
+
+    Text(
+        text = stringResource(R.string.acp_sessions_count, sessions.size),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(bottom = 4.dp)
+    )
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(max = 430.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        items(sessions, key = { it.workspace + "/" + it.id }) { meta ->
+            val isCurrent = viewModel.currentSessionMeta?.id == meta.id
+            Surface(
+                onClick = { onOpen(meta) },
+                color = if (isCurrent) {
+                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f)
+                },
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (meta.pinned) {
+                            Icon(
+                                Icons.Default.Star,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .padding(end = 4.dp)
+                                    .size(13.dp),
+                                tint = MaterialTheme.colorScheme.tertiary
+                            )
+                        }
+                        Text(
+                            text = meta.title.ifBlank { stringResource(R.string.acp_session_untitled) },
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                        formatSessionTime(meta.updatedAt)?.let { time ->
+                            Text(
+                                text = time,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    if (meta.preview.isNotBlank()) {
+                        Text(
+                            text = meta.preview,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                    }
+                    Text(
+                        text = stringResource(
+                            R.string.acp_sessions_project,
+                            java.io.File(meta.workspace).name
+                        ) + " · " + meta.agentName.ifBlank { meta.agentId },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 3.dp)
+                    )
                 }
             }
         }

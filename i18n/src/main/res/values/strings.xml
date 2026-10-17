@@ -697,6 +697,9 @@
     <string name="acp_permission_cancelled">已取消</string>
     <string name="acp_permission_inline_hint">权限策略：%1$s</string>
     <string name="acp_sessions_local">本机记录</string>
+    <string name="acp_sessions_global">全局会话</string>
+    <string name="acp_sessions_project">项目：%1$s</string>
+    <string name="acp_sessions_empty_global">还没有全局会话</string>
     <string name="acp_sessions_agent">Agent 会话</string>
     <string name="acp_sessions_search_hint">搜索标题、摘要或正文…</string>
     <string name="acp_sessions_rename">重命名</string>

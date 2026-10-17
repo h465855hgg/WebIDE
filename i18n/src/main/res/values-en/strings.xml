@@ -681,6 +681,9 @@
     <string name="acp_permission_cancelled">Cancelled</string>
     <string name="acp_permission_inline_hint">Policy: %1$s</string>
     <string name="acp_sessions_local">On this device</string>
+    <string name="acp_sessions_global">All sessions</string>
+    <string name="acp_sessions_project">Project: %1$s</string>
+    <string name="acp_sessions_empty_global">No sessions yet</string>
     <string name="acp_sessions_agent">Agent sessions</string>
     <string name="acp_sessions_search_hint">Search title, preview or content…</string>
     <string name="acp_sessions_rename">Rename</string>

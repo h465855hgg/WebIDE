@@ -219,6 +219,16 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
     var isLoadingLocalSessions by mutableStateOf(false)
         private set
 
+    /** 所有项目的本地会话（全局会话页）。 */
+    var globalSessions by mutableStateOf<List<AcpSessionMeta>>(emptyList())
+        private set
+
+    var isLoadingGlobalSessions by mutableStateOf(false)
+        private set
+
+    var globalSearchQuery by mutableStateOf("")
+        private set
+
     /** 当前工作区本地会话占用的字节数。 */
     var storageBytes by mutableStateOf(0L)
         private set
@@ -1285,6 +1295,47 @@ internal class AcpViewModel(application: Application) : AndroidViewModel(applica
             } finally {
                 isLoadingLocalSessions = false
             }
+        }
+    }
+
+    fun refreshGlobalSessions() {
+        isLoadingGlobalSessions = true
+        viewModelScope.launch {
+            try {
+                globalSessions = if (globalSearchQuery.isBlank()) {
+                    sessionStore.listAll()
+                } else {
+                    sessionStore.searchAll(globalSearchQuery)
+                }
+            } finally {
+                isLoadingGlobalSessions = false
+            }
+        }
+    }
+
+    fun updateGlobalSearchQuery(query: String) {
+        globalSearchQuery = query
+        refreshGlobalSessions()
+    }
+
+    fun openGlobalSession(meta: AcpSessionMeta) {
+        viewModelScope.launch {
+            persistCurrentNow()
+            val stored = sessionStore.load(meta.workspace, meta.id) ?: return@launch
+            timeline.clear()
+            timeline.addAll(stored.items)
+            sessionId = meta.id
+            currentSessionMeta = meta
+            usage.reset()
+            usage.applyModel(meta.model)
+            usage.restore(
+                input = meta.inputTokens,
+                output = meta.outputTokens,
+                turns = meta.turns,
+                toolCalls = stored.items.count { it is AcpToolCallItem },
+                items = stored.items
+            )
+            isReadOnlyReplay = true
         }
     }
 
